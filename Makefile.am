@@ -42,6 +42,7 @@ ell_sources = ell/private.h \
 			ell/utf8.c \
 			ell/queue.c \
 			ell/timeout.c \
+			ell/main-private.h \
 			ell/main.c \
 			ell/idle.c \
 			ell/signal.c \
