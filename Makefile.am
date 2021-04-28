@@ -6,11 +6,11 @@ noinst_LTLIBRARIES =
 if EXTERNAL_ELL
 ell_cflags = @ELL_CFLAGS@
 ell_ldadd = @ELL_LIBS@
-ell_built_sources =
+ell_built_sources = ell/shared
 else
 ell_cflags =
 ell_ldadd = ell/libell-internal.la
-ell_built_sources = ell/internal ell/ell.h
+ell_built_sources = ell/shared ell/internal ell/ell.h
 
 noinst_LTLIBRARIES += ell/libell-internal.la
 
@@ -57,7 +57,9 @@ ell_sources = ell/private.h \
 			ell/string.c \
 			ell/gpio.c
 
-ell_libell_internal_la_SOURCES = $(ell_headers) $(ell_sources)
+ell_shared = ell/useful.h
+
+ell_libell_internal_la_SOURCES = $(ell_headers) $(ell_sources) $(ell_shared)
 endif
 
 pkginclude_HEADERS = include/log.h include/plugin.h include/history.h \
@@ -1104,6 +1106,14 @@ include/ofono/version.h: include/version.h
 include/ofono/%.h: $(abs_top_srcdir)/include/%.h
 	$(AM_V_at)$(MKDIR_P) include/ofono
 	$(AM_V_GEN)$(LN_S) $< $@
+
+ell/shared: Makefile
+	$(AM_V_at)$(MKDIR_P) ell
+	$(AM_V_GEN)for f in $(ell_shared) ; do \
+		if [ ! -f $$f ] ; then \
+			$(LN_S) -t ell -f $(abs_srcdir)/../ell/$$f ; \
+		fi \
+	done > $@
 
 ell/internal: Makefile
 	$(AM_V_at)$(MKDIR_P) ell
