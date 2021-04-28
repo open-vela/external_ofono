@@ -1606,7 +1606,7 @@ GSList *sim_parse_app_template_entries(const unsigned char *buffer, int len)
 		} else
 			app.label = NULL;
 
-		ret = g_slist_prepend(ret, g_memdup(&app, sizeof(app)));
+		ret = g_slist_prepend(ret, g_memdup2(&app, sizeof(app)));
 
 		len -= (dataobj - buffer) + dataobj_len;
 		buffer = dataobj + dataobj_len;
