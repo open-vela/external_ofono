@@ -501,7 +501,7 @@ static bool message_iter_next_entry_valist(struct mbim_message_iter *orig,
 			signature += 1;
 			indent += 1;
 
-			if (unlikely(indent > MAX_NESTING))
+			if (indent > MAX_NESTING)
 				return false;
 
 			if (!_iter_enter_struct(iter, &stack[indent - 1]))
@@ -511,7 +511,7 @@ static bool message_iter_next_entry_valist(struct mbim_message_iter *orig,
 
 			break;
 		case ')':
-			if (unlikely(indent == 0))
+			if (indent == 0)
 				return false;
 
 			signature += 1;
@@ -562,7 +562,7 @@ bool mbim_message_iter_next_entry(struct mbim_message_iter *iter, ...)
 	va_list args;
 	bool result;
 
-	if (unlikely(!iter))
+	if (!iter)
 		return false;
 
 	va_start(args, iter);
@@ -675,7 +675,7 @@ struct mbim_message *mbim_message_new(const uint8_t *uuid, uint32_t cid,
 
 struct mbim_message *mbim_message_ref(struct mbim_message *msg)
 {
-	if (unlikely(!msg))
+	if (!msg)
 		return NULL;
 
 	__sync_fetch_and_add(&msg->ref_count, 1);
@@ -687,7 +687,7 @@ void mbim_message_unref(struct mbim_message *msg)
 {
 	unsigned int i;
 
-	if (unlikely(!msg))
+	if (!msg)
 		return;
 
 	if (__sync_sub_and_fetch(&msg->ref_count, 1))
@@ -760,10 +760,10 @@ uint32_t mbim_message_get_error(struct mbim_message *message)
 {
 	struct mbim_message_header *hdr;
 
-	if (unlikely(!message))
+	if (!message)
 		return false;
 
-	if (unlikely(!message->sealed))
+	if (!message->sealed)
 		return false;
 
 	hdr = (struct mbim_message_header *) message->header;
@@ -776,7 +776,7 @@ uint32_t mbim_message_get_error(struct mbim_message *message)
 
 uint32_t mbim_message_get_cid(struct mbim_message *message)
 {
-	if (unlikely(!message))
+	if (!message)
 		return false;
 
 	return message->cid;
@@ -784,7 +784,7 @@ uint32_t mbim_message_get_cid(struct mbim_message *message)
 
 const uint8_t *mbim_message_get_uuid(struct mbim_message *message)
 {
-	if (unlikely(!message))
+	if (!message)
 		return false;
 
 	return message->uuid;
@@ -800,10 +800,10 @@ bool mbim_message_get_arguments(struct mbim_message *message,
 	uint32_t type;
 	size_t begin;
 
-	if (unlikely(!message))
+	if (!message)
 		return false;
 
-	if (unlikely(!message->sealed))
+	if (!message->sealed)
 		return false;
 
 	hdr = (struct mbim_message_header *) message->header;
@@ -834,10 +834,10 @@ static bool _mbim_message_get_data(struct mbim_message *message,
 	size_t pos;
 	uint32_t i;
 
-	if (unlikely(!message))
+	if (!message)
 		return false;
 
-	if (unlikely(!message->sealed))
+	if (!message->sealed)
 		return false;
 
 	hdr = (struct mbim_message_header *) message->header;
@@ -1008,7 +1008,7 @@ struct mbim_message_builder *mbim_message_builder_new(struct mbim_message *msg)
 	uint32_t type;
 	struct container *container;
 
-	if (unlikely(!msg))
+	if (!msg)
 		return NULL;
 
 	if (msg->sealed)
@@ -1033,7 +1033,7 @@ void mbim_message_builder_free(struct mbim_message_builder *builder)
 {
 	uint32_t i;
 
-	if (unlikely(!builder))
+	if (!builder)
 		return;
 
 	mbim_message_unref(builder->message);
@@ -1060,10 +1060,10 @@ bool mbim_message_builder_append_basic(struct mbim_message_builder *builder,
 	size_t len;
 	uint16_t *utf16;
 
-	if (unlikely(!builder))
+	if (!builder)
 		return false;
 
-	if (unlikely(!strchr(simple_types, type)))
+	if (!strchr(simple_types, type))
 		return false;
 
 	alignment = get_alignment(type);
@@ -1168,16 +1168,16 @@ bool mbim_message_builder_append_bytes(struct mbim_message_builder *builder,
 	struct container *container = &builder->stack[builder->index];
 	size_t start;
 
-	if (unlikely(!builder))
+	if (!builder)
 		return false;
 
 	if (container->container_type == CONTAINER_TYPE_ARRAY) {
 		struct container *array;
 
-		if (unlikely(container->sigindex != 0))
+		if (container->sigindex != 0)
 			return false;
 
-		if (unlikely(container->signature[container->sigindex] != 'y'))
+		if (container->signature[container->sigindex] != 'y')
 			return false;
 
 		array = container;
@@ -1247,12 +1247,12 @@ bool mbim_message_builder_leave_struct(struct mbim_message_builder *builder)
 	struct container *array = NULL;
 	size_t start;
 
-	if (unlikely(builder->index == 0))
+	if (builder->index == 0)
 		return false;
 
 	container = &builder->stack[builder->index];
 
-	if (unlikely(container->container_type != CONTAINER_TYPE_STRUCT))
+	if (container->container_type != CONTAINER_TYPE_STRUCT)
 		return false;
 
 	builder->index -= 1;
@@ -1339,12 +1339,12 @@ bool mbim_message_builder_leave_array(struct mbim_message_builder *builder)
 {
 	struct container *container;
 
-	if (unlikely(builder->index == 0))
+	if (builder->index == 0)
 		return false;
 
 	container = &builder->stack[builder->index];
 
-	if (unlikely(container->container_type != CONTAINER_TYPE_ARRAY))
+	if (container->container_type != CONTAINER_TYPE_ARRAY)
 		return false;
 
 	builder->index -= 1;
@@ -1381,12 +1381,12 @@ bool mbim_message_builder_leave_databuf(struct mbim_message_builder *builder)
 	struct container *parent;
 	size_t start;
 
-	if (unlikely(builder->index == 0))
+	if (builder->index == 0)
 		return false;
 
 	container = &builder->stack[builder->index];
 
-	if (unlikely(container->container_type != CONTAINER_TYPE_DATABUF))
+	if (container->container_type != CONTAINER_TYPE_DATABUF)
 		return false;
 
 	builder->index -= 1;
@@ -1415,7 +1415,7 @@ struct mbim_message *mbim_message_builder_finalize(
 	struct container *root;
 	struct mbim_message_header *hdr;
 
-	if (unlikely(!builder))
+	if (!builder)
 		return NULL;
 
 	if (builder->index != 0)
@@ -1701,10 +1701,10 @@ bool mbim_message_set_arguments(struct mbim_message *message,
 	va_list args;
 	bool result;
 
-	if (unlikely(!message))
+	if (!message)
 		return false;
 
-	if (unlikely(message->sealed))
+	if (message->sealed)
 		return false;
 
 	if (!signature)
