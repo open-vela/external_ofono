@@ -38,6 +38,7 @@
 #include "util.h"
 #include "storage.h"
 #include "smsutil.h"
+#include "missing.h"
 
 #define uninitialized_var(x) x = x
 
