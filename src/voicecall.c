@@ -38,6 +38,7 @@
 #include "simutil.h"
 #include "smsutil.h"
 #include "storage.h"
+#include "missing.h"
 
 #define MAX_VOICE_CALLS 16
 

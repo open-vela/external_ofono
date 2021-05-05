@@ -36,6 +36,7 @@
 #include "simutil.h"
 #include "util.h"
 #include "storage.h"
+#include "missing.h"
 
 #define SETTINGS_STORE "netreg"
 #define SETTINGS_GROUP "Settings"
