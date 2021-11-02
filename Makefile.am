@@ -32,7 +32,8 @@ ell_headers = ell/util.h \
 			ell/file.h \
 			ell/uintset.h \
 			ell/string.h \
-			ell/gpio.h
+			ell/gpio.h \
+			ell/cleanup.h
 
 ell_sources = ell/private.h \
 			ell/missing.h \
