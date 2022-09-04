@@ -395,6 +395,10 @@ static void gsm_end(GMarkupParseContext *context, const gchar *element_name,
 	if (ap == NULL)
 		return;
 
+	/* select authentication method NONE if others cannot be used */
+	if (!ap->username || (!ap->username && !ap->password))
+		ap->auth_method = OFONO_GPRS_AUTH_METHOD_NONE;
+
 	if (gsm->allow_duplicates == FALSE) {
 		GSList *l;
 
