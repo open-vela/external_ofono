@@ -605,9 +605,12 @@ static void qinistat_cb(gboolean ok, GAtResult *result, gpointer user_data)
 	case QUECTEL_EC200:
 		/*
 		 * EC200T doesn't indicate that the Phonebook initialization
-		 * is completed (==4) when AT+CFUN=4, that's why 1 + 2 = 3
+		 * of some SIM cards is completed (==4) when AT+CFUN=4,
+		 * that's why 1 + 2 = 3
 		 */
 		ready = 3;
+		if ((status & ready) == ready)
+			ready = status;
 		break;
 	case QUECTEL_M95:
 	case QUECTEL_MC60:
@@ -827,6 +830,8 @@ static void setup_aux(struct ofono_modem *modem)
 				NULL, NULL, NULL);
 	} else if (data->model == QUECTEL_EC200) {
 		g_at_chat_send(data->aux, "ATE0; &C0; +CMEE=1", none_prefix,
+				NULL, NULL, NULL);
+		g_at_chat_send(data->aux, "AT+QCFG=\"servicedomain\",2", none_prefix,
 				NULL, NULL, NULL);
 	} else
 		g_at_chat_send(data->aux, "ATE0; &C0; +CMEE=1; +QIURC=0",
