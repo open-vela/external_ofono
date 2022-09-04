@@ -94,7 +94,7 @@ static int config_file_provision_get_settings(const char *mcc,
 		(*settings)[0].password = value;
 
 	/* select default authentication method */
-	(*settings)[0].auth_method = OFONO_GPRS_AUTH_METHOD_NONE;
+	(*settings)[0].auth_method = OFONO_GPRS_AUTH_METHOD_CHAP;
 
 	value = g_key_file_get_string(key_file, setting_group,
 					"internet.AuthenticationMethod", NULL);
