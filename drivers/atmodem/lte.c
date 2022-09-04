@@ -82,7 +82,8 @@ static void at_lte_set_default_attach_info_cb(gboolean ok, GAtResult *result,
 	auth_method = ldd->pending_info.auth_method;
 
 	/* change the authentication method if the  parameters are invalid */
-	if (!*ldd->pending_info.username || !*ldd->pending_info.password)
+	if (!*ldd->pending_info.username ||
+		(!*ldd->pending_info.username && !*ldd->pending_info.password))
 		auth_method = OFONO_GPRS_AUTH_METHOD_NONE;
 
 	len = snprintf(buf, buflen, "AT+CGAUTH=0,%d",
