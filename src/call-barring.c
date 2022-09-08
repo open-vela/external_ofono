@@ -766,14 +766,14 @@ static gboolean cb_lock_property_lookup(const char *property, const char *value,
 		prefix = bearer_class_to_string(i);
 		len = strlen(prefix);
 
-		if (!strncmp(property, prefix, len))
+		if (!strncmp(property, prefix, len)) {
+			property += len;
 			break;
+		}
 	}
 
 	if (i > BEARER_CLASS_PAD)
 		return FALSE;
-
-	property += len;
 
 	if (!strcmp(property, "Outgoing")) {
 		start = CB_OUTGOING_START;
