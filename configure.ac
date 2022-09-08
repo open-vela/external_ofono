@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([ofono], [1.34])
+AC_INIT([ofono], [2.0])
 
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_AUX_DIR(build-aux)
