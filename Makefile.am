@@ -1,6 +1,8 @@
 
 AM_MAKEFLAGS = --no-print-directory
 
+ACLOCAL_AMFLAGS = -I build-aux
+
 noinst_LTLIBRARIES =
 
 if EXTERNAL_ELL
@@ -1133,7 +1135,7 @@ ell/ell.h: Makefile
 	done
 
 maintainer-clean-local:
-	-rm -rf ell
+	-rm -rf build-aux ell
 
 clean-local:
 	@$(RM) -rf include/ofono

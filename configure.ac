@@ -1,8 +1,12 @@
 AC_PREREQ([2.69])
 AC_INIT([ofono], [1.34])
 
-AM_INIT_AUTOMAKE([foreign subdir-objects color-tests])
 AC_CONFIG_HEADERS(config.h)
+AC_CONFIG_AUX_DIR(build-aux)
+AC_CONFIG_MACRO_DIR(build-aux)
+
+AM_INIT_AUTOMAKE([foreign subdir-objects color-tests silent-rules
+					tar-pax no-dist-gzip dist-xz])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
