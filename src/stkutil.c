@@ -6339,7 +6339,7 @@ char *stk_text_to_html(const char *utf8,
 
 	for (pos = 0; pos <= text_len; pos++) {
 		wchar_t c;
-		int len;
+		int clen;
 
 		attr = formats[pos];
 		if (attr != prev_attr) {
@@ -6355,16 +6355,16 @@ char *stk_text_to_html(const char *utf8,
 		if (pos == text_len)
 			break;
 
-		len = l_utf8_get_codepoint(text, 4, &c);
+		clen = l_utf8_get_codepoint(text, 4, &c);
 		switch (c) {
 		case '\n':
 			l_string_append(string, "<br/>");
 			break;
 		case '\r':
 			/* If the next character is a newline, consume it */
-			if ((pos + 1 < text_len) && (text[len] == '\n')) {
+			if ((pos + 1 < text_len) && (text[clen] == '\n')) {
 				pos += 1;
-				len += 1;
+				clen += 1;
 			}
 
 			l_string_append(string, "<br/>");
@@ -6379,10 +6379,10 @@ char *stk_text_to_html(const char *utf8,
 			l_string_append(string, "&amp;");
 			break;
 		default:
-			l_string_append_fixed(string, text, len);
+			l_string_append_fixed(string, text, clen);
 		}
 
-		text += len;
+		text += clen;
 	}
 
 	l_free(formats);
