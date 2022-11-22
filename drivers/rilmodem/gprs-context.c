@@ -432,13 +432,10 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	/* Split DNS addresses */
 	if (raw_dns) {
 		char **dns_addrs = g_strsplit(raw_dns, " ", 3);
-		enum ofono_gprs_context_type type =
-					ofono_gprs_context_get_type(gc);
 
 		/* Check for valid DNS settings, except for MMS contexts */
-		if (type != OFONO_GPRS_CONTEXT_TYPE_MMS &&
-				(dns_addrs == NULL ||
-					g_strv_length(dns_addrs) == 0)) {
+		if (ofono_gprs_context_get_type(gc) != OFONO_GPRS_CONTEXT_TYPE_MMS &&
+		    (dns_addrs == NULL || g_strv_length(dns_addrs) == 0)) {
 			g_strfreev(dns_addrs);
 			ofono_error("%s: no DNS: %s", __func__, raw_dns);
 			goto error_free;

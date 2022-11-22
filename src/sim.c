@@ -767,7 +767,7 @@ error:
 		if (set_ok)
 			return NULL;
 	} else if (!strcmp(name, "ActiveCardSlot")) {
-		dbus_uint32_t value;
+		dbus_uint32_t slot;
 
 		dbus_message_iter_next(&iter);
 
@@ -782,18 +782,18 @@ error:
 		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_UINT32)
 			return __ofono_error_invalid_args(msg);
 
-		dbus_message_iter_get_basic(&var, &value);
+		dbus_message_iter_get_basic(&var, &slot);
 
-		if (value <= 0 || value > sim->card_slot_count)
+		if (slot <= 0 || slot > sim->card_slot_count)
 			return __ofono_error_invalid_args(msg);
 
-		if (sim->active_card_slot == value)
+		if (sim->active_card_slot == slot)
 			return dbus_message_new_method_return(msg);
 
 		sim->pending = dbus_message_ref(msg);
-		sim->pending_active_card_slot = value;
+		sim->pending_active_card_slot = slot;
 
-		sim->driver->set_active_card_slot(sim, value - 1,
+		sim->driver->set_active_card_slot(sim, slot - 1,
 							sim_set_slot_callback,
 							sim);
 		return NULL;
