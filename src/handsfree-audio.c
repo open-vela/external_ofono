@@ -660,21 +660,21 @@ ofono_bool_t ofono_handsfree_audio_has_transparent_sco(void)
 	return transparent_sco;
 }
 
-static void agent_free(struct agent *agent)
+static void agent_free(struct agent *p_agent)
 {
-	if (agent->watch > 0)
-		g_dbus_remove_watch(ofono_dbus_get_connection(), agent->watch);
+	if (p_agent->watch > 0)
+		g_dbus_remove_watch(ofono_dbus_get_connection(), p_agent->watch);
 
-	g_free(agent->owner);
-	g_free(agent->path);
-	g_free(agent);
+	g_free(p_agent->owner);
+	g_free(p_agent->path);
+	g_free(p_agent);
 }
 
-static void agent_release(struct agent *agent)
+static void agent_release(struct agent *p_agent)
 {
 	DBusMessage *msg;
 
-	msg = dbus_message_new_method_call(agent->owner, agent->path,
+	msg = dbus_message_new_method_call(p_agent->owner, p_agent->path,
 					HFP_AUDIO_AGENT_INTERFACE, "Release");
 
 	g_dbus_send_message(ofono_dbus_get_connection(), msg);
