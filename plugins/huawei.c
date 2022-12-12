@@ -93,6 +93,19 @@ struct huawei_data {
 	gboolean have_ussdmode;
 };
 
+#ifndef UDEV
+static ofono_bool_t huawei_find(struct ofono_modem *modem, void *user_data)
+{
+  const char *value = ofono_modem_get_string(modem, "type");
+  if (value != NULL)
+    {
+      return !strcmp(value, "huawei");
+    }
+
+  return false;
+}
+#endif
+
 static int huawei_probe(struct ofono_modem *modem)
 {
 	struct huawei_data *data;
@@ -918,11 +931,37 @@ static struct ofono_modem_driver huawei_driver = {
 
 static int huawei_init(void)
 {
-	return ofono_modem_driver_register(&huawei_driver);
+#ifndef UDEV
+	struct ofono_modem *modem;
+#endif
+	int ret;
+
+	ret = ofono_modem_driver_register(&huawei_driver);
+	if (ret < 0)
+	    return ret;
+
+#ifndef UDEV
+	modem = ofono_modem_create(NULL, "huawei");
+	if (modem == NULL)
+		return TRUE;
+
+	ofono_modem_set_string(modem, "type", "huawei");
+	ofono_modem_set_string(modem, "Modem", "/dev/ttyMODEM");
+	ofono_modem_set_string(modem, "Pcui", "/dev/ttyPCUI");
+	return ofono_modem_register(modem);
+#endif
 }
 
 static void huawei_exit(void)
 {
+#ifndef UDEV
+	struct ofono_modem *modem;
+
+	modem = ofono_modem_find(huawei_find, NULL);
+	if (modem != NULL)
+		ofono_modem_remove(modem);
+	else
+#endif
 	ofono_modem_driver_unregister(&huawei_driver);
 }
 
