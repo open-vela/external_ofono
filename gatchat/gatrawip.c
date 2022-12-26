@@ -28,7 +28,12 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#ifdef __NuttX__
+#include <nuttx/net/ioctl.h>
+#include <nuttx/net/tun.h>
+#else
 #include <linux/if_tun.h>
+#endif
 
 #include <glib.h>
 
