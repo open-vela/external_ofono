@@ -290,7 +290,9 @@ int __ofono_log_init(const char *program, const char *debug,
 						ofono_bool_t detach)
 {
 	static char path[PATH_MAX];
+#ifdef HAVE_OPENLOG
 	int option = LOG_NDELAY | LOG_PID;
+#endif
 
 	program_exec = program;
 	program_path = getcwd(path, sizeof(path));
@@ -300,14 +302,18 @@ int __ofono_log_init(const char *program, const char *debug,
 
 	__ofono_log_enable(__start___debug, __stop___debug);
 
+#ifdef HAVE_OPENLOG
 	if (detach == FALSE)
 		option |= LOG_PERROR;
+#endif
 
 #ifdef __GLIBC__
 	signal_setup(signal_handler);
 #endif
 
+#ifdef HAVE_OPENLOG
 	openlog(basename(program), option, LOG_DAEMON);
+#endif
 
 	syslog(LOG_INFO, "oFono version %s", VERSION);
 
@@ -318,7 +324,9 @@ void __ofono_log_cleanup(void)
 {
 	syslog(LOG_INFO, "Exit");
 
+#ifdef HAVE_OPENLOG
 	closelog();
+#endif
 
 #ifdef __GLIBC__
 	signal_setup(SIG_DFL);
