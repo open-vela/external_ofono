@@ -1073,7 +1073,8 @@ int sim_fs_read(struct ofono_sim_context *context, int id,
 	op->num_bytes = num_bytes;
 	op->info_only = FALSE;
 	op->context = context;
-	memcpy(op->path, path, path_len);
+	if (path != NULL)
+		memcpy(op->path, path, path_len);
 	op->path_len = path_len;
 
 	g_queue_push_tail(fs->op_q, op);
