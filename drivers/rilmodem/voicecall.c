@@ -653,14 +653,13 @@ static void ril_ss_notify(struct ril_msg *message, gpointer user_data)
 static void ril_ecc_list_notify(struct ril_msg* message, gpointer user_data)
 {
 		struct ofono_voicecall *vc = user_data;
-		struct ril_voicecall_data* vd = ofono_voicecall_get_data(vc);
 		struct parcel rilp;
 
 		g_ril_init_parcel(message, &rilp);
 		struct parcel_str_array* ecc_list_st = parcel_r_str_array(&rilp);
 
 		if (ecc_list_st) {
-			ofono_voicecall_en_list_notify(vc, &ecc_list_st->str);
+			ofono_voicecall_en_list_notify(vc, ecc_list_st->str);
 			parcel_free_str_array(ecc_list_st);
 		}
 }
