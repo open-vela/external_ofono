@@ -38,9 +38,9 @@
 #include "common.h"
 #include "storage.h"
 
-#define SETTINGS_STORE "lte"
+#define SETTINGS_STORE "gprs"
 #define SETTINGS_GROUP "Settings"
-#define LTE_APN "DefaultAccessPointName"
+#define LTE_APN "AccessPointName"
 #define LTE_PROTO "Protocol"
 #define LTE_USERNAME "Username"
 #define LTE_PASSWORD "Password"
@@ -62,10 +62,13 @@ static GSList *g_drivers = NULL;
 static void lte_load_settings(struct ofono_lte *lte)
 {
 	char *apn;
+	char *type_str;
 	char *proto_str;
 	char *auth_method_str;
 	char *username;
 	char *password;
+	char **groups;
+	ofono_bool_t ia_apn_exiting;
 
 	if (lte->imsi == NULL)
 		return;
@@ -78,45 +81,63 @@ static void lte_load_settings(struct ofono_lte *lte)
 		return;
 	}
 
-	apn = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
-				LTE_APN, NULL);
-	proto_str = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
-				LTE_PROTO, NULL);
-	auth_method_str = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
-				LTE_AUTH_METHOD, NULL);
-	username = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
-				LTE_USERNAME, NULL);
-	password = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
-				LTE_PASSWORD, NULL);
-	if (apn && is_valid_apn(apn))
-		strcpy(lte->info.apn, apn);
+	groups = g_key_file_get_groups(lte->settings, NULL);
 
-	if (proto_str == NULL)
-		proto_str = g_strdup("ip");
+	for (int i = 0; groups[i]; i++) {
+		type_str = g_key_file_get_string(lte->settings, groups[i], "Type", NULL);
 
-	/* this must have a valid default */
-	if (!gprs_proto_from_string(proto_str, &lte->info.proto))
-		lte->info.proto = OFONO_GPRS_PROTO_IP;
+		if (strcasecmp(type_str, "ia") == 0) {
+			apn = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
+						LTE_APN, NULL);
+			proto_str = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
+						LTE_PROTO, NULL);
+			auth_method_str = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
+						LTE_AUTH_METHOD, NULL);
+			username = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
+						LTE_USERNAME, NULL);
+			password = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
+						LTE_PASSWORD, NULL);
+			if (apn && is_valid_apn(apn))
+				strcpy(lte->info.apn, apn);
 
-	if (auth_method_str == NULL)
-		auth_method_str = g_strdup("none");
+			if (proto_str == NULL)
+				proto_str = g_strdup("ip");
 
-	/* this must have a valid default */
-	if (!gprs_auth_method_from_string(auth_method_str,
-							&lte->info.auth_method))
-		lte->info.auth_method = OFONO_GPRS_AUTH_METHOD_NONE;
+			/* this must have a valid default */
+			if (!gprs_proto_from_string(proto_str, &lte->info.proto))
+				lte->info.proto = OFONO_GPRS_PROTO_IP;
 
-	if (username && strlen(username) <= OFONO_GPRS_MAX_USERNAME_LENGTH)
-		strcpy(lte->info.username, username);
+			if (auth_method_str == NULL)
+				auth_method_str = g_strdup("none");
 
-	if (password && strlen(password) <= OFONO_GPRS_MAX_PASSWORD_LENGTH)
-		strcpy(lte->info.password, password);
+			/* this must have a valid default */
+			if (!gprs_auth_method_from_string(auth_method_str,
+									&lte->info.auth_method))
+				lte->info.auth_method = OFONO_GPRS_AUTH_METHOD_NONE;
 
-	g_free(apn);
-	g_free(proto_str);
-	g_free(auth_method_str);
-	g_free(username);
-	g_free(password);
+			if (username && strlen(username) <= OFONO_GPRS_MAX_USERNAME_LENGTH)
+				strcpy(lte->info.username, username);
+
+			if (password && strlen(password) <= OFONO_GPRS_MAX_PASSWORD_LENGTH)
+				strcpy(lte->info.password, password);
+
+			g_free(apn);
+			g_free(proto_str);
+			g_free(auth_method_str);
+			g_free(username);
+			g_free(password);
+
+			ia_apn_exiting = TRUE;
+		}
+
+		if (type_str != NULL)
+			g_free(type_str);
+
+		if (ia_apn_exiting)
+			break;
+	}
+
+	g_strfreev(groups);
 }
 
 static DBusMessage *lte_get_properties(DBusConnection *conn,
