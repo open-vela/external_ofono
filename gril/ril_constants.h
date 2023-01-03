@@ -391,6 +391,8 @@
 #define RIL_UNSOL_VOICE_RADIO_TECH_CHANGED 1035
 #define RIL_UNSOL_CELL_INFO_LIST 1036
 
+#define RIL_UNSOL_EMERGENCY_NUMBER_LIST 1102
+
 /* Suplementary services Service class*/
 #define SERVICE_CLASS_NONE 0
 

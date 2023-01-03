@@ -650,7 +650,22 @@ static void ril_ss_notify(struct ril_msg *message, gpointer user_data)
 		ofono_voicecall_ssn_mo_notify(vc, 0, code, index);
 }
 
-void ril_answer(struct ofono_voicecall *vc, ofono_voicecall_cb_t cb, void *data)
+static void ril_ecc_list_notify(struct ril_msg* message, gpointer user_data)
+{
+		struct ofono_voicecall *vc = user_data;
+		struct ril_voicecall_data* vd = ofono_voicecall_get_data(vc);
+		struct parcel rilp;
+
+		g_ril_init_parcel(message, &rilp);
+		struct parcel_str_array* ecc_list_st = parcel_r_str_array(&rilp);
+
+		if (ecc_list_st) {
+			ofono_voicecall_en_list_notify(vc, &ecc_list_st->str);
+			parcel_free_str_array(ecc_list_st);
+		}
+}
+
+void ril_answer(struct ofono_voicecall* vc, ofono_voicecall_cb_t cb, void* data)
 {
 	DBG("Answering current call");
 
@@ -814,6 +829,9 @@ static gboolean ril_delayed_register(gpointer user_data)
 	/* Unsol when call set on hold */
 	g_ril_register(vd->ril, RIL_UNSOL_SUPP_SVC_NOTIFICATION,
 			ril_ss_notify, vc);
+
+	g_ril_register(vd->ril, RIL_UNSOL_EMERGENCY_NUMBER_LIST,
+			ril_ecc_list_notify, vc);
 
 	/* request supplementary service notifications*/
 	parcel_init(&rilp);
