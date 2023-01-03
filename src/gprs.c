@@ -181,6 +181,8 @@ static const char *gprs_context_default_name(enum ofono_gprs_context_type type)
 		return "WAP";
 	case OFONO_GPRS_CONTEXT_TYPE_IMS:
 		return "IMS";
+	case OFONO_GPRS_CONTEXT_TYPE_IA:
+		return "IA";
 	}
 
 	return NULL;
@@ -200,6 +202,8 @@ static const char *gprs_context_type_to_string(
 		return "wap";
 	case OFONO_GPRS_CONTEXT_TYPE_IMS:
 		return "ims";
+	case OFONO_GPRS_CONTEXT_TYPE_IA:
+		return "ia";
 	}
 
 	return NULL;
