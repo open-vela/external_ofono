@@ -215,7 +215,8 @@ builtin_sources += drivers/rilmodem/rilmodem.h \
 			drivers/rilmodem/stk.c \
 			drivers/rilmodem/cbs.c \
 			drivers/infineonmodem/infineon_constants.h \
-			drivers/rilmodem/lte.c
+			drivers/rilmodem/lte.c \
+			drivers/rilmodem/ims.c
 endif
 
 if ISIMODEM
