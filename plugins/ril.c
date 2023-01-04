@@ -45,6 +45,7 @@
 #include <ofono/cbs.h>
 #include <ofono/sim.h>
 #include <ofono/ussd.h>
+#include <ofono/ims.h>
 #include <ofono/call-forwarding.h>
 #include <ofono/call-settings.h>
 #include <ofono/call-barring.h>
@@ -246,6 +247,7 @@ void ril_post_online(struct ofono_modem *modem)
 	ofono_call_barring_create(modem, rd->vendor, RILMODEM, rd->ril);
 	gprs = ofono_gprs_create(modem, rd->vendor, RILMODEM, rd->ril);
 	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	ofono_ims_create(modem, RILMODEM, rd->ril);
 
 	if (gc) {
 		ofono_gprs_context_set_type(gc,
