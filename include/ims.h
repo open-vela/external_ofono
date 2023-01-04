@@ -46,6 +46,8 @@ struct ofono_ims_driver {
 				ofono_ims_register_cb_t cb, void *data);
 	void (*registration_status)(struct ofono_ims *ims,
 				ofono_ims_status_cb_t cb, void *data);
+	void (*set_capable)(struct ofono_ims *ims, int cap,
+				ofono_ims_register_cb_t cb, void *data);
 };
 
 void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,

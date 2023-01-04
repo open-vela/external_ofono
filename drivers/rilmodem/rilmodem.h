@@ -81,3 +81,6 @@ extern void ril_cbs_exit(void);
 
 extern void ril_lte_init(void);
 extern void ril_lte_exit(void);
+
+extern void ril_ims_init(void);
+extern void ril_ims_exit(void);

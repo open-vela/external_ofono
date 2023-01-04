@@ -239,6 +239,46 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 	return NULL;
 }
 
+static void set_capability_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_ims *ims = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during set capability");
+		reply = __ofono_error_failed(ims->pending);
+		__ofono_dbus_pending_reply(&ims->pending, reply);
+		return;
+	}
+
+	reply = dbus_message_new_method_return(ims->pending);
+
+	__ofono_dbus_pending_reply(&ims->pending, reply);
+}
+
+static DBusMessage *ofono_ims_set_capability(DBusConnection *conn,
+						DBusMessage *msg, void *data)
+{
+	struct ofono_ims *ims = data;
+	int cap;
+
+	if (ims->pending)
+		return __ofono_error_busy(msg);
+
+	if (ims->driver->set_capable == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &cap,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	ims->pending = dbus_message_ref(msg);
+
+	ims->driver->set_capable(ims, cap, set_capability_cb, ims);
+
+	return NULL;
+}
+
 static const GDBusMethodTable ims_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -247,6 +287,9 @@ static const GDBusMethodTable ims_methods[] = {
 			ofono_ims_send_register) },
 	{ GDBUS_ASYNC_METHOD("Unregister", NULL, NULL,
 			ofono_ims_unregister) },
+	{ GDBUS_ASYNC_METHOD("SetCapability",
+			GDBUS_ARGS({ "capable", "i" }), NULL,
+			ofono_ims_set_capability) },
 	{ }
 };
 
