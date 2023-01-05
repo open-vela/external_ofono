@@ -32,9 +32,13 @@
 
 #include "ofono.h"
 #include "common.h"
+#include "storage.h"
 #include "missing.h"
 
 #define DEFAULT_POWERED_TIMEOUT (20)
+#define SETTINGS_KEY "modem"
+#define SETTINGS_STORE "store"
+#define SETTINGS_GROUP "Settings"
 
 static GSList *g_devinfo_drivers;
 static GSList *g_driver_list;
@@ -90,6 +94,7 @@ struct ofono_modem {
 	void			*driver_data;
 	char			*driver_type;
 	char			*name;
+	GKeyFile		*settings;
 };
 
 struct ofono_devinfo {
@@ -137,6 +142,38 @@ static const char *modem_type_to_string(enum ofono_modem_type type)
 	}
 
 	return "unknown";
+}
+
+static void modem_load_settings(struct ofono_modem *modem)
+{
+	GError *error;
+	modem->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
+	if (modem->settings == NULL) {
+		return;
+	}
+
+	error = NULL;
+	modem->online = g_key_file_get_boolean(modem->settings,
+						SETTINGS_GROUP,
+						"Online",
+						&error);
+	if (error) {
+		g_error_free(error);
+		modem->online = FALSE;
+		g_key_file_set_boolean(modem->settings, SETTINGS_GROUP,
+							"Online",
+							modem->online);
+		storage_sync(SETTINGS_KEY, SETTINGS_STORE, modem->settings);
+	}
+}
+
+static void modem_close_settings(struct ofono_modem *modem)
+{
+	if (modem->settings) {
+		storage_close(SETTINGS_KEY, SETTINGS_STORE, modem->settings, TRUE);
+
+		modem->settings = NULL;
+	}
 }
 
 unsigned int __ofono_modem_callid_next(struct ofono_modem *modem)
@@ -502,6 +539,10 @@ static void set_online(struct ofono_modem *modem, ofono_bool_t new_online)
 						OFONO_MODEM_INTERFACE,
 						"Online", DBUS_TYPE_BOOLEAN,
 						&modem->online);
+	g_key_file_set_boolean(modem->settings, SETTINGS_GROUP,
+						"Online",
+						new_online);
+	storage_sync(SETTINGS_KEY, SETTINGS_STORE, modem->settings);
 
 	notify_online_watches(modem);
 }
@@ -783,6 +824,11 @@ static DBusMessage *set_property_online(struct ofono_modem *modem,
 
 	driver->set_online(modem, online,
 				online ? online_cb : offline_cb, modem);
+
+	g_key_file_set_boolean(modem->settings, SETTINGS_GROUP,
+							"Online",
+							online);
+	storage_sync(SETTINGS_KEY, SETTINGS_STORE, modem->settings);
 
 	return NULL;
 }
@@ -2091,6 +2137,8 @@ int ofono_modem_register(struct ofono_modem *modem)
 					OFONO_ATOM_TYPE_SIM,
 					sim_watch, modem, NULL);
 
+	modem_load_settings(modem);
+
 	return 0;
 }
 
@@ -2156,6 +2204,8 @@ static void modem_unregister(struct ofono_modem *modem)
 					"Lockdown", DBUS_TYPE_BOOLEAN,
 					&modem->lockdown);
 	}
+
+	modem_close_settings(modem);
 
 	g_dbus_unregister_interface(conn, modem->path, OFONO_MODEM_INTERFACE);
 
