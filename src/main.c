@@ -272,6 +272,8 @@ int main(int argc, char **argv)
 	g_dbus_set_disconnect_function(conn, system_bus_disconnected,
 					NULL, NULL);
 
+	g_dbus_attach_object_manager(conn);
+
 	__ofono_dbus_init(conn);
 
 	__ofono_modemwatch_init();
@@ -290,6 +292,8 @@ int main(int argc, char **argv)
 	__ofono_manager_cleanup();
 
 	__ofono_modemwatch_cleanup();
+
+	g_dbus_detach_object_manager(conn);
 
 	__ofono_dbus_cleanup();
 	dbus_connection_unref(conn);
