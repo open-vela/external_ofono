@@ -340,6 +340,11 @@ int __ofono_sms_txq_submit(struct ofono_sms *sms, GSList *list,
 				unsigned int flags, struct ofono_uuid *uuid,
 				ofono_sms_txq_queued_cb_t, void *data);
 
+int __ofono_sms_txq_write_to_sim(struct ofono_sms *sms, GSList *list,
+				unsigned int flags, struct ofono_uuid *uuid,
+				char *date, int type,
+				ofono_sms_txq_queued_cb_t, void *data);
+
 int __ofono_sms_txq_set_submit_notify(struct ofono_sms *sms,
 					struct ofono_uuid *uuid,
 					ofono_sms_txq_submit_cb_t cb,
