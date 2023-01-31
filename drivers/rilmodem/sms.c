@@ -376,6 +376,49 @@ static void ril_cmgs(struct ofono_sms *sms, const unsigned char *pdu,
 	CALLBACK_WITH_FAILURE(cb, -1, user_data);
 }
 
+static void ril_sms_write_to_sim(struct ofono_sms *sms, const unsigned char *pdu,
+                                			int pdu_len, int tpdu_len, int mms,
+                                			ofono_sms_submit_cb_t cb, void *user_data)
+{
+	struct sms_data *sd = ofono_sms_get_data(sms);
+	struct cb_data *cbd = cb_data_new(cb, user_data, sd);
+	struct parcel rilp;
+	char hexbuf[tpdu_len * 2 + 1];
+
+	DBG("pdu_len: %d", pdu_len);
+
+	parcel_init(&rilp);
+
+	encode_hex_own_buf(pdu, tpdu_len, 0, hexbuf);
+	parcel_w_string(&rilp, hexbuf); /*write sms pdu*/
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_WRITE_SMS_TO_SIM, &rilp,
+			ril_submit_sms_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, user_data);
+}
+
+static void ril_sms_delete_on_sim(struct ofono_sms *sms,
+			char *index, ofono_sms_delete_sms_on_sim_cb_t cb, void *user_data)
+{
+	struct sms_data *sd = ofono_sms_get_data(sms);
+	struct cb_data *cbd = cb_data_new(cb, user_data, sd);
+	struct parcel rilp;
+
+	parcel_init(&rilp);
+
+	parcel_w_string(&rilp, index); /* delete sms index */
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_DELETE_SMS_ON_SIM, &rilp,
+			ril_submit_sms_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, user_data);
+}
+
 static void ril_ack_delivery_cb(struct ril_msg *message, gpointer user_data)
 {
 	if (message->error != RIL_E_SUCCESS)
@@ -511,6 +554,8 @@ static const struct ofono_sms_driver driver = {
 	.submit		= ril_cmgs,
 	.bearer_query   = ril_sms_bearer_query,
 	.bearer_set	= ril_sms_bearer_set
+	.sms_write_to_sim   = ril_sms_write_to_sim,
+	.sms_delete_on_sim  = ril_sms_delete_on_sim,
 };
 
 void ril_sms_init(void)
