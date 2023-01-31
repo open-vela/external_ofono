@@ -1872,6 +1872,18 @@ time_t sms_scts_to_time(const struct sms_scts *scts, struct tm *remote)
 	return ret;
 }
 
+/*
+ * Returns sms_scts of time.  The date value returns the time in local
+ * timezone.  The struct tm is filled out with the remote time information
+ */
+gboolean time_to_sms_scts(char *date, struct sms_scts *scts)
+{
+	scts = calloc(1, sizeof(scts));
+	sscanf(date, "%4d%2d%2d%2d%2d%2d", &scts->year, &scts->month,
+				&scts->day, &scts->hour, &scts->minute, &scts->second);
+	return true;
+}
+
 void sms_address_from_string(struct sms_address *addr, const char *str)
 {
 	addr->numbering_plan = SMS_NUMBERING_PLAN_ISDN;
