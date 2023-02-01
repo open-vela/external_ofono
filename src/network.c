@@ -125,7 +125,7 @@ static char **network_operator_technologies(struct network_operator_data *opd)
 	unsigned int i;
 
 	for (i = 0; i < sizeof(opd->techs) * 8; i++) {
-		if (opd->techs & (1 << i))
+		if (opd->techs & (1u << i))
 			ntechs += 1;
 	}
 
@@ -133,7 +133,7 @@ static char **network_operator_technologies(struct network_operator_data *opd)
 	ntechs = 0;
 
 	for (i = 0; i < sizeof(opd->techs) * 8; i++) {
-		if (!(opd->techs & (1 << i)))
+		if (!(opd->techs & (1u << i)))
 			continue;
 
 		techs[ntechs++] = g_strdup(registration_tech_to_string(i));

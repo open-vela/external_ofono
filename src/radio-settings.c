@@ -254,7 +254,7 @@ static DBusMessage *radio_get_properties_reply(DBusMessage *msg,
 		unsigned int i;
 
 		for (i = 0; i < sizeof(uint32_t) * CHAR_BIT; i++) {
-			unsigned int tech = 1 << i;
+			unsigned int tech = 1u << i;
 
 			if (!(rs->available_rats & tech))
 				continue;
