@@ -221,7 +221,7 @@ static void ss_info_notify(struct qmi_result *result, void *user_data)
 	status = remember_ss_info(data, status, lac, cellid, roaming);
 
 	ofono_netreg_status_notify(netreg, status, data->lac, data->cellid,
-									tech);
+									tech, -1);
 }
 
 static void get_ss_info_cb(struct qmi_result *result, void *user_data)
@@ -235,19 +235,19 @@ static void get_ss_info_cb(struct qmi_result *result, void *user_data)
 	DBG("");
 
 	if (qmi_result_set_error(result, NULL)) {
-		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 		return;
 	}
 
 	if (!extract_ss_info(result, &status, &lac, &cellid, &tech, &roaming,
 							&data->operator)) {
-		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 		return;
 	}
 
 	status = remember_ss_info(data, status, lac, cellid, roaming);
 
-	CALLBACK_WITH_SUCCESS(cb, status, data->lac, data->cellid, tech,
+	CALLBACK_WITH_SUCCESS(cb, status, data->lac, data->cellid, tech, -1, 
 								cbd->data);
 }
 
@@ -265,7 +265,7 @@ static void qmi_registration_status(struct ofono_netreg *netreg,
 					get_ss_info_cb, cbd, g_free) > 0)
 		return;
 
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 
 	g_free(cbd);
 }
