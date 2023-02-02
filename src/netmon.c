@@ -247,21 +247,23 @@ void ofono_netmon_serving_cell_notify(struct ofono_netmon *netmon,
 					int info_type, ...)
 {
 	va_list arglist;
-	DBusMessage *agent_notify = NULL;
+	DBusMessage *signal;
 	DBusMessageIter iter;
 	DBusMessageIter dict;
 	const char *technology = cell_type_to_tech_name(type);
+	const char *path = __ofono_atom_get_path(netmon->atom);
+	DBusConnection *conn = ofono_dbus_get_connection();
 
-	if (netmon->pending != NULL) {
-		netmon->reply = dbus_message_new_method_return(netmon->pending);
-		dbus_message_iter_init_append(netmon->reply, &iter);
-	} else if (netmon->agent != NULL) {
-		agent_notify = netmon_agent_new_method_call(netmon->agent,
-					"ServingCellInformationChanged");
-
-		dbus_message_iter_init_append(agent_notify, &iter);
-	} else
+	if (technology == NULL)
 		return;
+
+	signal = dbus_message_new_signal(path, OFONO_NETMON_INTERFACE,
+						"CellInfoPropertyChanged");
+
+	if (signal == NULL)
+		return;
+
+	dbus_message_iter_init_append(signal, &iter);
 
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
 					OFONO_PROPERTIES_ARRAY_SIGNATURE,
@@ -269,21 +271,16 @@ void ofono_netmon_serving_cell_notify(struct ofono_netmon *netmon,
 
 	va_start(arglist, info_type);
 
-	if (technology == NULL)
-		goto done;
-
 	ofono_dbus_dict_append(&dict, "Technology",
 						DBUS_TYPE_STRING, &technology);
 
 	netmon_cell_info_dict_append(&dict, &arglist, info_type);
 
-done:
 	va_end(arglist);
 
 	dbus_message_iter_close_container(&iter, &dict);
 
-	if (agent_notify)
-		netmon_agent_send_no_reply(netmon->agent, agent_notify);
+	g_dbus_send_message(conn, signal);
 }
 
 static void serving_cell_info_callback(const struct ofono_error *error,
@@ -552,6 +549,12 @@ static const GDBusMethodTable netmon_methods[] = {
 	{ }
 };
 
+static const GDBusSignalTable netmon_signals[] = {
+	{ GDBUS_SIGNAL("CellInfoPropertyChanged",
+			GDBUS_ARGS({ "cellinfo", "a(a{sv})" })) },
+	{ }
+};
+
 int ofono_netmon_driver_register(const struct ofono_netmon_driver *d)
 {
 	DBG("driver: %p, name: %s", d, d->name);
@@ -635,8 +638,9 @@ void ofono_netmon_register(struct ofono_netmon *netmon)
 
 	if (!g_dbus_register_interface(conn, path,
 				OFONO_NETMON_INTERFACE,
-				netmon_methods, NULL, NULL,
-				netmon, NULL)) {
+				netmon_methods,
+				netmon_signals,
+				NULL, netmon, NULL)) {
 		ofono_error("Could not create %s interface",
 				OFONO_NETMON_INTERFACE);
 		return;
