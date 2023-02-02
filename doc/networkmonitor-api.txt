@@ -48,6 +48,11 @@ Methods		a{sv} GetServingCellInformation()
 
 			Unregisters an agent.
 
+Signals		CellInfoPropertyChanged(string property, variant value)
+
+			Signal is emitted whenever a property has changed.
+			The new value is passed as the signal argument.
+
 NetworkMonitorAgent Hierarchy [experimental]
 =============================
 
