@@ -58,6 +58,7 @@ struct ofono_netreg {
 	int technology;
 	int mode;
 	char *base_station;
+	char *nitz_time;
 	struct network_operator_data *current_operator;
 	GSList *operator_list;
 	struct ofono_network_registration_ops *ops;
@@ -845,6 +846,11 @@ static DBusMessage *network_get_properties(DBusConnection *conn,
 					&strength);
 	}
 
+	if (netreg->nitz_time) {
+		ofono_dbus_dict_append(&dict, "NITZ", DBUS_TYPE_STRING,
+					&netreg->nitz_time);
+	}
+
 	if (netreg->base_station)
 		ofono_dbus_dict_append(&dict, "BaseStation", DBUS_TYPE_STRING,
 					&netreg->base_station);
@@ -1113,6 +1119,40 @@ static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
 					"Technology", DBUS_TYPE_STRING,
 					&tech_str);
+}
+
+static void set_nitz_time(struct ofono_netreg *netreg,
+					struct ofono_network_time *info)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(netreg->atom);
+	char buf[128];
+	const char *nitz_str = buf;
+
+	int error_code = snprintf(buf, sizeof(buf), "%d,%d,%d,%d,%d,%d,%d,%d",
+		info->sec, info->min, info->hour,
+		info->mday, info->mon, info->year,
+		info->dst, info->utcoff);
+
+	if (netreg->nitz_time == NULL && info == NULL)
+		return;
+
+	if (netreg->nitz_time)
+		g_free(netreg->nitz_time);
+
+	if (error_code < 0 || info == NULL) {
+		DBG("Error during set nitz time");
+		netreg->nitz_time = NULL;
+		return;
+	} else {
+		netreg->nitz_time = g_strdup(buf);
+	}
+
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_NETWORK_REGISTRATION_INTERFACE,
+					"NITZ", DBUS_TYPE_STRING,
+					&nitz_str);
+
 }
 
 void __ofono_netreg_set_base_station_name(struct ofono_netreg *netreg,
@@ -1412,6 +1452,8 @@ void ofono_netreg_time_notify(struct ofono_netreg *netreg,
 	    info->year, info->mon, info->mday,
 	    info->hour, info->min, info->sec,
 	    info->utcoff, info->dst);
+
+	set_nitz_time(netreg, info);
 
 	__ofono_nettime_info_received(modem, info);
 }
