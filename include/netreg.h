@@ -56,7 +56,7 @@ typedef void (*ofono_netreg_operator_list_cb_t)(const struct ofono_error *error,
 				void *data);
 
 typedef void (*ofono_netreg_status_cb_t)(const struct ofono_error *error,
-					int status, int lac, int ci, int tech,
+					int status, int lac, int ci, int tech, int denial,
 					void *data);
 
 typedef void (*ofono_netreg_strength_cb_t)(const struct ofono_error *error,
@@ -90,7 +90,7 @@ struct ofono_netreg_driver {
 
 void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength);
 void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
-					int lac, int ci, int tech);
+					int lac, int ci, int tech, int denial);
 void ofono_netreg_time_notify(struct ofono_netreg *netreg,
 				struct ofono_network_time *info);
 

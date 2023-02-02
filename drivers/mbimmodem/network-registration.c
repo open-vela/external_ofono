@@ -88,7 +88,7 @@ static void mbim_register_state_changed(struct mbim_message *message,
 	status = register_state_to_status(register_state);
 	tech = mbim_data_class_to_tech(available_data_classes);
 
-	ofono_netreg_status_notify(netreg, status, -1, -1, tech);
+	ofono_netreg_status_notify(netreg, status, -1, -1, tech, -1);
 }
 
 static void mbim_registration_status_cb(struct mbim_message *message,
@@ -116,10 +116,10 @@ static void mbim_registration_status_cb(struct mbim_message *message,
 	status = register_state_to_status(register_state);
 	tech = mbim_data_class_to_tech(available_data_classes);
 
-	CALLBACK_WITH_SUCCESS(cb, status, -1, -1, tech, cbd->data);
+	CALLBACK_WITH_SUCCESS(cb, status, -1, -1, tech, -1, cbd->data);
 	return;
 error:
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 }
 
 static void mbim_registration_status(struct ofono_netreg *netreg,
@@ -141,7 +141,7 @@ static void mbim_registration_status(struct ofono_netreg *netreg,
 
 	l_free(cbd);
 	mbim_message_unref(message);
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 }
 
 static void mbim_current_operator_cb(struct mbim_message *message, void *user)

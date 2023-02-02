@@ -49,7 +49,7 @@ static void dun_registration_status(struct ofono_netreg *netreg,
 
 	DBG("");
 
-	CALLBACK_WITH_SUCCESS(cb, status, -1, -1, -1, data);
+	CALLBACK_WITH_SUCCESS(cb, status, -1, -1, -1, -1, data);
 }
 
 static void dun_current_operator(struct ofono_netreg *netreg,

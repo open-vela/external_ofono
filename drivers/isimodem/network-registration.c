@@ -222,7 +222,7 @@ static void reg_status_ind_cb(const GIsiMessage *msg, void *data)
 
 	ofono_netreg_status_notify(netreg, isi_status_to_at_status(&nd->reg),
 					nd->gsm.lac, nd->gsm.ci,
-					isi_to_at_tech(&nd->rat, &nd->gsm));
+					isi_to_at_tech(&nd->rat, &nd->gsm), -1);
 }
 
 static gboolean parse_rat_info(GIsiSubBlockIter *iter, struct rat_info *rat)
@@ -264,7 +264,7 @@ static void rat_ind_cb(const GIsiMessage *msg, void *data)
 
 	ofono_netreg_status_notify(netreg, isi_status_to_at_status(&nd->reg),
 					nd->gsm.lac, nd->gsm.ci,
-					isi_to_at_tech(&nd->rat, &nd->gsm));
+					isi_to_at_tech(&nd->rat, &nd->gsm), -1);
 }
 
 static void reg_status_resp_cb(const GIsiMessage *msg, void *data)
@@ -301,13 +301,13 @@ static void reg_status_resp_cb(const GIsiMessage *msg, void *data)
 
 	CALLBACK_WITH_SUCCESS(cb, isi_status_to_at_status(&nd->reg),
 				nd->gsm.lac, nd->gsm.ci,
-				isi_to_at_tech(&nd->rat, &nd->gsm),
+				isi_to_at_tech(&nd->rat, &nd->gsm), -1,
 				cbd->data);
 	g_free(cbd);
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 	g_free(cbd);
 }
 
@@ -349,7 +349,7 @@ static void rat_resp_cb(const GIsiMessage *msg, void *data)
 		return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 	g_free(cbd);
 }
 
@@ -379,7 +379,7 @@ static void isi_registration_status(struct ofono_netreg *netreg,
 		return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 	g_free(cbd);
 }
 

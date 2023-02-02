@@ -249,7 +249,7 @@ static gboolean is_registered(int status)
 }
 
 static void registration_status_cb(const struct ofono_error *error,
-				   int status, int lac, int ci, int tech,
+				   int status, int lac, int ci, int tech, int denial,
 				   void *user_data)
 {
 	struct tech_query *tq = user_data;
@@ -269,7 +269,7 @@ static void registration_status_cb(const struct ofono_error *error,
 		return;
 	}
 
-	ofono_netreg_status_notify(netreg, status, lac, ci, tech);
+	ofono_netreg_status_notify(netreg, status, lac, ci, tech, -1);
 }
 
 static void ublox_ureg_cb(gboolean ok, GAtResult *result,
@@ -306,7 +306,7 @@ error:
 		tech = tq->tech;
 
 	ofono_netreg_status_notify(tq->netreg,
-			tq->status, tq->lac, tq->ci, tech);
+			tq->status, tq->lac, tq->ci, tech, -1);
 }
 
 static void ureg_notify(GAtResult *result, gpointer user_data)
@@ -379,7 +379,7 @@ static void creg_notify(GAtResult *result, gpointer user_data)
 		tech = nd->at_data.tech;
 
 notify:
-	ofono_netreg_status_notify(netreg, status, lac, ci, tech);
+	ofono_netreg_status_notify(netreg, status, lac, ci, tech, -1);
 }
 
 static void at_cmer_not_supported(struct ofono_netreg *netreg)

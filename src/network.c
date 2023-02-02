@@ -56,6 +56,7 @@ struct ofono_netreg {
 	int location;
 	int cellid;
 	int technology;
+	int denial_reason;
 	int mode;
 	char *base_station;
 	char *nitz_time;
@@ -144,7 +145,7 @@ static char **network_operator_technologies(struct network_operator_data *opd)
 }
 
 static void registration_status_callback(const struct ofono_error *error,
-					int status, int lac, int ci, int tech,
+					int status, int lac, int ci, int tech, int denial,
 					void *data)
 {
 	struct ofono_netreg *netreg = data;
@@ -154,7 +155,7 @@ static void registration_status_callback(const struct ofono_error *error,
 		return;
 	}
 
-	ofono_netreg_status_notify(netreg, status, lac, ci, tech);
+	ofono_netreg_status_notify(netreg, status, lac, ci, tech, denial);
 }
 
 static void init_register(const struct ofono_error *error, void *data)
@@ -822,6 +823,11 @@ static DBusMessage *network_get_properties(DBusConnection *conn,
 					&technology);
 	}
 
+	if (netreg->denial_reason != -1) {
+		ofono_dbus_dict_append(&dict, "DenialReason", DBUS_TYPE_UINT16,
+					&netreg->denial_reason);
+	}
+
 	if (netreg->current_operator) {
 		if (netreg->current_operator->mcc[0] != '\0') {
 			const char *mcc = netreg->current_operator->mcc;
@@ -1102,6 +1108,23 @@ static void set_registration_cellid(struct ofono_netreg *netreg, int ci)
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
 					"CellId", DBUS_TYPE_UINT32, &dbus_ci);
+}
+
+static void set_registration_denial_reason(struct ofono_netreg *netreg, int denial)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(netreg->atom);
+	dbus_uint16_t dbus_denial_reason = denial;
+
+	if (denial > 0xffff || denial == -1)
+		return;
+
+	netreg->denial_reason = denial;
+
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_NETWORK_REGISTRATION_INTERFACE,
+					"DenialReason",
+					DBUS_TYPE_UINT16, &dbus_denial_reason);
 }
 
 static void set_registration_technology(struct ofono_netreg *netreg, int tech)
@@ -1387,13 +1410,13 @@ static void notify_emulator_status(struct ofono_atom *atom, void *data)
 }
 
 void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
-			int lac, int ci, int tech)
+			int lac, int ci, int tech, int denial)
 {
 	if (netreg == NULL)
 		return;
 
-	DBG("%s status %d tech %d lac %d ci %d",
-	    __ofono_atom_get_path(netreg->atom), status, tech, lac, ci);
+	DBG("%s status %d tech %d lac %d ci %d denial %d",
+	    __ofono_atom_get_path(netreg->atom), status, tech, lac, ci, denial);
 
 	if (netreg->status != status) {
 		struct ofono_modem *modem;
@@ -1409,6 +1432,9 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 
 	if (netreg->location != lac)
 		set_registration_location(netreg, lac);
+
+	if (netreg->denial_reason != denial)
+		set_registration_denial_reason(netreg, denial);
 
 	if (netreg->cellid != ci)
 		set_registration_cellid(netreg, ci);
@@ -1511,7 +1537,7 @@ static void sim_csp_changed(int id, void *userdata)
 }
 
 static void init_registration_status(const struct ofono_error *error,
-					int status, int lac, int ci, int tech,
+					int status, int lac, int ci, int tech, int denial,
 					void *data)
 {
 	struct ofono_netreg *netreg = data;
@@ -1521,7 +1547,7 @@ static void init_registration_status(const struct ofono_error *error,
 		return;
 	}
 
-	ofono_netreg_status_notify(netreg, status, lac, ci, tech);
+	ofono_netreg_status_notify(netreg, status, lac, ci, tech, denial);
 
 	/*
 	 * Bootstrap our signal strength value without waiting for the

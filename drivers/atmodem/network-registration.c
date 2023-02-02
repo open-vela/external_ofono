@@ -202,13 +202,13 @@ static void at_creg_cb(gboolean ok, GAtResult *result, gpointer user_data)
 	decode_at_error(&error, g_at_result_final_response(result));
 
 	if (!ok) {
-		cb(&error, -1, -1, -1, -1, cbd->data);
+		cb(&error, -1, -1, -1, -1, -1, cbd->data);
 		return;
 	}
 
 	if (at_util_parse_reg(result, "+CREG:", NULL, &status,
 				&lac, &ci, &tech, nd->vendor) == FALSE) {
-		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 		return;
 	}
 
@@ -219,7 +219,7 @@ static void at_creg_cb(gboolean ok, GAtResult *result, gpointer user_data)
 	if (status > 5 && tech == -1)
 		tech = ACCESS_TECHNOLOGY_EUTRAN;
 
-	cb(&error, status, lac, ci, tech, cbd->data);
+	cb(&error, status, lac, ci, tech, -1, cbd->data);
 }
 
 static void gemalto_query_tech_cb(gboolean ok, GAtResult *result,
@@ -231,7 +231,7 @@ static void gemalto_query_tech_cb(gboolean ok, GAtResult *result,
 	tech = gemalto_parse_tech(result);
 
 	ofono_netreg_status_notify(tq->netreg,
-			tq->status, tq->lac, tq->ci, tech);
+			tq->status, tq->lac, tq->ci, tech, -1);
 }
 
 static void zte_tech_cb(gboolean ok, GAtResult *result, gpointer user_data)
@@ -319,7 +319,7 @@ void at_registration_status(struct ofono_netreg *netreg,
 
 	g_free(cbd);
 
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 }
 
 static void cops_cb(gboolean ok, GAtResult *result, gpointer user_data)
@@ -1540,7 +1540,7 @@ static void cnti_query_tech_cb(gboolean ok, GAtResult *result,
 	struct at_netreg_data *nd = ofono_netreg_get_data(tq->netreg);
 
 	ofono_netreg_status_notify(tq->netreg,
-			tq->status, tq->lac, tq->ci, nd->tech);
+			tq->status, tq->lac, tq->ci, nd->tech, -1);
 }
 
 static void zte_query_tech_cb(gboolean ok, GAtResult *result,
@@ -1555,7 +1555,7 @@ static void zte_query_tech_cb(gboolean ok, GAtResult *result,
 		tech = -1;
 
 	ofono_netreg_status_notify(tq->netreg,
-			tq->status, tq->lac, tq->ci, tech);
+			tq->status, tq->lac, tq->ci, tech, -1);
 }
 
 static void option_query_tech_cb(gboolean ok, GAtResult *result,
@@ -1570,7 +1570,7 @@ static void option_query_tech_cb(gboolean ok, GAtResult *result,
 		tech = -1;
 
 	ofono_netreg_status_notify(tq->netreg,
-			tq->status, tq->lac, tq->ci, tech);
+			tq->status, tq->lac, tq->ci, tech, -1);
 }
 
 static void creg_notify(GAtResult *result, gpointer user_data)
@@ -1632,7 +1632,7 @@ static void creg_notify(GAtResult *result, gpointer user_data)
 		tech = nd->tech;
 
 notify:
-	ofono_netreg_status_notify(netreg, status, lac, ci, tech);
+	ofono_netreg_status_notify(netreg, status, lac, ci, tech, -1);
 }
 
 static void at_cmer_not_supported(struct ofono_netreg *netreg)

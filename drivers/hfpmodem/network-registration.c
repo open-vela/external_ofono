@@ -127,7 +127,7 @@ static void ciev_notify(GAtResult *result, gpointer user_data)
 		else
 			status = NETWORK_REGISTRATION_STATUS_NOT_REGISTERED;
 
-		ofono_netreg_status_notify(netreg, status, -1, -1, -1);
+		ofono_netreg_status_notify(netreg, status, -1, -1, -1, -1);
 	} else if (index == nd->cind_pos[HFP_INDICATOR_ROAM]) {
 		nd->cind_val[HFP_INDICATOR_ROAM] = value;
 
@@ -138,7 +138,7 @@ static void ciev_notify(GAtResult *result, gpointer user_data)
 		else
 			status = NETWORK_REGISTRATION_STATUS_NOT_REGISTERED;
 
-		ofono_netreg_status_notify(netreg, status, -1, -1, -1);
+		ofono_netreg_status_notify(netreg, status, -1, -1, -1, -1);
 	} else if (index == nd->cind_pos[HFP_INDICATOR_SIGNAL]) {
 		nd->cind_val[HFP_INDICATOR_SIGNAL] = value;
 		ofono_netreg_strength_notify(netreg, value * 20);
@@ -200,14 +200,14 @@ static void registration_status_cb(gboolean ok, GAtResult *result,
 	decode_at_error(&error, g_at_result_final_response(result));
 
 	if (!ok) {
-		cb(&error, -1, -1, -1, -1, cbd->data);
+		cb(&error, -1, -1, -1, -1, -1, cbd->data);
 		return;
 	}
 
 	g_at_result_iter_init(&iter, result);
 
 	if (!g_at_result_iter_next(&iter, "+CIND:")) {
-		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 		return;
 	}
 
@@ -231,7 +231,7 @@ static void registration_status_cb(gboolean ok, GAtResult *result,
 	if (nd->cind_val[HFP_INDICATOR_ROAM])
 		status = NETWORK_REGISTRATION_STATUS_ROAMING;
 
-	cb(&error, status, -1, -1, -1, cbd->data);
+	cb(&error, status, -1, -1, -1, -1, cbd->data);
 }
 
 static void hfp_registration_status(struct ofono_netreg *netreg,
@@ -251,7 +251,7 @@ static void hfp_registration_status(struct ofono_netreg *netreg,
 
 	g_free(cbd);
 
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 }
 
 static void hfp_current_operator(struct ofono_netreg *netreg,

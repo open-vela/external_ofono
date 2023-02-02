@@ -253,6 +253,7 @@ static void ril_creg_cb(struct ril_msg *message, gpointer user_data)
 	int lac = -1;
 	int ci = -1;
 	int tech = -1;
+	int denial = -1;
 	char *end;
 
 	DBG("");
@@ -324,22 +325,28 @@ static void ril_creg_cb(struct ril_msg *message, gpointer user_data)
 		}
 	}
 
+	if (num_str >= 5) {
+		denial = strtoul(strv[4], &end, 16);
+		if (end == strv[4] || *end != '\0')
+			denial = -1;
+	}
+
 	g_strfreev(strv);
 	nd->tech = tech;
 
 	CALLBACK_WITH_SUCCESS(cb, status, lac, ci,
-				ril_tech_to_access_tech(tech),
+				ril_tech_to_access_tech(tech), denial,
 				cbd->data);
 	return;
 
 error_free:
 	g_strfreev(strv);
 error:
-	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, cbd->data);
 }
 
 static void ril_creg_notify(struct ofono_error *error, int status, int lac,
-					int ci, int tech, gpointer user_data)
+					int ci, int tech, int denial, gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
 
@@ -348,7 +355,7 @@ static void ril_creg_notify(struct ofono_error *error, int status, int lac,
 		return;
 	}
 
-	ofono_netreg_status_notify(netreg, status, lac, ci, tech);
+	ofono_netreg_status_notify(netreg, status, lac, ci, tech, denial);
 }
 
 static void ril_network_state_change(struct ril_msg *message,
@@ -381,7 +388,7 @@ static void ril_registration_status(struct ofono_netreg *netreg,
 	if (g_ril_send(nd->ril, RIL_REQUEST_VOICE_REGISTRATION_STATE, NULL,
 			ril_creg_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, data);
+		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 	}
 }
 
