@@ -156,6 +156,19 @@ enum context_status {
 	CONTEXT_STATUS_ACTIVATED = 1,
 };
 
+/**
+ * The phone status.
+ * IDLE : no phone activity
+ * RINGING : a phone call is ringing or call waiting.
+ * OFFHOOK : The phone is off hook. At least one call exists that is dialing,
+ * active or holding and no calls are ringing or waiting.
+ */
+enum phone_status {
+	PHONE_STATUS_IDLE = 0,
+	PHONE_STATUS_RINGING = 1,
+	PHONE_STATUS_OFFHOOK = 2,
+};
+
 const char *telephony_error_to_str(const struct ofono_error *error);
 
 gboolean valid_number_format(const char *number, int length);
