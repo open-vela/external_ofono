@@ -76,6 +76,7 @@ struct ofono_voicecall {
 	ofono_voicecall_cb_t release_queue_done_cb;
 	struct ofono_emulator *pending_em;
 	unsigned int pending_id;
+	enum phone_status status;
 };
 
 struct voicecall {
@@ -126,6 +127,7 @@ static void generic_callback(const struct ofono_error *error, void *data);
 static void hangup_all_active(const struct ofono_error *error, void *data);
 static void multirelease_callback(const struct ofono_error *err, void *data);
 static gboolean tone_request_run(gpointer user_data);
+static void notify_phone_status_changed(struct ofono_voicecall *vc);
 
 static gint call_compare_by_id(gconstpointer a, gconstpointer b)
 {
@@ -1199,6 +1201,8 @@ static void voicecalls_emit_call_removed(struct ofono_voicecall *vc,
 	g_dbus_emit_signal(conn, atompath, OFONO_VOICECALL_MANAGER_INTERFACE,
 				"CallRemoved", DBUS_TYPE_OBJECT_PATH, &path,
 				DBUS_TYPE_INVALID);
+
+	notify_phone_status_changed(vc);
 }
 
 static void voicecalls_emit_call_added(struct ofono_voicecall *vc,
@@ -1232,6 +1236,8 @@ static void voicecalls_emit_call_added(struct ofono_voicecall *vc,
 	dbus_message_iter_close_container(&iter, &dict);
 
 	g_dbus_send_message(ofono_dbus_get_connection(), signal);
+
+	notify_phone_status_changed(vc);
 }
 
 static void voicecalls_release_queue(struct ofono_voicecall *vc, GSList *calls,
@@ -1332,6 +1338,9 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	ofono_dbus_dict_append_array(&dict, "EmergencyNumbers",
 					DBUS_TYPE_STRING, &list);
 	g_free(list);
+
+	/* property PhoneState */
+	ofono_dbus_dict_append(&dict, "PhoneStatus", DBUS_TYPE_INT32, &vc->status);
 
 	dbus_message_iter_close_container(&iter, &dict);
 
@@ -2310,6 +2319,7 @@ static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("CallAdded",
 		GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("CallRemoved", GDBUS_ARGS({ "path", "o"})) },
+	{ GDBUS_SIGNAL("PhoneStatusChanged", GDBUS_ARGS({ "status", "i" })) },
 	{ }
 };
 
@@ -2383,6 +2393,8 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	voicecall_dbus_unregister(vc, call);
 
 	vc->call_list = g_slist_remove(vc->call_list, call);
+
+	notify_phone_status_changed(vc);
 }
 
 void ofono_voicecall_notify(struct ofono_voicecall *vc,
@@ -4204,6 +4216,38 @@ static void ssn_mo_forwarded_notify(struct ofono_voicecall *vc,
 				"Forwarded",
 				DBUS_TYPE_STRING, &info,
 				DBUS_TYPE_INVALID);
+}
+
+static void notify_phone_status_changed(struct ofono_voicecall *vc)
+{
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	const char *path;
+	enum phone_status status = vc->status;
+
+	if (voicecalls_have_waiting(vc) || voicecalls_have_incoming(vc)) {
+		status = PHONE_STATUS_RINGING;
+	} else if (voicecalls_have_active(vc) || voicecalls_have_held(vc)) {
+		status = PHONE_STATUS_OFFHOOK;
+	} else {
+		status = PHONE_STATUS_IDLE;
+	}
+
+	if (status != vc->status) {
+		vc->status = status;
+
+		path = __ofono_atom_get_path(vc->atom);
+		signal = dbus_message_new_signal(path,
+						OFONO_VOICECALL_MANAGER_INTERFACE,
+						"PhoneStatusChanged");
+
+		if (signal == NULL)
+			return;
+
+		dbus_message_iter_init_append(signal, &iter);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+		g_dbus_send_message(ofono_dbus_get_connection(), signal);
+	}
 }
 
 void ofono_voicecall_ssn_mo_notify(struct ofono_voicecall *vc,
