@@ -66,6 +66,7 @@ struct ofono_gprs {
 	ofono_bool_t roaming_allowed;
 	ofono_bool_t powered;
 	ofono_bool_t suspended;
+	ofono_bool_t data_on;
 	int status;
 	int flags;
 	int bearer;
@@ -1830,6 +1831,9 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 	value = gprs->powered;
 	ofono_dbus_dict_append(&dict, "Powered", DBUS_TYPE_BOOLEAN, &value);
 
+	value = gprs->data_on;
+	ofono_dbus_dict_append(&dict, "DataOn", DBUS_TYPE_BOOLEAN, &value);
+
 	if (gprs->attached) {
 		value = gprs->suspended;
 		ofono_dbus_dict_append(&dict, "Suspended",
@@ -1910,6 +1914,26 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 		}
 
 		gprs_netreg_update(gprs);
+	} else if (!strcmp(property, "DataOn")) {
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+			return __ofono_error_invalid_args(msg);
+
+		dbus_message_iter_get_basic(&var, &value);
+
+		if (gprs->data_on == (ofono_bool_t) value)
+			return dbus_message_new_method_return(msg);
+
+		gprs->data_on = value;
+		if (gprs->settings) {
+			g_key_file_set_integer(gprs->settings, SETTINGS_GROUP,
+						"DataOn", gprs->data_on);
+			storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
+		}
+
+		path = __ofono_atom_get_path(gprs->atom);
+		ofono_dbus_signal_property_changed(conn, path,
+				OFONO_CONNECTION_MANAGER_INTERFACE,
+					"DataSwitchChanged", DBUS_TYPE_BOOLEAN, &value);
 	} else {
 		return __ofono_error_invalid_args(msg);
 	}
@@ -2641,6 +2665,7 @@ static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("ContextAdded",
 			GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("ContextRemoved", GDBUS_ARGS({ "path", "o" })) },
+	{ GDBUS_SIGNAL("DataSwitchChanged", GDBUS_ARGS({ "status", "i" })) },
 	{ }
 };
 
@@ -3417,6 +3442,18 @@ static void gprs_load_settings(struct ofono_gprs *gprs, const char *imsi)
 		gprs->powered = TRUE;
 		g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
 					"Powered", gprs->powered);
+	}
+
+	error = NULL;
+	gprs->data_on = g_key_file_get_boolean(gprs->settings, SETTINGS_GROUP,
+						"DataOn", &error);
+
+	if (error) {
+		g_error_free(error);
+		gprs->data_on = FALSE;
+		g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
+					"DataOn",
+					gprs->data_on);
 	}
 
 	error = NULL;
