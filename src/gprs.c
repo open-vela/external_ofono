@@ -1375,7 +1375,12 @@ static const GDBusSignalTable context_signals[] = {
 
 static struct pri_context *pri_context_create(struct ofono_gprs *gprs,
 					const char *name,
-					enum ofono_gprs_context_type type)
+					enum ofono_gprs_context_type type,
+					const char *apn,
+					const char *username,
+					const char *password,
+					const int protocal,
+					const int authtype)
 {
 	struct pri_context *context = g_try_new0(struct pri_context, 1);
 
@@ -1393,6 +1398,11 @@ static struct pri_context *pri_context_create(struct ofono_gprs *gprs,
 	context->gprs = gprs;
 	strcpy(context->name, name);
 	context->type = type;
+	strcpy(context->context.apn, apn);
+	strcpy(context->context.username, username);
+	strcpy(context->context.password, password);
+	context->context.proto = protocal;
+	context->context.auth_method = authtype;
 
 	return context;
 }
@@ -1976,7 +1986,12 @@ static struct pri_context *find_usable_context(struct ofono_gprs *gprs,
 
 static struct pri_context *add_context(struct ofono_gprs *gprs,
 					const char *name,
-					enum ofono_gprs_context_type type)
+					enum ofono_gprs_context_type type,
+					const char *apn,
+					const char *username,
+					const char *password,
+					const int protocal,
+					const int authtype)
 {
 	unsigned int id;
 	struct pri_context *context;
@@ -1990,7 +2005,8 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 	if (id > l_uintset_get_max(gprs->used_pids))
 		return NULL;
 
-	context = pri_context_create(gprs, name, type);
+	context = pri_context_create(gprs, name, type,
+		apn, username, password, protocal, authtype);
 	if (context == NULL) {
 		ofono_error("Unable to allocate context struct");
 		return NULL;
@@ -2046,7 +2062,8 @@ void ofono_gprs_cid_activated(struct ofono_gprs  *gprs, unsigned int cid,
 
 	if (!pri_ctx) {
 		pri_ctx = add_context(gprs, apn,
-					OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+					OFONO_GPRS_CONTEXT_TYPE_INTERNET, apn, NULL, NULL,
+					OFONO_GPRS_PROTO_IPV4V6, OFONO_GPRS_AUTH_METHOD_NONE);
 		if (!pri_ctx) {
 			ofono_error("Can't find/create automatic context %d "
 					"with APN %s.", cid, apn);
@@ -2123,8 +2140,17 @@ static DBusMessage *gprs_add_context(DBusConnection *conn,
 	struct pri_context *context;
 	const char *typestr;
 	const char *name;
+	const char *apn;
+	const char *username;
+	const char *password;
+	int protocal;
+	int authtype;
 	const char *path;
 	enum ofono_gprs_context_type type;
+	DBusMessageIter iter;
+
+	if (!dbus_message_iter_init(msg, &iter))
+		return __ofono_error_invalid_args(msg);
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
 					DBUS_TYPE_INVALID))
@@ -2133,11 +2159,31 @@ static DBusMessage *gprs_add_context(DBusConnection *conn,
 	if (gprs_context_string_to_type(typestr, &type) == FALSE)
 		return __ofono_error_invalid_format(msg);
 
-	name = gprs_context_default_name(type);
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, &name);
+
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, &apn);
+
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, &username);
+
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, &password);
+
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, &protocal);
+
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, &authtype);
+
+	if (name == NULL)
+		name = gprs_context_default_name(type);
+
 	if (name == NULL)
 		name = typestr;
 
-	context = add_context(gprs, name, type);
+	context = add_context(gprs, name, type, apn, username, password, protocal, authtype);
 	if (context == NULL)
 		return __ofono_error_failed(msg);
 
@@ -2414,7 +2460,8 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 	if (id > l_uintset_get_max(gprs->used_pids))
 		return;
 
-	context = pri_context_create(gprs, ap->name, ap->type);
+	context = pri_context_create(gprs, ap->name, ap->type,
+		ap->apn, ap->username, ap->password, ap->proto, ap->auth_method);
 	if (context == NULL)
 		return;
 
@@ -2550,7 +2597,8 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 				ofono_sim_get_mnc(sim), ofono_sim_get_spn(sim));
 
 	if (gprs->contexts == NULL) /* Automatic provisioning failed */
-		add_context(gprs, NULL, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+		add_context(gprs, NULL, OFONO_GPRS_CONTEXT_TYPE_INTERNET,
+			NULL, NULL, NULL, OFONO_GPRS_PROTO_IPV4V6, OFONO_GPRS_AUTH_METHOD_NONE);
 
 	for (l = gprs->contexts; l; l = l->next) {
 		struct pri_context *ctx = l->data;
@@ -2568,7 +2616,10 @@ static const GDBusMethodTable manager_methods[] = {
 			GDBUS_ARGS({ "property", "s" }, { "value", "v" }),
 			NULL, gprs_set_property) },
 	{ GDBUS_ASYNC_METHOD("AddContext",
-			GDBUS_ARGS({ "type", "s" }),
+			GDBUS_ARGS({ "type", "s" },
+			{ "name", "s" }, { "apn", "s" },
+			{ "username", "s" }, { "password", "s" },
+			{ "protocol", "i" }, { "auth_method", "i" }),
 			GDBUS_ARGS({ "path", "o" }),
 			gprs_add_context) },
 	{ GDBUS_ASYNC_METHOD("RemoveContext",
@@ -3293,7 +3344,7 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	if (apn[0] != '\0' && is_valid_apn(apn) == FALSE)
 		goto error;
 
-	context = pri_context_create(gprs, name, type);
+	context = pri_context_create(gprs, name, type, apn, username, password, proto, auth);
 	if (context == NULL)
 		goto error;
 
@@ -3422,7 +3473,8 @@ static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 	const struct ofono_gprs_driver *driver = gprs->driver;
 
 	if (gprs->contexts == NULL) /* Automatic provisioning failed */
-		add_context(gprs, NULL, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+		add_context(gprs, NULL, OFONO_GPRS_CONTEXT_TYPE_INTERNET,
+			NULL, NULL, NULL, OFONO_GPRS_PROTO_IPV4V6, OFONO_GPRS_AUTH_METHOD_NONE);
 
 	if (!g_dbus_register_interface(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
