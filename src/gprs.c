@@ -67,6 +67,7 @@ struct ofono_gprs {
 	ofono_bool_t powered;
 	ofono_bool_t suspended;
 	ofono_bool_t data_on;
+	char *preferred_apn;
 	int status;
 	int flags;
 	int bearer;
@@ -1840,6 +1841,11 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 				DBUS_TYPE_BOOLEAN, &value);
 	}
 
+	if (gprs->preferred_apn) {
+		const char *pref_apn = gprs->preferred_apn;
+		ofono_dbus_dict_append(&dict, "PreferredApn", DBUS_TYPE_STRING, &pref_apn);
+	}
+
 	dbus_message_iter_close_container(&iter, &dict);
 
 	return reply;
@@ -1853,6 +1859,7 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 	DBusMessageIter var;
 	const char *property;
 	dbus_bool_t value;
+	const char *value_str;
 	const char *path;
 
 	if (gprs->pending)
@@ -1934,6 +1941,18 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 		ofono_dbus_signal_property_changed(conn, path,
 				OFONO_CONNECTION_MANAGER_INTERFACE,
 					"DataSwitchChanged", DBUS_TYPE_BOOLEAN, &value);
+	} else if (!strcmp(property, "PreferredApn")) {
+		dbus_message_iter_get_basic(&var, &value_str);
+
+		if (gprs->settings && value_str) {
+			g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
+						"PreferredApn", value_str);
+			storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
+
+			if (gprs->preferred_apn)
+				g_free(gprs->preferred_apn);
+			gprs->preferred_apn = g_strdup(value_str);
+		}
 	} else {
 		return __ofono_error_invalid_args(msg);
 	}
@@ -3130,6 +3149,10 @@ static void free_contexts(struct ofono_gprs *gprs)
 
 		g_free(gprs->imsi);
 		gprs->imsi = NULL;
+
+		g_free(gprs->preferred_apn);
+		gprs->preferred_apn = NULL;
+
 		gprs->settings = NULL;
 	}
 
@@ -3468,6 +3491,20 @@ static void gprs_load_settings(struct ofono_gprs *gprs, const char *imsi)
 		g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
 					"RoamingAllowed",
 					gprs->roaming_allowed);
+	}
+
+	error = NULL;
+	gprs->preferred_apn = g_key_file_get_string(gprs->settings,
+							SETTINGS_GROUP,
+							"PreferredApn",
+							&error);
+
+	if (error) {
+		g_error_free(error);
+		gprs->preferred_apn = NULL;
+		g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
+					"PreferredApn",
+					gprs->preferred_apn);
 	}
 
 	groups = g_key_file_get_groups(gprs->settings, NULL);
