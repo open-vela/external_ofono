@@ -70,6 +70,26 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidArguments
 					 [service].Error.NotAllowed
 
+		void RequestNetwork()
+
+			Request data connection with the given APN type.
+			Usually, this only increases the reference count on the give APN type
+			if the connection on it was already existing.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.NotAllowed
+
+		void ReleaseNetwork()
+
+			Release data connection with given APN type.
+			Usually, this only decreases the reference count on the give APN type.
+			Only when the reference count reaches Zero, data connection will be deactivated.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.NotAllowed
+
 Signals		PropertyChanged(string property, variant value)
 
 			This signal indicates a changed value of the given
@@ -87,6 +107,16 @@ Signals		PropertyChanged(string property, variant value)
 			removed.  The object path of the context is only
 			included for reference.  Its properties are no
 			longer accessible at this point.
+
+		DataSwitchChanged(int32 status)
+
+			Signal that gets emitted when cellular data switch has been changed.
+			It contains cellular data switch status.
+
+		DataConnectionChanged(string apn_tpye, boolean active, string interface)
+
+			Signal that gets emitted when a context has been
+			changed.  It contains the conresponding apn type, status and interface.
 
 Properties	boolean Attached [readonly]
 
@@ -142,6 +172,18 @@ Properties	boolean Attached [readonly]
 			Controls whether packet radio use is allowed. Setting
 			this value to off detaches the modem from the
 			Packet Domain network.
+
+		boolean DataOn [readwrite]
+
+			Controls whether internet connection is allowed. Setting
+			this value to off deactivates internet connection from the
+			Packet Domain network.
+
+		string PreferredApn [readwrite]
+
+			Contains the context path of preferred apn.
+			If devices have multiple internet apns, then PreferredApn will be used for
+			data connection activation flow.
 
 Connection Context hierarchy
 =================
