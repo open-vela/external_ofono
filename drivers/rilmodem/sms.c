@@ -397,11 +397,11 @@ static void ril_sms_write_to_sim(struct ofono_sms *sms, const unsigned char *pdu
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, user_data);
+	CALLBACK_WITH_FAILURE(cb, -1, user_data);
 }
 
 static void ril_sms_delete_on_sim(struct ofono_sms *sms,
-			char *index, ofono_sms_delete_sms_on_sim_cb_t cb, void *user_data)
+			char *index, ofono_sms_delete_on_sim_cb_t cb, void *user_data)
 {
 	struct sms_data *sd = ofono_sms_get_data(sms);
 	struct cb_data *cbd = cb_data_new(cb, user_data, sd);
@@ -553,7 +553,7 @@ static const struct ofono_sms_driver driver = {
 	.remove		= ril_sms_remove,
 	.submit		= ril_cmgs,
 	.bearer_query   = ril_sms_bearer_query,
-	.bearer_set	= ril_sms_bearer_set
+	.bearer_set	= ril_sms_bearer_set,
 	.sms_write_to_sim   = ril_sms_write_to_sim,
 	.sms_delete_on_sim  = ril_sms_delete_on_sim,
 };
