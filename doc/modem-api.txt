@@ -182,3 +182,13 @@ Properties	boolean Powered [readwrite]
 			supported by this modem.
 
 			Possible values are "test", "hfp", "sap" and "hardware".
+
+		uint32 RadioState [readonly]
+
+			Indicates the radio status of the current modem.
+
+			Possible values are
+			0 - RADIO_STATUS_UNAVAILABLE
+			1 - RADIO_STATUS_ON
+			2 - RADIO_STATUS_OFF
+			3 - RADIO_STATUS_EMERGENCY_ONLY
