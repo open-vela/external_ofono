@@ -172,6 +172,13 @@ enum phone_status {
 	PHONE_STATUS_OFFHOOK = 2,
 };
 
+enum radio_status {
+	RADIO_STATUS_UNAVAILABLE = 0,
+	RADIO_STATUS_ON = 1,
+	RADIO_STATUS_OFF = 2,
+	RADIO_STATUS_EMERGENCY_ONLY = 3,
+};
+
 const char *telephony_error_to_str(const struct ofono_error *error);
 
 gboolean valid_number_format(const char *number, int length);
