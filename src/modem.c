@@ -83,6 +83,7 @@ struct ofono_modem {
 	guint			timeout;
 	guint			timeout_hint;
 	ofono_bool_t		online;
+	enum radio_status	status;
 	struct ofono_watchlist	*online_watches;
 	struct ofono_watchlist	*powered_watches;
 	guint			emergency;
@@ -289,6 +290,30 @@ const char *__ofono_atom_get_path(struct ofono_atom *atom)
 struct ofono_modem *__ofono_atom_get_modem(struct ofono_atom *atom)
 {
 	return atom->modem;
+}
+
+static void radio_status_change(struct ofono_modem *modem)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	enum radio_status status = modem->status;
+
+	if (modem->powered == FALSE) {
+		status = RADIO_STATUS_UNAVAILABLE;
+	} else if (modem->emergency == TRUE) {
+		status = RADIO_STATUS_EMERGENCY_ONLY;
+	} else if (modem->online == TRUE) {
+		status = RADIO_STATUS_ON;
+	} else {
+		status = RADIO_STATUS_OFF;
+	}
+
+	if (status != modem->status) {
+		modem->status = status;
+		ofono_dbus_signal_property_changed(conn, modem->path,
+					OFONO_MODEM_INTERFACE,
+					"RadioState",
+					DBUS_TYPE_UINT32, &modem->status);
+	}
 }
 
 static void call_watches(struct ofono_atom *atom,
@@ -508,6 +533,8 @@ static void notify_online_watches(struct ofono_modem *modem)
 		notify = item->notify;
 		notify(modem, modem->online, item->notify_data);
 	}
+
+	radio_status_change(modem);
 }
 
 static void notify_powered_watches(struct ofono_modem *modem)
@@ -524,6 +551,8 @@ static void notify_powered_watches(struct ofono_modem *modem)
 		notify = item->notify;
 		notify(modem, modem->powered, item->notify_data);
 	}
+
+	radio_status_change(modem);
 }
 
 static void set_online(struct ofono_modem *modem, ofono_bool_t new_online)
@@ -864,6 +893,9 @@ void __ofono_modem_append_properties(struct ofono_modem *modem,
 
 	ofono_dbus_dict_append(dict, "Emergency", DBUS_TYPE_BOOLEAN,
 				&emergency);
+
+	ofono_dbus_dict_append(dict, "RadioState", DBUS_TYPE_UINT32,
+				&modem->status);
 
 	info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
 	if (info) {
@@ -2371,6 +2403,8 @@ void __ofono_modem_inc_emergency_mode(struct ofono_modem *modem)
 						OFONO_MODEM_INTERFACE,
 						"Emergency", DBUS_TYPE_BOOLEAN,
 						&emergency);
+
+	radio_status_change(modem);
 }
 
 void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
@@ -2390,6 +2424,8 @@ void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 						OFONO_MODEM_INTERFACE,
 						"Emergency", DBUS_TYPE_BOOLEAN,
 						&emergency);
+
+	radio_status_change(modem);
 
 out:
 	modem->emergency--;
