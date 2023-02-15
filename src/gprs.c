@@ -59,6 +59,9 @@
 #define MAX_CONTEXTS 256
 #define SUSPEND_TIMEOUT 8
 
+/* Block packet data access due to restriction. */
+#define RIL_RESTRICTED_STATE_PS_ALL 0x10
+
 struct ofono_gprs {
 	GSList *contexts;
 	ofono_bool_t attached;
@@ -68,6 +71,7 @@ struct ofono_gprs {
 	ofono_bool_t suspended;
 	ofono_bool_t data_on;
 	char *preferred_apn;
+	ofono_bool_t restricted;
 	int status;
 	int flags;
 	int bearer;
@@ -986,6 +990,11 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 {
 	struct pri_context* ctx;
 	struct ofono_gprs_context* gc;
+
+	if (gprs->restricted) {
+		DBG("data call is not allowned due to ps restricted.");
+		return;
+	}
 
 	if (!gprs_context_type_allowed(apn_type)) {
 		DBG("requested apn type - %d not allowned for data call .", apn_type);
@@ -1971,6 +1980,9 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 
 	value = gprs->attached;
 	ofono_dbus_dict_append(&dict, "Attached", DBUS_TYPE_BOOLEAN, &value);
+
+	value = gprs->restricted;
+	ofono_dbus_dict_append(&dict, "Restricted", DBUS_TYPE_BOOLEAN, &value);
 
 	if (gprs->bearer != -1) {
 		const char *bearer = packet_bearer_to_string(gprs->bearer);
@@ -3053,6 +3065,22 @@ void ofono_gprs_bearer_notify(struct ofono_gprs *gprs, int bearer)
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
 					"Bearer", DBUS_TYPE_STRING, &value);
+}
+
+void ofono_gprs_restricted_notify(struct ofono_gprs *gprs, int status)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	ofono_bool_t value = status & RIL_RESTRICTED_STATE_PS_ALL;
+	const char *path;
+
+	if (gprs->restricted == value)
+		return;
+
+	gprs->restricted = value;
+	path = __ofono_atom_get_path(gprs->atom);
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_CONNECTION_MANAGER_INTERFACE,
+					"Restricted", DBUS_TYPE_BOOLEAN, &value);
 }
 
 void ofono_gprs_context_deactivated(struct ofono_gprs_context *gc,
