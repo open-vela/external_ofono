@@ -2094,7 +2094,7 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 		path = __ofono_atom_get_path(gprs->atom);
 		ofono_dbus_signal_property_changed(conn, path,
 				OFONO_CONNECTION_MANAGER_INTERFACE,
-					"DataSwitchChanged", DBUS_TYPE_BOOLEAN, &value);
+				"DataOn", DBUS_TYPE_BOOLEAN, &value);
 
 		if (gprs->data_on)
 			gprs_try_setup_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
@@ -2900,7 +2900,6 @@ static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("ContextAdded",
 			GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("ContextRemoved", GDBUS_ARGS({ "path", "o" })) },
-	{ GDBUS_SIGNAL("DataSwitchChanged", GDBUS_ARGS({ "status", "i" })) },
 	{ GDBUS_SIGNAL("DataConnectionChanged",
 			GDBUS_ARGS({ "type", "s" }, { "active", "b" },{ "interface", "s" })) },
 	{ }
