@@ -481,6 +481,24 @@ static void get_active_data_calls(struct ofono_gprs *gprs)
 		ofono_error("%s: send failed", __func__);
 }
 
+static void ril_gprs_restricted_state_change(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_gprs *gprs = user_data;
+	struct ril_gprs_data *gd = ofono_gprs_get_data(gprs);
+	struct parcel rilp;
+	int resticted_state;
+
+	g_ril_print_unsol_no_args(gd->ril, message);
+
+	g_ril_init_parcel(message, &rilp);
+
+	/* indication_type. */
+	parcel_r_int32(&rilp);
+	resticted_state = parcel_r_int32(&rilp);
+
+	ofono_gprs_restricted_notify(gprs, resticted_state);
+}
+
 static int ril_gprs_probe(struct ofono_gprs *gprs, unsigned int vendor,
 								void *userdata)
 {
@@ -498,6 +516,9 @@ static int ril_gprs_probe(struct ofono_gprs *gprs, unsigned int vendor,
 	ofono_gprs_set_data(gprs, gd);
 
 	get_active_data_calls(gprs);
+
+	g_ril_register(gd->ril, RIL_UNSOL_RESTRICTED_STATE_CHANGED,
+			ril_gprs_restricted_state_change, gprs);
 
 	return 0;
 }
