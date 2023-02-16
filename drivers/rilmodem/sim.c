@@ -40,6 +40,7 @@
 #include <gril/gril.h>
 #include <gril/grilutil.h>
 
+#include "common.h"
 #include "ofono.h"
 
 #include "simutil.h"
@@ -1469,6 +1470,32 @@ static void ril_query_facility_lock(struct ofono_sim *sim,
 	CALLBACK_WITH_FAILURE(cb, 0, data);
 }
 
+static void ril_query_fdn_lock(struct ofono_sim *sim,
+				ofono_query_facility_lock_cb_t cb,
+				void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sd);
+	struct parcel rilp;
+	char svcs_str[4];
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 4); /* # of strings */
+	parcel_w_string(&rilp, "FD"); /* SIM card or active application in the UICC (GSM or USIM)
+	                               * fixed dialling number feature */
+	parcel_w_string(&rilp, ""); /* Password is empty when not needed */
+	snprintf(svcs_str, sizeof(svcs_str), "%d", BEARER_CLASS_DEFAULT); /* Service class default */
+	parcel_w_string(&rilp, svcs_str);
+	parcel_w_string(&rilp, sd->aid_str);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_QUERY_FACILITY_LOCK, &rilp,
+			ril_query_facility_lock_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, 0, data);
+}
+
 static void ril_sim_remove(struct ofono_sim *sim)
 {
 	struct sim_data *sd = ofono_sim_get_data(sim);
@@ -1499,6 +1526,7 @@ static const struct ofono_sim_driver driver = {
 	.change_passwd		= ril_change_passwd,
 	.lock			= ril_set_facility_lock,
 	.query_facility_lock    = ril_query_facility_lock,
+	.query_fdn_lock		= ril_query_fdn_lock,
 };
 
 void ril_sim_init(void)
