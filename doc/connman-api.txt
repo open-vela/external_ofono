@@ -126,6 +126,15 @@ Properties	boolean Attached [readonly]
 			be available, e.g. receiving SMS over packet radio
 			or network initiated PDP activation.
 
+		int32 Status [readonly]
+
+			Contains the Packet Service Registration status as reported by the
+			GPRS service registration (if known).
+
+			Possible values are:
+			"0-not registerred", "1-registerred", "2-searching", "3-denied",
+			"4-unknown", "5-roaming".
+
 		string Bearer [readonly, optional]
 
 			Contains the data bearer technology as reported by the
