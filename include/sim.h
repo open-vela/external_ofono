@@ -211,6 +211,8 @@ struct ofono_sim_driver {
 			ofono_sim_logical_access_cb_t cb, void *data);
 	void (*set_active_card_slot)(struct ofono_sim *sim, unsigned int index,
 			ofono_sim_set_active_card_slot_cb_t cb, void *data);
+	void (*query_fdn_lock)(struct ofono_sim *sim,
+			ofono_query_facility_lock_cb_t cb, void *data);
 };
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d);

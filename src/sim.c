@@ -1310,6 +1310,50 @@ static DBusMessage *sim_reset_pin(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void sim_query_fdn_cb(const struct ofono_error *error, ofono_bool_t result, void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Query failed with error: %s",
+				telephony_error_to_str(error));
+
+		__ofono_dbus_pending_reply(&sim->pending,
+				__ofono_error_from_error(error, sim->pending));
+		return;
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN, &result);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+}
+
+static DBusMessage *sim_query_fdn(DBusConnection *conn, DBusMessage *msg,
+				void *data)
+{
+	struct ofono_sim *sim = data;
+
+	if (sim->state == OFONO_SIM_STATE_NOT_PRESENT)
+		return __ofono_error_failed(msg);
+
+	if (sim->driver->query_fdn_lock == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (sim->pending)
+		return __ofono_error_busy(msg);
+
+	sim->pending = dbus_message_ref(msg);
+	sim->driver->query_fdn_lock(sim, sim_query_fdn_cb, sim);
+
+	return NULL;
+}
+
 static const GDBusMethodTable sim_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1338,6 +1382,9 @@ static const GDBusMethodTable sim_methods[] = {
 			GDBUS_ARGS({ "id", "y" }),
 			GDBUS_ARGS({ "icon", "ay" }),
 			sim_get_icon) },
+	{ GDBUS_ASYNC_METHOD("QueryFdn",
+			NULL, GDBUS_ARGS({ "result", "b" }),
+			sim_query_fdn) },
 	{ }
 };
 
