@@ -1981,6 +1981,8 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 	value = gprs->attached;
 	ofono_dbus_dict_append(&dict, "Attached", DBUS_TYPE_BOOLEAN, &value);
 
+	ofono_dbus_dict_append(&dict, "Status", DBUS_TYPE_INT32, &gprs->netreg_status);
+
 	value = gprs->restricted;
 	ofono_dbus_dict_append(&dict, "Restricted", DBUS_TYPE_BOOLEAN, &value);
 
@@ -2942,10 +2944,20 @@ void ofono_gprs_detached_notify(struct ofono_gprs *gprs)
 
 void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 {
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path;
+
 	DBG("%s status %s (%d)", __ofono_atom_get_path(gprs->atom),
 			registration_status_to_string(status), status);
 
-	gprs->status = status;
+	if (gprs->status != status) {
+		gprs->status = status;
+
+		path = __ofono_atom_get_path(gprs->atom);
+		ofono_dbus_signal_property_changed(conn, path,
+			OFONO_CONNECTION_MANAGER_INTERFACE,
+			"Status", DBUS_TYPE_INT32, &status);
+	}
 
 	/*
 	 * If we're already taking action, e.g. attaching or detaching, then
