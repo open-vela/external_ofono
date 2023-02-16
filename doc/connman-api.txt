@@ -35,13 +35,23 @@ Methods		dict GetProperties()
 			Further changes shall be monitored via ContextAdded
 			ContextRemoved signals.
 
-		object AddContext(string type)
+		object AddContext(string type, string name, string apn,
+				string username, string password, int32 protocol, int32 auth_method)
 
-			Creates a new Primary context.  The type contains
-			the intended purpose of the context.
+			Creates a new Primary context.
+			The type contains the intended purpose of the context, like
+			"internet", and "mms";
+			The name contains apn entry name, like "China Mobile GPRS";
+			The apn contains access point name, like "cmnet", "ctnet" and so on;
+			The username contains apn username, and normally it's empty;
+			The password contains apn password, and normally it's empty;
+			The protocol contains supported ip protocol type, like "0 - ipv4",
+			"1 - ipv6" and "2 - ipv4v6";
+			The auth_method contains apn auth type, like
+			"0 - chap", "1 - pap" and "2 - none".
 
-			For possible values of the type parameter see the
-			Type documentation of ConnectionContext interface.
+			For possible values of the parameters see the
+			documentation of ConnectionContext interface.
 			Returns the object path of the created context.
 
 			Possible Errors: [service].Error.InvalidArguments
