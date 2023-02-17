@@ -79,6 +79,16 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidArguments
 					 [service].Error.Failed
 
+		int32 OpenLogicalChannel(string aid)
+
+			Open a new logical channel and select the given application.
+                        The session id of the logical channel will be returned.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
 		void SetProperty(string property, variant value)
 
 			Sets the given property value to that specified in
