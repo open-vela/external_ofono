@@ -49,6 +49,9 @@ struct ofono_gprs_driver {
 					ofono_gprs_cb_t cb, void *data);
 	void (*set_data_allow)(struct ofono_gprs *gprs, ofono_bool_t allow,
 					ofono_gprs_status_cb_t cb, void *data);
+	void (*set_data_profile)(struct ofono_gprs *gprs,
+					void *param, int length,
+					ofono_gprs_status_cb_t cb, void *data);
 };
 
 enum gprs_suspend_cause {

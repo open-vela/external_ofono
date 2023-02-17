@@ -3797,12 +3797,22 @@ static void gprs_list_active_contexts_callback(const struct ofono_error *error,
 	DBG("error = %d", error->type);
 }
 
+static void gprs_set_data_profile_callback(const struct ofono_error *error,
+						int status, void *data)
+{
+	DBG("error = %d", error->type);
+}
+
 static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
 	const char *path = __ofono_atom_get_path(gprs->atom);
 	const struct ofono_gprs_driver *driver = gprs->driver;
+	struct ofono_gprs_primary_context *contexts;
+	GSList *l;
+	int length;
+	int i;
 
 	if (gprs->contexts == NULL) /* Automatic provisioning failed */
 		add_context(gprs, NULL, OFONO_GPRS_CONTEXT_TYPE_INTERNET,
@@ -3833,6 +3843,21 @@ static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 		driver->list_active_contexts(gprs,
 					     gprs_list_active_contexts_callback,
 					     gprs);
+
+	/* Sync APN profile to modem side */
+	length = g_slist_length(gprs->contexts);
+	contexts = g_new0(struct ofono_gprs_primary_context, length);
+	if (contexts == NULL)
+		return;
+
+	i = 0;
+	for (l = gprs->contexts; l; l = l->next) {
+		struct pri_context *ctx = l->data;
+		contexts[i++] = ctx->context;
+	}
+
+	driver->set_data_profile(gprs, contexts, i, gprs_set_data_profile_callback, gprs);
+	g_free(contexts);
 }
 
 static void spn_read_cb(const char *spn, const char *dc, void *data)
