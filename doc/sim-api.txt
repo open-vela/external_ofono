@@ -89,6 +89,16 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidArguments
 					 [service].Error.Failed
 
+		void CloseLogicalChannel(int32 sessionid)
+
+			Close a previously opened logical channel given by
+                        the logical channel's session id.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
 		void SetProperty(string property, variant value)
 
 			Sets the given property value to that specified in
