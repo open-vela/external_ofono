@@ -1399,6 +1399,46 @@ static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
 	return NULL;
 }
 
+static void close_logical_channel_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during close logical channel");
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+		return;
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+}
+
+static DBusMessage *sim_close_logical_channel(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_sim *sim = data;
+	int session_id;
+
+	if (sim->pending)
+		return __ofono_error_busy(msg);
+
+	if (sim->driver->close_channel == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &session_id,
+					DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	sim->pending = dbus_message_ref(msg);
+
+	sim->driver->close_channel(sim, session_id, close_logical_channel_cb, sim);
+
+	return NULL;
+}
+
 static const GDBusMethodTable sim_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1434,6 +1474,9 @@ static const GDBusMethodTable sim_methods[] = {
 			GDBUS_ARGS({ "aid", "s" }),
 			GDBUS_ARGS({ "sessionid", "i" }),
 			sim_open_logical_channel) },
+	{ GDBUS_ASYNC_METHOD("CloseLogicalChannel",
+			GDBUS_ARGS({ "sessionid", "i" }), NULL,
+			sim_close_logical_channel) },
 	{ }
 };
 
