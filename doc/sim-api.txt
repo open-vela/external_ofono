@@ -99,6 +99,16 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidArguments
 					 [service].Error.Failed
 
+		string TransmitApduLogicalChannel(int32 sessionid, string pdu, uint32 len)
+
+			Transmit an APDU to the ICC card over a previously
+			opened logical channel.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
 		void SetProperty(string property, variant value)
 
 			Sets the given property value to that specified in

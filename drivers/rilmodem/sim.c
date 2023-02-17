@@ -1618,6 +1618,89 @@ static void ril_sim_close_channel(struct ofono_sim *sim, int session_id,
 	}
 }
 
+static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_sim_logical_access_cb_t cb = cbd->cb;
+	struct sim_data *sd = cbd->user;
+	int sw1, sw2;
+	char *hex_response;
+	unsigned char *response = NULL;
+	size_t len;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("RILD reply failure: %s",
+				ril_error_to_string(message->error));
+		goto error;
+	}
+
+	if (parse_sim_io(sd->ril, message, &sw1, &sw2, &hex_response) == FALSE)
+		goto error;
+
+	if (hex_response == NULL)
+		goto error;
+
+	response = l_util_from_hexstring(hex_response, &len);
+	g_free(hex_response);
+	hex_response = NULL;
+
+	if (response == NULL || len == 0) {
+		ofono_error("Null SIM IO response from RILD");
+		goto error;
+	}
+
+	CALLBACK_WITH_SUCCESS(cb, response, len, cbd->data);
+	l_free(response);
+	return;
+
+error:
+	l_free(response);
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
+}
+
+static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
+		const unsigned char *pdu, unsigned int len,
+		ofono_sim_logical_access_cb_t cb, void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sd);
+	struct parcel rilp;
+
+	if (len < 5) {
+		ofono_error("logical access parameter err.");
+		g_free(cbd);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+		return;
+	}
+
+	int cla = (int) *pdu;
+	int ins = (int) *pdu++;
+	int p1 = (int) *pdu++;
+	int p2 = (int) *pdu++;
+	int p3 = (int) *pdu++;
+	char *encoded_pdu_data = NULL;
+	if (len > 5)
+		encoded_pdu_data = l_util_hexstring(pdu++, len - 5);
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, session_id);
+	parcel_w_int32(&rilp, cla);
+	parcel_w_int32(&rilp, ins);
+	parcel_w_int32(&rilp, p1);
+	parcel_w_int32(&rilp, p2);
+	parcel_w_int32(&rilp, p3);
+	parcel_w_string(&rilp, encoded_pdu_data);
+
+	g_ril_append_print_buf(sd->ril, "(%d,%d,%d, %d,%d,%d,%s)", session_id, cla, ins, p1, p2, p3, encoded_pdu_data);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL, &rilp,
+			ril_sim_logical_access_cb, cbd, g_free) == 0) {
+		g_free(cbd);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+	}
+	l_free(encoded_pdu_data);
+}
+
 static const struct ofono_sim_driver driver = {
 	.name			= RILMODEM,
 	.probe			= ril_sim_probe,
@@ -1640,6 +1723,7 @@ static const struct ofono_sim_driver driver = {
 	.query_fdn_lock		= ril_query_fdn_lock,
 	.open_channel		= ril_sim_open_channel,
 	.close_channel		= ril_sim_close_channel,
+	.logical_access		= ril_sim_logical_access,
 };
 
 void ril_sim_init(void)
