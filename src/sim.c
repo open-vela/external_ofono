@@ -1354,6 +1354,51 @@ static DBusMessage *sim_query_fdn(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void open_logical_channel_cb(const struct ofono_error *error, int session_id,
+		void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during open logical channel");
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+		return;
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &session_id);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+}
+
+static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_sim *sim = data;
+	const unsigned char *aid;
+
+	if (sim->pending)
+		return __ofono_error_busy(msg);
+
+	if (sim->driver->open_channel == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &aid,
+					DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	sim->pending = dbus_message_ref(msg);
+
+	sim->driver->open_channel(sim, aid, open_logical_channel_cb, sim);
+
+	return NULL;
+}
+
 static const GDBusMethodTable sim_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1385,6 +1430,10 @@ static const GDBusMethodTable sim_methods[] = {
 	{ GDBUS_ASYNC_METHOD("QueryFdn",
 			NULL, GDBUS_ARGS({ "result", "b" }),
 			sim_query_fdn) },
+	{ GDBUS_ASYNC_METHOD("OpenLogicalChannel",
+			GDBUS_ARGS({ "aid", "s" }),
+			GDBUS_ARGS({ "sessionid", "i" }),
+			sim_open_logical_channel) },
 	{ }
 };
 
