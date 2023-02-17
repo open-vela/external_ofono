@@ -213,6 +213,10 @@ struct ofono_sim_driver {
 			ofono_sim_set_active_card_slot_cb_t cb, void *data);
 	void (*query_fdn_lock)(struct ofono_sim *sim,
 			ofono_query_facility_lock_cb_t cb, void *data);
+	void (*send_pin2)(struct ofono_sim *sim, const char *passwd,
+			ofono_sim_lock_unlock_cb_t cb, void *data);
+	void (*reset_pin2)(struct ofono_sim *sim, const char *puk2,
+			const char *passwd, ofono_sim_lock_unlock_cb_t cb, void *data);
 };
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d);

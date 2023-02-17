@@ -1036,6 +1036,22 @@ recheck:
 	__ofono_sim_recheck_pin(sim);
 }
 
+static void sim_enter_pin2_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during sim enter pin2");
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+}
+
 static DBusMessage *sim_enter_pin(DBusConnection *conn, DBusMessage *msg,
 					void *data)
 {
@@ -1043,9 +1059,6 @@ static DBusMessage *sim_enter_pin(DBusConnection *conn, DBusMessage *msg,
 	const char *typestr;
 	enum ofono_sim_password_type type;
 	const char *pin;
-
-	if (sim->driver->send_passwd == NULL)
-		return __ofono_error_not_implemented(msg);
 
 	if (sim->pending)
 		return __ofono_error_busy(msg);
@@ -1057,8 +1070,16 @@ static DBusMessage *sim_enter_pin(DBusConnection *conn, DBusMessage *msg,
 
 	type = sim_string_to_passwd(typestr);
 
-	if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type)
-		return __ofono_error_invalid_format(msg);
+	if (type == OFONO_SIM_PASSWORD_SIM_PIN2) {
+		if (sim->driver->send_pin2 == NULL)
+			return __ofono_error_not_implemented(msg);
+	} else {
+		if (sim->driver->send_passwd == NULL)
+			return __ofono_error_not_implemented(msg);
+
+		if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type)
+			return __ofono_error_invalid_format(msg);
+	}
 
 	if (password_is_pin(type) == FALSE)
 		return __ofono_error_invalid_format(msg);
@@ -1067,7 +1088,11 @@ static DBusMessage *sim_enter_pin(DBusConnection *conn, DBusMessage *msg,
 		return __ofono_error_invalid_format(msg);
 
 	sim->pending = dbus_message_ref(msg);
-	sim->driver->send_passwd(sim, pin, sim_enter_pin_cb, sim);
+
+	if (type == OFONO_SIM_PASSWORD_SIM_PIN2)
+		sim->driver->send_pin2(sim, pin, sim_enter_pin2_cb, sim);
+	else
+		sim->driver->send_passwd(sim, pin, sim_enter_pin_cb, sim);
 
 	return NULL;
 }
@@ -1279,9 +1304,6 @@ static DBusMessage *sim_reset_pin(DBusConnection *conn, DBusMessage *msg,
 	const char *puk;
 	const char *pin;
 
-	if (sim->driver->reset_passwd == NULL)
-		return __ofono_error_not_implemented(msg);
-
 	if (sim->pending)
 		return __ofono_error_busy(msg);
 
@@ -1293,8 +1315,16 @@ static DBusMessage *sim_reset_pin(DBusConnection *conn, DBusMessage *msg,
 
 	type = sim_string_to_passwd(typestr);
 
-	if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type)
+	if (type == OFONO_SIM_PASSWORD_SIM_PUK2) {
+		if (sim->driver->reset_pin2 == NULL)
+			return __ofono_error_not_implemented(msg);
+	} else {
+		if (sim->driver->reset_passwd == NULL)
+			return __ofono_error_not_implemented(msg);
+
+		if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type)
 		return __ofono_error_invalid_format(msg);
+	}
 
 	if (!__ofono_is_valid_sim_pin(puk, type))
 		return __ofono_error_invalid_format(msg);
@@ -1305,7 +1335,11 @@ static DBusMessage *sim_reset_pin(DBusConnection *conn, DBusMessage *msg,
 		return __ofono_error_invalid_format(msg);
 
 	sim->pending = dbus_message_ref(msg);
-	sim->driver->reset_passwd(sim, puk, pin, sim_enter_pin_cb, sim);
+
+	if (type == OFONO_SIM_PASSWORD_SIM_PIN2)
+		sim->driver->reset_pin2(sim, puk, pin, sim_enter_pin2_cb, sim);
+	else
+		sim->driver->reset_passwd(sim, puk, pin, sim_enter_pin_cb, sim);
 
 	return NULL;
 }

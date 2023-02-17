@@ -1153,6 +1153,31 @@ static void ril_pin_send(struct ofono_sim *sim, const char *passwd,
 	CALLBACK_WITH_FAILURE(cb, data);
 }
 
+static void ril_pin2_send(struct ofono_sim *sim, const char *passwd,
+				ofono_sim_lock_unlock_cb_t cb, void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sim);
+	struct parcel rilp;
+
+	sd->passwd_type = OFONO_SIM_PASSWORD_SIM_PIN2;
+
+	parcel_init(&rilp);
+
+	parcel_w_int32(&rilp, 2);
+	parcel_w_string(&rilp, passwd);
+	parcel_w_string(&rilp, sd->aid_str);
+
+	g_ril_append_print_buf(sd->ril, "(pin2=%s,aid=%s)", passwd, sd->aid_str);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PIN2, &rilp,
+			ril_enter_sim_pin_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
 static const char *const clck_cpwd_fac[] = {
 	[OFONO_SIM_PASSWORD_SIM_PIN] = "SC",
 	[OFONO_SIM_PASSWORD_SIM_PIN2] = "P2",
@@ -1297,6 +1322,65 @@ static void ril_pin_send_puk(struct ofono_sim *sim,
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PUK, &rilp,
 			ril_enter_sim_puk_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_enter_sim_puk2_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_sim_lock_unlock_cb_t cb = cbd->cb;
+	struct ofono_sim *sim = cbd->user;
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct parcel rilp;
+
+	g_ril_init_parcel(message, &rilp);
+
+	parcel_r_int32(&rilp);
+
+	if (message->error != RIL_E_SUCCESS) {
+		sd->retries[OFONO_SIM_PASSWORD_SIM_PUK2] = parcel_r_int32(&rilp);
+	} else {
+		sd->retries[OFONO_SIM_PASSWORD_SIM_PIN2] = -1;
+		sd->retries[OFONO_SIM_PASSWORD_SIM_PUK2] = -1;
+	}
+
+	g_ril_append_print_buf(sd->ril, "{%d}",
+				sd->retries[OFONO_SIM_PASSWORD_SIM_PUK2]);
+	g_ril_print_response(sd->ril, message);
+
+	if (message->error == RIL_E_SUCCESS) {
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+		return;
+	}
+
+	CALLBACK_WITH_FAILURE(cb, cbd->data);
+}
+
+static void ril_pin2_send_puk2(struct ofono_sim *sim,
+				const char *puk2, const char *passwd,
+				ofono_sim_lock_unlock_cb_t cb, void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sim);
+	struct parcel rilp;
+
+	sd->passwd_type = OFONO_SIM_PASSWORD_SIM_PUK2;
+
+	parcel_init(&rilp);
+
+	parcel_w_int32(&rilp, 3);
+	parcel_w_string(&rilp, puk2);
+	parcel_w_string(&rilp, passwd);
+	parcel_w_string(&rilp, sd->aid_str);
+
+	g_ril_append_print_buf(sd->ril, "(puk2=%s,pin2=%s,aid=%s)",
+				puk2, passwd, sd->aid_str);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PUK2, &rilp,
+			ril_enter_sim_puk2_cb, cbd, g_free) > 0)
 		return;
 
 	g_free(cbd);
@@ -1724,6 +1808,8 @@ static const struct ofono_sim_driver driver = {
 	.open_channel		= ril_sim_open_channel,
 	.close_channel		= ril_sim_close_channel,
 	.logical_access		= ril_sim_logical_access,
+	.send_pin2		= ril_pin2_send,
+	.reset_pin2		= ril_pin2_send_puk2,
 };
 
 void ril_sim_init(void)
