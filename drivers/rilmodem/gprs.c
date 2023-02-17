@@ -341,6 +341,64 @@ static void ril_gprs_set_data_allow(struct ofono_gprs *gprs, ofono_bool_t allow,
 	}
 }
 
+static void ril_set_data_profile_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_gprs_status_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("%s: RIL_REQUEST_SET_DATA_PROFILE reply failure: %s",
+				__func__,
+				ril_error_to_string(message->error));
+
+		if (cb != NULL) {
+			CALLBACK_WITH_FAILURE(cb, message->error, user_data);
+			return;
+		}
+	}
+
+	if (cb != NULL)
+		CALLBACK_WITH_SUCCESS(cb, RIL_E_SUCCESS, user_data);
+}
+
+static void ril_gprs_set_data_profile(struct ofono_gprs *gprs,
+		void *param, int length, ofono_gprs_status_cb_t cb, void *data)
+{
+	struct ril_gprs_data *gd = ofono_gprs_get_data(gprs);
+	struct cb_data *cbd = cb_data_new(cb, data, gprs);
+	struct ofono_gprs_primary_context *contexts = param;
+	struct ofono_gprs_primary_context pri_ctx;
+	struct parcel rilp;
+	int i;
+
+	if (contexts == NULL)
+		return;
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, length);
+
+	for (i = 0; i < length; i++) {
+		pri_ctx = *(contexts + i);
+
+		parcel_w_string(&rilp, pri_ctx.apn);
+		parcel_w_string(&rilp, pri_ctx.username);
+		parcel_w_string(&rilp, pri_ctx.password);
+		parcel_w_int32(&rilp, pri_ctx.proto);
+		parcel_w_int32(&rilp, pri_ctx.auth_method);
+	}
+
+	if (g_ril_send(gd->ril, RIL_REQUEST_SET_DATA_PROFILE, &rilp,
+			ril_set_data_profile_cb, cbd, g_free) == 0) {
+		ofono_error("%s: send "
+				"RIL_REQUEST_SET_DATA_PROFILE failed",
+				__func__);
+		g_free(cbd);
+
+		if (cb != NULL)
+			CALLBACK_WITH_FAILURE(cb, -1, data);
+	}
+}
+
 static void query_max_cids_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_gprs *gprs = user_data;
@@ -584,6 +642,7 @@ static const struct ofono_gprs_driver driver = {
 	.set_attached		= ril_gprs_set_attached,
 	.attached_status	= ril_gprs_registration_status,
 	.set_data_allow		= ril_gprs_set_data_allow,
+	.set_data_profile	= ril_gprs_set_data_profile,
 };
 
 void ril_gprs_init(void)
