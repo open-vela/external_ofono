@@ -787,7 +787,7 @@ next_q:
 	}
 }
 
-static void tx_write_to_sim_finish(const struct ofono_error *error, int mr, void *data)
+static void tx_write_to_sim_finish(const struct ofono_error *error, void *data)
 {
 	DBG("tx_write_to_sim_finish result: %d", error->type == OFONO_ERROR_TYPE_NO_ERROR);
 }
@@ -1084,7 +1084,7 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	struct ofono_sms *sms = data;
 	const char *to;
 	const unsigned char *text;
-	const char *port;
+	unsigned char port;
 	GSList *msg_list;
 	unsigned int flags;
 	gboolean use_16bit_ref = FALSE;
@@ -1092,7 +1092,7 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	struct ofono_uuid uuid;
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
-					DBUS_TYPE_STRING, &port,
+					DBUS_TYPE_BYTE, &port,
 					DBUS_TYPE_STRING, &text,
 					DBUS_TYPE_INVALID))
 		return __ofono_error_invalid_args(msg);
@@ -1100,14 +1100,11 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	if (valid_phone_number_format(to) == FALSE)
 		return __ofono_error_invalid_format(msg);
 
-	if (port == NULL)
-		return __ofono_error_invalid_format(msg);
-
-	if (atoi(port) < 0 || atoi(port) > 65535)
+	if (port < 0 || port > 65535)
 		return __ofono_error_invalid_format(msg);
 
 	msg_list = sms_datagram_prepare(to, text, sizeof(text), sms->ref,
-						use_16bit_ref, 0, atoi(port), true,
+						use_16bit_ref, 0, port, true,
 						sms->use_delivery_reports);
 
 	if (msg_list == NULL)
@@ -1144,17 +1141,16 @@ static DBusMessage *copy_message_to_sim(DBusConnection *conn, DBusMessage *msg,
 	struct ofono_sms *sms = data;
 	const char *phone_num;
 	const char *text;
-	const char *box_id;
+	int type;
 	char *time_stamp;
 	GSList *msg_list;
 	unsigned int flags = 0;
-	unsigned int type = 0;
 	gboolean use_16bit_ref = FALSE;
 	int err;
 	struct ofono_uuid uuid;
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &phone_num,
-					DBUS_TYPE_STRING, &text, DBUS_TYPE_STRING, &box_id,
+					DBUS_TYPE_STRING, &text, DBUS_TYPE_INT32, &type,
 					DBUS_TYPE_STRING, &time_stamp,
 					DBUS_TYPE_INVALID))
 		return __ofono_error_invalid_args(msg);
@@ -1181,17 +1177,114 @@ static DBusMessage *copy_message_to_sim(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void append_sms_on_sim(char * message, struct sms *s,
+					DBusMessageIter *entry)
+{
+	ofono_dbus_dict_append(entry, "Type", DBUS_TYPE_INT32, &s->type);
+	ofono_dbus_dict_append(entry, "To", DBUS_TYPE_STRING, &s->deliver.oaddr);
+	ofono_dbus_dict_append(entry, "Text", DBUS_TYPE_STRING, &message);
+	ofono_dbus_dict_append(entry, "Date", DBUS_TYPE_STRING, &s->deliver.scts);
+}
+
+static void sim_sms_read_cb(int ok, int total_length, int record,
+			const unsigned char *data, int record_length,
+			void *userdata)
+{
+	struct ofono_sms *sms = userdata;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter array;
+	DBusMessageIter entry, dict;
+	struct simple_tlv_iter tlv_iter;
+	GSList *sms_list;
+	const char *path;
+	guint16 ref;
+	guint8 max;
+	guint8 seq;
+
+	if (!ok) {
+		reply = __ofono_error_failed(sms->pending);
+		__ofono_dbus_pending_reply(&sms->pending, reply);
+		return;
+	}
+
+	reply = dbus_message_new_method_return(sms->pending);
+	if (reply == NULL)
+		return;
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_STRUCT_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_OBJECT_PATH_AS_STRING
+					DBUS_TYPE_ARRAY_AS_STRING
+					DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_STRING_AS_STRING
+					DBUS_TYPE_VARIANT_AS_STRING
+					DBUS_DICT_ENTRY_END_CHAR_AS_STRING
+					DBUS_STRUCT_END_CHAR_AS_STRING,
+					&array);
+
+	simple_tlv_iter_init(&tlv_iter, &data[1], total_length - 1);
+
+	while (simple_tlv_iter_next(&tlv_iter)) {
+		struct sms s;
+		if (simple_tlv_iter_get_tag(&tlv_iter) != 0xDD)
+			continue;
+		if (simple_tlv_iter_get_length(&tlv_iter) < 0) {
+			break;
+		}
+		sms_decode(simple_tlv_iter_get_data(&tlv_iter) + 1,
+					simple_tlv_iter_get_length(&tlv_iter) - 1,
+					FALSE, simple_tlv_iter_get_data(&tlv_iter)[0], &s);
+
+		if (sms_extract_concatenation(&s, &ref, &max, &seq)) {
+
+			if (sms->assembly == NULL)
+				break;
+
+			sms_list = sms_assembly_add_fragment(sms->assembly,
+							&s, time(NULL),
+							&s.deliver.oaddr,
+							ref, max, seq);
+
+			if (sms_list == NULL)
+				break;
+		}
+
+		char *message = sms_decode_text(sms_list);
+
+		path = __ofono_atom_get_path(sms->atom);
+
+		dbus_message_iter_open_container(&array, DBUS_TYPE_STRUCT,
+							NULL, &entry);
+		dbus_message_iter_append_basic(&entry, DBUS_TYPE_OBJECT_PATH,
+						&path);
+		dbus_message_iter_open_container(&entry, DBUS_TYPE_ARRAY,
+					OFONO_PROPERTIES_ARRAY_SIGNATURE,
+					&dict);
+
+		append_sms_on_sim(message, &s, &dict);
+		dbus_message_iter_close_container(&entry, &dict);
+		dbus_message_iter_close_container(&array, &entry);
+
+	}
+
+	dbus_message_iter_close_container(&iter, &array);
+
+	__ofono_dbus_pending_reply(&sms->pending, reply);
+}
+
 static void delete_message_from_sim_callback(const struct ofono_error *error,
-					void *data)
+					int mr, void *data)
 {
 	struct ofono_sms *sms = data;
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("delete message succeeded, but query failed");
-		sms->flags &= ~MESSAGE_MANAGER_FLAG_CACHED;
-		reply = __ofono_error_failed(sms->pending);
-		__ofono_dbus_pending_reply(&sms->pending, reply);
+		ofono_error("delete message fail!");
+		__ofono_dbus_pending_reply(&sms->pending,
+					__ofono_error_failed(sms->pending));
 		return;
 	}
 
@@ -1211,23 +1304,50 @@ static DBusMessage *delete_message_from_sim(DBusConnection *conn, DBusMessage *m
 					void *data)
 {
 	struct ofono_sms *sms = data;
-	DBusMessageIter iter;
-	char *index_id;
+	int index;
 
 	if (sms->pending)
 		return __ofono_error_busy(msg);
 
-	if (!dbus_message_iter_init(msg, &iter))
+	if (!dbus_message_get_args(msg, NULL,
+					DBUS_TYPE_INT32, &index,
+					DBUS_TYPE_INVALID))
 		return __ofono_error_invalid_args(msg);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
-		return __ofono_error_invalid_args(msg);
-
-	dbus_message_iter_get_basic(&iter, &index_id);
+	if (index < 0)
+		return __ofono_error_invalid_format(msg);
 
 	sms->pending = dbus_message_ref(msg);
 
-	sms->driver->sms_delete_on_sim(sms, index_id, delete_message_from_sim_callback, sms);
+	sms->driver->sms_delete_on_sim(sms, index, delete_message_from_sim_callback, sms);
+
+	return NULL;
+}
+
+/*
+ * get all messages from sim
+ *
+ * @conn: D-Bus connection
+ * @msg: message data (telephone number and text)
+ * @data: SMS object to use for transmision
+ *
+ */
+static DBusMessage *get_all_messages_from_sim(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_sms *sms = data;
+	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
+	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
+	struct ofono_sim_context *sim_context = ofono_sim_context_create(sim);
+
+	if (sms->pending)
+		return __ofono_error_busy(msg);
+
+	sms->pending = dbus_message_ref(msg);
+
+	ofono_sim_read(sim_context, SIM_ISIM_EFSMS_FILEID,
+			OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
+			sim_sms_read_cb, sms);
 
 	return NULL;
 }
@@ -1350,7 +1470,7 @@ static const GDBusMethodTable sms_manager_methods[] = {
 			GDBUS_ARGS({ "path", "o" }),
 			sms_send_message) },
 	{ GDBUS_ASYNC_METHOD("SendDataMessage",
-			GDBUS_ARGS({ "to", "s" }, { "port", "s" }, { "text", "s" } ),
+			GDBUS_ARGS({ "to", "s" }, { "port", "y" }, { "text", "s" } ),
 			GDBUS_ARGS({ "path", "o" }),
 			sms_send_data_message) },
 	{ GDBUS_METHOD("GetMessages",
@@ -1358,12 +1478,16 @@ static const GDBusMethodTable sms_manager_methods[] = {
 			sms_get_messages) },
 	{ GDBUS_ASYNC_METHOD("InsertMessageToSim",
 			GDBUS_ARGS({ "phone_num", "s" }, { "text", "s" },
-			{ "box_id", "s" }, { "time_stamp", "s" }),
+			{ "type", "s" }, { "time_stamp", "s" }),
 			NULL, copy_message_to_sim) },
 	{ GDBUS_ASYNC_METHOD("DeleteMessageFromSim",
-			GDBUS_ARGS({ "index_id", "s" }),
+			GDBUS_ARGS({ "index", "i" }),
 			GDBUS_ARGS({ "path", "o" }),
 			delete_message_from_sim) },
+	{ GDBUS_ASYNC_METHOD("GetAllMessagesFromSim",
+			NULL,
+			GDBUS_ARGS({ "messages", "a(oa{sv})" }),
+			get_all_messages_from_sim) },
 	{ }
 };
 
