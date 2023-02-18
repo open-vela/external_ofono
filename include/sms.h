@@ -43,7 +43,7 @@ typedef void (*ofono_sms_bearer_query_cb_t)(const struct ofono_error *error,
 						int bearer, void *data);
 typedef void (*ofono_sms_write_to_sim_cb_t)(const struct ofono_error *error,
 					void *data);
-typedef void (*ofono_sms_delete_on_sim_cb_t)(const struct ofono_error *error,
+typedef void (*ofono_sms_delete_on_sim_cb_t)(const struct ofono_error *error, int mr,
 					void *data);
 
 struct ofono_sms_driver {
@@ -64,8 +64,8 @@ struct ofono_sms_driver {
 				ofono_sms_bearer_set_cb_t, void *data);
 	void (*sms_write_to_sim)(struct ofono_sms *sms, const unsigned char *pdu,
 			int pdu_len, int tpdu_len, int mms,
-			ofono_sms_submit_cb_t cb, void *data);
-	void (*sms_delete_on_sim)(struct ofono_sms *sms, char *index,
+			ofono_sms_write_to_sim_cb_t cb, void *data);
+	void (*sms_delete_on_sim)(struct ofono_sms *sms, int index,
 				ofono_sms_delete_on_sim_cb_t cb, void *user_data);
 };
 

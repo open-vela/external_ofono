@@ -46,6 +46,51 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 
+		object SendDataMessage(string to, unsigned char port, string text)
+
+			Send the message in data to the address in to & port.
+			If the message could be queued successfully, this method
+			returns an object path to the created Message object.
+
+			Possible Errors: [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		array{object,dict} GetAllMessagesFromSim()
+
+			Get an array of message object paths and properties
+			that current sim card messages;
+
+			This method call should only be used once when
+			sim card message starts up.  Further message additions
+			and removal shall be monitored via InsertMessageToSim
+			and DeleteMessageFromSim to control sim card.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.Failed
+
+		void InsertMessageToSim(string phone_num, string text,
+			string type, string time_stamp)
+
+			Save the message to sim card for the special text & phone num.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		void DeleteMessageFromSim(string index)
+
+			Delete the index message from sim card.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string name, variant value)
 
 			This signal indicates a changed value of the given
