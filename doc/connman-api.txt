@@ -119,10 +119,11 @@ Signals		PropertyChanged(string property, variant value)
 			longer accessible at this point.
 
 
-		DataConnectionChanged(string apn_tpye, boolean active, string interface)
+		ContextChanged(object path, dict properties)
 
 			Signal that gets emitted when a context has been
-			changed.  It contains the conresponding apn type, status and interface.
+			changed.  It contains the context object path
+			and its properties.
 
 Properties	boolean Attached [readonly]
 
