@@ -184,6 +184,45 @@ static void ril_submit_sms_cb(struct ril_msg *message, gpointer user_data)
 	CALLBACK_WITH_SUCCESS(cb, mr, cbd->data);
 }
 
+static void ril_write_sms_to_sim_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_sms_write_to_sim_cb_t cb = cbd->cb;
+	struct sms_data *sd = cbd->user;
+
+	if (message->error == RIL_E_SUCCESS) {
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+	} else {
+		ofono_error("%s RILD reply failure: %s",
+			g_ril_request_id_to_string(sd->ril, message->req),
+			ril_error_to_string(message->error));
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+	}
+}
+
+static void ril_delete_sms_on_sim_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_sms_delete_on_sim_cb_t cb = cbd->cb;
+	struct sms_data *sd = cbd->user;
+	struct parcel rilp;
+	int mr;
+
+	if (message->error != RIL_E_SUCCESS) {
+		CALLBACK_WITH_FAILURE(cb, 0, cbd->data);
+		return;
+	}
+
+	g_ril_init_parcel(message, &rilp);
+
+	mr = parcel_r_int32(&rilp);
+
+	g_ril_append_print_buf(sd->ril, "{%d}", mr);
+	g_ril_print_response(sd->ril, message);
+
+	CALLBACK_WITH_SUCCESS(cb, mr, cbd->data);
+}
+
 static void imc_sms_bearer_query_cb(struct ril_msg *message,
 					gpointer user_data)
 {
@@ -378,30 +417,56 @@ static void ril_cmgs(struct ofono_sms *sms, const unsigned char *pdu,
 
 static void ril_sms_write_to_sim(struct ofono_sms *sms, const unsigned char *pdu,
                                 			int pdu_len, int tpdu_len, int mms,
-                                			ofono_sms_submit_cb_t cb, void *user_data)
+                                			ofono_sms_write_to_sim_cb_t cb, void *user_data)
 {
 	struct sms_data *sd = ofono_sms_get_data(sms);
 	struct cb_data *cbd = cb_data_new(cb, user_data, sd);
 	struct parcel rilp;
+	int smsc_len;
 	char hexbuf[tpdu_len * 2 + 1];
 
 	DBG("pdu_len: %d", pdu_len);
 
 	parcel_init(&rilp);
 
-	encode_hex_own_buf(pdu, tpdu_len, 0, hexbuf);
+	parcel_w_int32(&rilp, 2);	/* Number of strings */
+
+	/*
+	 * SMSC address:
+	 *
+	 * smsc_len == 1, then zero-length SMSC was spec'd
+	 * RILD expects a NULL string in this case instead
+	 * of a zero-length string.
+	 */
+	smsc_len = pdu_len - tpdu_len;
+	/* TODO: encode SMSC & write to parcel */
+	if (smsc_len > 1)
+		ofono_error("SMSC address specified (smsc_len %d); "
+				"NOT-IMPLEMENTED", smsc_len);
+
+	parcel_w_string(&rilp, NULL); /* SMSC address; NULL == default */
+
+	/*
+	 * TPDU:
+	 *
+	 * 'pdu' is a raw hexadecimal string
+	 *  encode_hex() turns it into an ASCII/hex UTF8 buffer
+	 *  parcel_w_string() encodes utf8 -> utf16
+	 */
+	encode_hex_own_buf(pdu + smsc_len, tpdu_len, 0, hexbuf);
+
 	parcel_w_string(&rilp, hexbuf); /*write sms pdu*/
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_WRITE_SMS_TO_SIM, &rilp,
-			ril_submit_sms_cb, cbd, g_free) > 0)
+			ril_write_sms_to_sim_cb, cbd, g_free) > 0)
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, -1, user_data);
+	CALLBACK_WITH_FAILURE(cb, user_data);
 }
 
 static void ril_sms_delete_on_sim(struct ofono_sms *sms,
-			char *index, ofono_sms_delete_on_sim_cb_t cb, void *user_data)
+			int index, ofono_sms_delete_on_sim_cb_t cb, void *user_data)
 {
 	struct sms_data *sd = ofono_sms_get_data(sms);
 	struct cb_data *cbd = cb_data_new(cb, user_data, sd);
@@ -409,14 +474,14 @@ static void ril_sms_delete_on_sim(struct ofono_sms *sms,
 
 	parcel_init(&rilp);
 
-	parcel_w_string(&rilp, index); /* delete sms index */
+	parcel_w_int32(&rilp, index); /* delete sms index */
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_DELETE_SMS_ON_SIM, &rilp,
-			ril_submit_sms_cb, cbd, g_free) > 0)
+			ril_delete_sms_on_sim_cb, cbd, g_free) > 0)
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, user_data);
+	CALLBACK_WITH_FAILURE(cb, -1, user_data);
 }
 
 static void ril_ack_delivery_cb(struct ril_msg *message, gpointer user_data)
