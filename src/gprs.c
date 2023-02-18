@@ -149,6 +149,7 @@ static void gprs_netreg_update(struct ofono_gprs *gprs);
 static void gprs_deactivate_next(struct ofono_gprs *gprs);
 static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type);
 static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type);
+static void gprs_context_changed(struct pri_context *context);
 
 static GSList *g_drivers = NULL;
 static GSList *g_context_drivers = NULL;
@@ -573,30 +574,12 @@ static void pri_context_signal_settings(struct pri_context *ctx,
 	if (ipv6)
 		signal_settings(ctx, "IPv6.Settings",
 				context_settings_append_ipv6);
-}
 
-static void pri_data_connection_changed(struct pri_context *ctx,  const char *interface)
-
-{
-	struct ofono_gprs *gprs = ctx->gprs;
-	DBusConnection *conn = ofono_dbus_get_connection();
-	DBusMessage *signal;
-	DBusMessageIter iter;
-
-	const char *atompath = __ofono_atom_get_path(gprs->atom);
-	signal = dbus_message_new_signal(atompath,
-					OFONO_CONNECTION_MANAGER_INTERFACE,
-					"DataConnectionChanged");
-
-	if (signal == NULL)
-		return;
-
-	dbus_message_iter_init_append(signal, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ctx->type);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN, &ctx->active);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &interface);
-
-	g_dbus_send_message(conn, signal);
+	/**
+	 * send signal through OFONO_CONNECTION_MANAGER_INTERFACE, indicating
+	 * which data connection or network (internet, mms, ims ...) is changing.
+	 */
+	gprs_context_changed(ctx);
 }
 
 static void pri_parse_proxy(struct pri_context *ctx, const char *proxy)
@@ -924,8 +907,6 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 
 		pri_context_signal_settings(ctx, gc->settings->ipv4 != NULL,
 						gc->settings->ipv6 != NULL);
-
-		pri_data_connection_changed(ctx, gc->interface);
 	}
 
 	value = ctx->active;
@@ -945,7 +926,6 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 static void pri_deactivate_callback(const struct ofono_error *error, void *data)
 {
 	struct pri_context *ctx = data;
-	struct ofono_gprs_context *gc;
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t value;
 
@@ -968,10 +948,6 @@ static void pri_deactivate_callback(const struct ofono_error *error, void *data)
 	ofono_dbus_signal_property_changed(conn, ctx->path,
 					OFONO_CONNECTION_CONTEXT_INTERFACE,
 					"Active", DBUS_TYPE_BOOLEAN, &value);
-
-	gc = ctx->context_driver;
-	if (gc)
-		pri_data_connection_changed(ctx, gc->interface);
 
 	/*
 	 * If "Attached" property was about to be signalled as TRUE but there
@@ -1080,6 +1056,36 @@ static void gprs_set_attached_property(struct ofono_gprs *gprs,
 	ofono_dbus_signal_property_changed(conn, path,
 				OFONO_CONNECTION_MANAGER_INTERFACE,
 				"Attached", DBUS_TYPE_BOOLEAN, &value);
+}
+
+static void gprs_context_changed(struct pri_context *context)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	struct ofono_gprs *gprs = context->gprs;
+	const char *path;
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	DBusMessageIter dict;
+
+	path = __ofono_atom_get_path(gprs->atom);
+	signal = dbus_message_new_signal(path,
+					OFONO_CONNECTION_MANAGER_INTERFACE,
+					"ContextChanged");
+	if (!signal)
+		return;
+
+	dbus_message_iter_init_append(signal, &iter);
+
+	path = context->path;
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_OBJECT_PATH, &path);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					OFONO_PROPERTIES_ARRAY_SIGNATURE,
+					&dict);
+	append_context_properties(context, &dict);
+	dbus_message_iter_close_container(&iter, &dict);
+
+	g_dbus_send_message(conn, signal);
 }
 
 static void pri_read_settings_callback(const struct ofono_error *error,
@@ -2914,8 +2920,8 @@ static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("ContextAdded",
 			GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("ContextRemoved", GDBUS_ARGS({ "path", "o" })) },
-	{ GDBUS_SIGNAL("DataConnectionChanged",
-			GDBUS_ARGS({ "type", "s" }, { "active", "b" },{ "interface", "s" })) },
+	{ GDBUS_SIGNAL("ContextChanged",
+			GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ }
 };
 
