@@ -127,6 +127,28 @@ Methods		dict GetProperties()
 					 [service].Error.NotImplemented
 					 [service].Error.Failed
 
+		void EnableFdn(string password)
+
+			Set the ICC fdn enabled. Password needed to
+			change the ICC fdn enable, aka Pin2.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		void DisableFdn(string password)
+
+			Set the ICC fdn disabled. Password needed to
+			change the ICC fdn disable, aka Pin2.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string name, variant value)
 
 			This signal indicates a changed value of the given

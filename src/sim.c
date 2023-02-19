@@ -1344,6 +1344,64 @@ static DBusMessage *sim_reset_pin(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void sim_enable_or_disable_fdn_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during sim enable or disable fdn");
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+}
+
+static DBusMessage *sim_enable_or_disable_fdn(struct ofono_sim *sim, int enable,
+					DBusConnection *conn, DBusMessage *msg)
+{
+	const char *passwd;
+
+	if (sim->driver->lock_fdn == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (sim->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &passwd,
+					DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (!__ofono_is_valid_sim_pin(passwd, OFONO_SIM_PASSWORD_SIM_PIN2))
+		return __ofono_error_invalid_format(msg);
+
+	sim->pending = dbus_message_ref(msg);
+
+	sim->driver->lock_fdn(sim, enable, passwd,
+				sim_enable_or_disable_fdn_cb, sim);
+
+	return NULL;
+}
+
+static DBusMessage *sim_enable_fdn(DBusConnection *conn, DBusMessage *msg,
+				void *data)
+{
+	struct ofono_sim *sim = data;
+
+	return sim_enable_or_disable_fdn(sim, 1, conn, msg);
+}
+
+static DBusMessage *sim_disable_fdn(DBusConnection *conn, DBusMessage *msg,
+				void *data)
+{
+	struct ofono_sim *sim = data;
+
+	return sim_enable_or_disable_fdn(sim, 0, conn, msg);
+}
+
 static void sim_query_fdn_cb(const struct ofono_error *error, ofono_bool_t result, void *data)
 {
 	struct ofono_sim *sim = data;
@@ -1564,6 +1622,12 @@ static const GDBusMethodTable sim_methods[] = {
 			GDBUS_ARGS({ "sessionid", "i" }, {"pdu", "s"}, {"len", "u"}),
 			GDBUS_ARGS({ "response", "s" }),
 			sim_logical_access) },
+	{ GDBUS_ASYNC_METHOD("EnableFdn",
+			GDBUS_ARGS({ "password", "s" }), NULL,
+			sim_enable_fdn) },
+	{ GDBUS_ASYNC_METHOD("DisableFdn",
+			GDBUS_ARGS({ "password", "s" }), NULL,
+			sim_disable_fdn) },
 	{ }
 };
 
