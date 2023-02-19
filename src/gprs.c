@@ -184,12 +184,18 @@ static const char *gprs_context_default_name(enum ofono_gprs_context_type type)
 		return NULL;
 	case OFONO_GPRS_CONTEXT_TYPE_INTERNET:
 		return "Internet";
+	case OFONO_GPRS_CONTEXT_TYPE_HIPRI:
+		return "HIPRI";
+	case OFONO_GPRS_CONTEXT_TYPE_SUPL:
+		return "SUPL";
 	case OFONO_GPRS_CONTEXT_TYPE_MMS:
 		return "MMS";
 	case OFONO_GPRS_CONTEXT_TYPE_WAP:
 		return "WAP";
 	case OFONO_GPRS_CONTEXT_TYPE_IMS:
 		return "IMS";
+	case OFONO_GPRS_CONTEXT_TYPE_EMERGENCY:
+		return "EMERGENCY";
 	case OFONO_GPRS_CONTEXT_TYPE_IA:
 		return "IA";
 	}
@@ -205,12 +211,18 @@ static const char *gprs_context_type_to_string(
 		return NULL;
 	case OFONO_GPRS_CONTEXT_TYPE_INTERNET:
 		return "internet";
+	case OFONO_GPRS_CONTEXT_TYPE_HIPRI:
+		return "hipri";
+	case OFONO_GPRS_CONTEXT_TYPE_SUPL:
+		return "supl";
 	case OFONO_GPRS_CONTEXT_TYPE_MMS:
 		return "mms";
 	case OFONO_GPRS_CONTEXT_TYPE_WAP:
 		return "wap";
 	case OFONO_GPRS_CONTEXT_TYPE_IMS:
 		return "ims";
+	case OFONO_GPRS_CONTEXT_TYPE_EMERGENCY:
+		return "emergency";
 	case OFONO_GPRS_CONTEXT_TYPE_IA:
 		return "ia";
 	}
@@ -223,9 +235,12 @@ static gboolean gprs_context_type_allowed(int type)
 	switch (type) {
 	case OFONO_GPRS_CONTEXT_TYPE_ANY:
 	case OFONO_GPRS_CONTEXT_TYPE_INTERNET:
+	case OFONO_GPRS_CONTEXT_TYPE_HIPRI:
+	case OFONO_GPRS_CONTEXT_TYPE_SUPL:
 	case OFONO_GPRS_CONTEXT_TYPE_WAP:
 	case OFONO_GPRS_CONTEXT_TYPE_MMS:
 	case OFONO_GPRS_CONTEXT_TYPE_IMS:
+	case OFONO_GPRS_CONTEXT_TYPE_EMERGENCY:
 		return TRUE;
 	default:
 		break;
@@ -240,6 +255,12 @@ static gboolean gprs_context_string_to_type(const char *str,
 	if (g_str_equal(str, "internet")) {
 		*out = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
 		return TRUE;
+	} else if (g_str_equal(str, "hipri")) {
+		*out = OFONO_GPRS_CONTEXT_TYPE_HIPRI;
+		return TRUE;
+	} else if (g_str_equal(str, "supl")) {
+		*out = OFONO_GPRS_CONTEXT_TYPE_SUPL;
+		return TRUE;
 	} else if (g_str_equal(str, "wap")) {
 		*out = OFONO_GPRS_CONTEXT_TYPE_WAP;
 		return TRUE;
@@ -248,6 +269,9 @@ static gboolean gprs_context_string_to_type(const char *str,
 		return TRUE;
 	} else if (g_str_equal(str, "ims")) {
 		*out = OFONO_GPRS_CONTEXT_TYPE_IMS;
+		return TRUE;
+	} else if (g_str_equal(str, "emergency")) {
+		*out = OFONO_GPRS_CONTEXT_TYPE_EMERGENCY;
 		return TRUE;
 	}
 
