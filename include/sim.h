@@ -217,6 +217,8 @@ struct ofono_sim_driver {
 			ofono_sim_lock_unlock_cb_t cb, void *data);
 	void (*reset_pin2)(struct ofono_sim *sim, const char *puk2,
 			const char *passwd, ofono_sim_lock_unlock_cb_t cb, void *data);
+	void (*lock_fdn)(struct ofono_sim *sim, int enable,
+			const char *passwd, ofono_sim_lock_unlock_cb_t cb, void *data);
 };
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d);

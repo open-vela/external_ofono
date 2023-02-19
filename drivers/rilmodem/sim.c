@@ -1269,6 +1269,38 @@ error:
 	CALLBACK_WITH_FAILURE(cb, data);
 }
 
+static void ril_set_fdn_lock(struct ofono_sim *sim,
+				int enable, const char *passwd,
+				ofono_sim_lock_unlock_cb_t cb, void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sd);
+	struct parcel rilp;
+	char svcs_str[4];
+
+	sd->passwd_type = OFONO_SIM_PASSWORD_SIM_PIN2;
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 5);
+	parcel_w_string(&rilp, "FD"); /* SIM card or active application in the UICC (GSM or USIM)
+	                               * fixed dialling number feature */
+	parcel_w_string(&rilp, enable ? "1" : "0");
+	parcel_w_string(&rilp, passwd);
+	snprintf(svcs_str, sizeof(svcs_str), "%d", BEARER_CLASS_DEFAULT + BEARER_CLASS_SMS); /* Service class */
+	parcel_w_string(&rilp, svcs_str);
+	parcel_w_string(&rilp, sd->aid_str);
+
+	g_ril_append_print_buf(sd->ril, "(enable=%d,passwd=%s,svcs_str=%s,aid=%s)",
+				enable, passwd, svcs_str, sd->aid_str);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_SET_FACILITY_LOCK, &rilp,
+				ril_set_facility_lock_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
 static void ril_enter_sim_puk_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -1810,6 +1842,7 @@ static const struct ofono_sim_driver driver = {
 	.logical_access		= ril_sim_logical_access,
 	.send_pin2		= ril_pin2_send,
 	.reset_pin2		= ril_pin2_send_puk2,
+	.lock_fdn		= ril_set_fdn_lock,
 };
 
 void ril_sim_init(void)
