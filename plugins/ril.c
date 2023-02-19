@@ -268,6 +268,27 @@ void ril_post_online(struct ofono_modem *modem)
 		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_IMS);
 		ofono_gprs_add_context(gprs, gc);
 	}
+
+	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+
+	if (gc) {
+		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_HIPRI);
+		ofono_gprs_add_context(gprs, gc);
+	}
+
+	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+
+	if (gc) {
+		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_SUPL);
+		ofono_gprs_add_context(gprs, gc);
+	}
+
+	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+
+	if (gc) {
+		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_EMERGENCY);
+		ofono_gprs_add_context(gprs, gc);
+	}
 }
 
 static void ril_set_online_cb(struct ril_msg *message, gpointer user_data)
