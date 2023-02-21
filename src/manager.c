@@ -28,6 +28,16 @@
 #include <gdbus.h>
 
 #include "ofono.h"
+#include "storage.h"
+
+#define SETTINGS_KEY "ofono"
+#define SETTINGS_STORE "ofonosetting"
+#define SETTINGS_GROUP "Settings"
+
+struct ofono_manager {
+	GKeyFile *settings;
+	int data_slot;
+};
 
 static void append_modem(struct ofono_modem *modem, void *userdata)
 {
@@ -80,10 +90,89 @@ static DBusMessage *manager_get_modems(DBusConnection *conn,
 	return reply;
 }
 
+static void append_properties(struct ofono_manager *mgr, DBusMessageIter *dict)
+{
+	ofono_dbus_dict_append(dict, "DataSlot", DBUS_TYPE_INT32, &mgr->data_slot);
+}
+
+static DBusMessage *manager_set_property(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_manager *manager = data;
+	DBusMessageIter iter, var;
+	const char *name;
+	int new_dds;
+
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_basic(&iter, &name);
+	dbus_message_iter_next(&iter);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &var);
+
+	if (g_str_equal(name, "DataSlot") == TRUE) {
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_INT32)
+			return __ofono_error_invalid_args(msg);
+
+		dbus_message_iter_get_basic(&var, &new_dds);
+		if (new_dds == manager->data_slot) {
+			return NULL;
+		}
+
+		manager->data_slot = new_dds;
+		g_key_file_set_integer(manager->settings, SETTINGS_GROUP, "DataSlot", new_dds);
+
+		g_dbus_send_reply(conn, msg, DBUS_TYPE_INVALID);
+
+		// Notify all watches of data slot changed.
+		ofono_dbus_signal_property_changed(conn, OFONO_MANAGER_PATH,
+			OFONO_MANAGER_INTERFACE, "DataSlot", DBUS_TYPE_INT32, &new_dds);
+		return NULL;
+	}
+
+	return __ofono_error_invalid_args(msg);
+}
+
+static DBusMessage *manager_get_properties(DBusConnection *conn,
+						DBusMessage *msg, void *data)
+{
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter dict;
+	struct ofono_manager *manager = data;
+
+	reply = dbus_message_new_method_return(msg);
+	if (reply == NULL)
+		return NULL;
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					OFONO_PROPERTIES_ARRAY_SIGNATURE,
+					&dict);
+	append_properties(manager, &dict);
+	dbus_message_iter_close_container(&iter, &dict);
+
+	return reply;
+}
+
 static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_METHOD("GetModems",
 				NULL, GDBUS_ARGS({ "modems", "a(oa{sv})" }),
 				manager_get_modems) },
+	{ GDBUS_METHOD("GetProperties",
+			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
+			manager_get_properties) },
+	{ GDBUS_ASYNC_METHOD("SetProperty",
+			GDBUS_ARGS({ "property", "s" }, { "value", "v" }),
+			NULL, manager_set_property) },
 	{ }
 };
 
@@ -92,21 +181,45 @@ static const GDBusSignalTable manager_signals[] = {
 		GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("ModemRemoved",
 		GDBUS_ARGS({ "path", "o" })) },
+	{ GDBUS_SIGNAL("PropertyChanged",
+			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
 	{ }
 };
+
+static void manager_data_free(void *user_data)
+{
+	struct ofono_manager *manager = user_data;
+
+	if (manager->settings) {
+		storage_close(SETTINGS_KEY, SETTINGS_STORE, manager->settings, TRUE);
+	}
+
+	g_free(manager);
+}
 
 int __ofono_manager_init(void)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
+	struct ofono_manager *manager;
 	gboolean ret;
+
+	manager = g_try_malloc0(sizeof(struct ofono_manager));
+	if (manager == NULL)
+		return -ENOMEM;
+
+	manager->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
+	manager->data_slot = g_key_file_get_integer(
+		manager->settings, SETTINGS_GROUP, "DataSlot", NULL);
 
 	ret = g_dbus_register_interface(conn, OFONO_MANAGER_PATH,
 					OFONO_MANAGER_INTERFACE,
 					manager_methods, manager_signals,
-					NULL, NULL, NULL);
+					NULL, manager, manager_data_free);
 
-	if (ret == FALSE)
+	if (ret == FALSE) {
+		manager_data_free(manager);
 		return -1;
+	}
 
 	return 0;
 }
