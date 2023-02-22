@@ -132,6 +132,9 @@ typedef void (*ofono_sim_close_channel_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_sim_logical_access_cb_t)(const struct ofono_error *error,
 		const unsigned char *resp, unsigned int len, void *data);
 
+typedef void (*ofono_sim_basic_access_cb_t)(const struct ofono_error *error,
+		const unsigned char *resp, unsigned int len, void *data);
+
 typedef void (*ofono_sim_set_active_card_slot_cb_t)(
 					const struct ofono_error *error,
 					void *data);
@@ -219,6 +222,8 @@ struct ofono_sim_driver {
 			const char *passwd, ofono_sim_lock_unlock_cb_t cb, void *data);
 	void (*lock_fdn)(struct ofono_sim *sim, int enable,
 			const char *passwd, ofono_sim_lock_unlock_cb_t cb, void *data);
+	void (*basic_access)(struct ofono_sim *sim, const unsigned char *pdu,
+			unsigned int len, ofono_sim_basic_access_cb_t cb, void *data);
 };
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d);
