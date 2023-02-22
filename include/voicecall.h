@@ -181,6 +181,8 @@ void ofono_voicecall_ssn_mo_notify(struct ofono_voicecall *vc, unsigned int id,
 void ofono_voicecall_ssn_mt_notify(struct ofono_voicecall *vc, unsigned int id,
 					int code, int index,
 					const struct ofono_phone_number *ph);
+ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
+					const char *number);
 
 #ifdef __cplusplus
 }
