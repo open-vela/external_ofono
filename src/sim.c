@@ -1580,6 +1580,53 @@ static DBusMessage *sim_logical_access(DBusConnection *conn,
 	return NULL;
 }
 
+static void sim_basic_access_cb(const struct ofono_error *error,
+		const unsigned char *resp, unsigned int len, void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during basic access");
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+		return;
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &resp);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+}
+
+static DBusMessage *sim_basic_access(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_sim *sim = data;
+	const unsigned char *pdu;
+	unsigned int len;
+
+	if (sim->pending)
+		return __ofono_error_busy(msg);
+
+	if (sim->driver->basic_access == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &pdu,
+					DBUS_TYPE_UINT32, &len,
+					DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	sim->pending = dbus_message_ref(msg);
+
+	sim->driver->basic_access(sim, pdu, len, sim_basic_access_cb, sim);
+
+	return NULL;
+}
+
 static const GDBusMethodTable sim_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1628,6 +1675,10 @@ static const GDBusMethodTable sim_methods[] = {
 	{ GDBUS_ASYNC_METHOD("DisableFdn",
 			GDBUS_ARGS({ "password", "s" }), NULL,
 			sim_disable_fdn) },
+	{ GDBUS_ASYNC_METHOD("TransmitApduBasicChannel",
+			GDBUS_ARGS({"pdu", "s"}, {"len", "u"}),
+			GDBUS_ARGS({ "response", "s" }),
+			sim_basic_access) },
 	{ }
 };
 
