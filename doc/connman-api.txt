@@ -369,3 +369,7 @@ Properties	boolean Active [readwrite]
 		string MessageCenter [readwrite, MMS only]
 
 			Holds the MMSC setting.
+
+		uint32 Mtu [readonly]
+
+			Holds the maximum transmit unit size for this context.
