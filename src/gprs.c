@@ -100,6 +100,7 @@ struct ipv4_settings {
 	char *gateway;
 	char **dns;
 	char *proxy;
+	char *pcscf;
 };
 
 struct ipv6_settings {
@@ -107,6 +108,7 @@ struct ipv6_settings {
 	unsigned char prefix_len;
 	char *gateway;
 	char **dns;
+	char *pcscf;
 };
 
 struct context_settings {
@@ -390,6 +392,7 @@ static void context_settings_free(struct context_settings *settings)
 		g_free(settings->ipv4->gateway);
 		g_strfreev(settings->ipv4->dns);
 		g_free(settings->ipv4->proxy);
+		g_free(settings->ipv4->pcscf);
 
 		g_free(settings->ipv4);
 		settings->ipv4 = NULL;
@@ -399,6 +402,7 @@ static void context_settings_free(struct context_settings *settings)
 		g_free(settings->ipv6->ip);
 		g_free(settings->ipv6->gateway);
 		g_strfreev(settings->ipv6->dns);
+		g_free(settings->ipv6->pcscf);
 
 		g_free(settings->ipv6);
 		settings->ipv6 = NULL;
@@ -463,6 +467,10 @@ static void context_settings_append_ipv4(struct context_settings *settings,
 		ofono_dbus_dict_append_array(&array, "DomainNameServers",
 						DBUS_TYPE_STRING,
 						&settings->ipv4->dns);
+
+	if (settings->ipv4->pcscf)
+		ofono_dbus_dict_append(&array, "Pcscf", DBUS_TYPE_STRING,
+					&settings->ipv4->pcscf);
 
 done:
 	dbus_message_iter_close_container(&variant, &array);
@@ -530,6 +538,10 @@ static void context_settings_append_ipv6(struct context_settings *settings,
 		ofono_dbus_dict_append_array(&array, "DomainNameServers",
 						DBUS_TYPE_STRING,
 						&settings->ipv6->dns);
+
+	if (settings->ipv6->pcscf)
+		ofono_dbus_dict_append(&array, "Pcscf", DBUS_TYPE_STRING,
+					&settings->ipv6->pcscf);
 
 done:
 	dbus_message_iter_close_container(&variant, &array);
@@ -3406,6 +3418,30 @@ void ofono_gprs_context_set_ipv6_dns_servers(struct ofono_gprs_context *gc,
 
 	g_strfreev(settings->ipv6->dns);
 	settings->ipv6->dns = g_strdupv((char **) dns);
+}
+
+void ofono_gprs_context_set_ipv4_pcscf(struct ofono_gprs_context *gc,
+						const char *pcscf)
+{
+	struct context_settings *settings = gc->settings;
+
+	if (settings->ipv4 == NULL)
+		return;
+
+	g_free(settings->ipv4->pcscf);
+	settings->ipv4->pcscf = g_strdup(pcscf);
+}
+
+void ofono_gprs_context_set_ipv6_pcscf(struct ofono_gprs_context *gc,
+						const char *pcscf)
+{
+	struct context_settings *settings = gc->settings;
+
+	if (settings->ipv6 == NULL)
+		return;
+
+	g_free(settings->ipv6->pcscf);
+	settings->ipv6->pcscf = g_strdup(pcscf);
 }
 
 int ofono_gprs_driver_register(const struct ofono_gprs_driver *d)
