@@ -123,6 +123,7 @@ struct ofono_gprs_context {
 	const struct ofono_gprs_context_driver *driver;
 	void *driver_data;
 	char *interface;
+	unsigned int mtu;
 	struct context_settings *settings;
 	struct ofono_atom *atom;
 };
@@ -839,6 +840,7 @@ static void append_context_properties(struct pri_context *ctx,
 	const char *strvalue;
 	struct context_settings *settings;
 	const char *interface;
+	unsigned int mtu;
 
 	ofono_dbus_dict_append(dict, "Name", DBUS_TYPE_STRING, &name);
 
@@ -878,6 +880,9 @@ static void append_context_properties(struct pri_context *ctx,
 	if (ctx->context_driver) {
 		settings = ctx->context_driver->settings;
 		interface = ctx->context_driver->interface;
+
+		mtu = ctx->context_driver->mtu;
+		ofono_dbus_dict_append(dict, "Mtu", DBUS_TYPE_UINT32, &mtu);
 	} else {
 		settings = NULL;
 		interface = NULL;
@@ -3442,6 +3447,18 @@ void ofono_gprs_context_set_ipv6_pcscf(struct ofono_gprs_context *gc,
 
 	g_free(settings->ipv6->pcscf);
 	settings->ipv6->pcscf = g_strdup(pcscf);
+}
+
+void ofono_gprs_context_set_mtu(struct ofono_gprs_context *gc, unsigned int mtu)
+{
+	DBG("mtu %d", mtu);
+
+	gc->mtu = mtu;
+}
+
+unsigned int ofono_gprs_context_get_mtu(struct ofono_gprs_context *gc)
+{
+	return gc->mtu;
 }
 
 int ofono_gprs_driver_register(const struct ofono_gprs_driver *d)
