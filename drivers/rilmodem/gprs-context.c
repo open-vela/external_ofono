@@ -355,7 +355,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	struct ofono_gprs_context *gc = cbd->user;
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
 	struct parcel rilp;
-	unsigned int active, cid, num_calls, retry, status;
+	unsigned int active, cid, num_calls, retry, status, mtu;
 	char *type = NULL, *ifname = NULL, *raw_addrs = NULL, *pcscf_addrs = NULL;
 	char *raw_dns = NULL, *raw_gws = NULL;
 	int protocol;
@@ -403,6 +403,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	raw_dns = parcel_r_string(&rilp);
 	raw_gws = parcel_r_string(&rilp);
 	pcscf_addrs = parcel_r_string(&rilp);
+	mtu = parcel_r_int32(&rilp);
 
 	/* malformed check */
 	if (rilp.malformed) {
@@ -411,9 +412,9 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	DBG("[status=%d,retry=%d,cid=%d,active=%d,type=%s,ifname=%s,"
-		"address=%s,dns=%s,gateways=%s,pcscf_addrs=%s]",
+		"address=%s,dns=%s,gateways=%s,pcscf_addrs=%s,mtu=%d]",
 		status, retry, cid, active, type,
-		ifname, raw_addrs, raw_dns, raw_gws, pcscf_addrs);
+		ifname, raw_addrs, raw_dns, raw_gws, pcscf_addrs, mtu);
 
 	protocol = ril_protocol_string_to_ofono_protocol(type);
 	if (protocol < 0) {
@@ -507,6 +508,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	} else if (protocol == OFONO_GPRS_PROTO_IPV6) {
 		ofono_gprs_context_set_ipv6_pcscf(gc, pcscf_addrs);
 	}
+
+	ofono_gprs_context_set_mtu(gc, mtu);
 
 	g_free(type);
 	g_free(ifname);
