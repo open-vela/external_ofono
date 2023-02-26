@@ -619,7 +619,7 @@ void at_register_auto(struct ofono_netreg *netreg,
 }
 
 void at_register_manual(struct ofono_netreg *netreg,
-				const char *mcc, const char *mnc,
+				const char *mcc, const char *mnc, const char *tech,
 				ofono_netreg_register_cb_t cb, void *data)
 {
 	struct at_netreg_data *nd = ofono_netreg_get_data(netreg);

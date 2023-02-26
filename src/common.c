@@ -706,6 +706,25 @@ const char *registration_tech_to_string(int tech)
 	}
 }
 
+int registration_tech_from_string(const char *tech)
+{
+	if (tech == NULL)
+		return -1;
+
+	if (strcmp(tech, "gsm") == 0)
+		return ACCESS_TECHNOLOGY_GSM;
+	else if (strcmp(tech, "edge") == 0)
+		return ACCESS_TECHNOLOGY_GSM_EGPRS;
+	else if (strcmp(tech, "umts") == 0)
+		return ACCESS_TECHNOLOGY_UTRAN;
+	else if (strcmp(tech, "hspa") == 0)
+		return ACCESS_TECHNOLOGY_UTRAN;
+	else if (strcmp(tech, "lte") == 0)
+		return ACCESS_TECHNOLOGY_EUTRAN;
+
+	return -1;
+}
+
 gboolean is_valid_apn(const char *apn)
 {
 	int i;

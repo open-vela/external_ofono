@@ -5,7 +5,7 @@ Service		org.ofono
 Interface	org.ofono.NetworkMonitor
 Object path	[variable prefix]/{modem0,modem1,...}
 
-Methods		a{sv} GetServingCellInformation()
+Methods		a(a{sv}) GetServingCellInformation()
 
 			Requests the latest serving cell information and basic
 			measurements from oFono.  The returned value is a
@@ -48,10 +48,14 @@ Methods		a{sv} GetServingCellInformation()
 
 			Unregisters an agent.
 
-Signals		CellInfoPropertyChanged(string property, variant value)
+Signals		PropertyChanged(string property, variant value)
 
-			Signal is emitted whenever a property has changed.
-			The new value is passed as the signal argument.
+			This signal indicates a changed value of the given
+			property.
+
+Properties	array{object,dict} CellList [readonly, optional]
+
+			Holds array of Cell Info object and properties.
 
 NetworkMonitorAgent Hierarchy [experimental]
 =============================

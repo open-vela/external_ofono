@@ -208,6 +208,7 @@ const char *bearer_class_to_string(enum bearer_class cls);
 
 const char *registration_status_to_string(int status);
 const char *registration_tech_to_string(int tech);
+int registration_tech_from_string(const char *tech);
 const char *packet_bearer_to_string(int bearer);
 
 gboolean is_valid_apn(const char *apn);

@@ -30,7 +30,39 @@ extern "C" {
 
 struct ofono_netmon;
 
-typedef void (*ofono_netmon_cb_t)(const struct ofono_error *error, void *data);
+struct ofono_cell_info {
+	char mcc[OFONO_MAX_MCC_LENGTH + 1];
+	char mnc[OFONO_MAX_MNC_LENGTH + 1];
+	unsigned int ci;
+	unsigned int pci;
+	unsigned int lac;
+	unsigned int arfcn;
+	unsigned int bsic;
+	unsigned int rxlev;
+	unsigned int tadv;
+	unsigned int psc;
+	unsigned int ber;
+	unsigned int rssi;
+	unsigned int rscp;
+	unsigned int ecno;
+	unsigned int rsrq;
+	unsigned int rsrp;
+	unsigned int earfcn;
+	unsigned int eband;
+	unsigned int cqi;
+	unsigned int tac;
+	int snr;
+	int type;
+	ofono_bool_t registered;
+};
+
+typedef void (*ofono_netmon_cb_t)(const struct ofono_error *error,
+					void *data);
+
+typedef void (*ofono_netmon_cell_list_cb_t)(const struct ofono_error *error,
+					int total,
+					const struct ofono_cell_info* list,
+					void *data);
 
 struct ofono_netmon_driver {
 	const char *name;
@@ -38,13 +70,13 @@ struct ofono_netmon_driver {
 					void *data);
 	void (*remove)(struct ofono_netmon *netmon);
 	void (*request_update)(struct ofono_netmon *netmon,
-					ofono_netmon_cb_t cb, void *data);
+					ofono_netmon_cell_list_cb_t cb, void *data);
 	void (*enable_periodic_update)(struct ofono_netmon *netmon,
 					unsigned int enable,
 					unsigned int period,
 					ofono_netmon_cb_t cb, void *data);
 	void (*neighbouring_cell_update)(struct ofono_netmon *netmon,
-					ofono_netmon_cb_t cb, void *data);
+					ofono_netmon_cell_list_cb_t cb, void *data);
 };
 
 enum ofono_netmon_cell_type {
@@ -78,20 +110,9 @@ enum ofono_netmon_info {
 	OFONO_NETMON_INFO_INVALID,
 };
 
-/*
- * Examples:
- * ofono_netmon_serving_cell_notify(netmon, OFONO_NETMON_CELL_TYPE_GSM,
- *					OFONO_NETMON_INFO_MCC, "123",
- *					OFONO_NETMON_INFO_MNC, "456",
- *					OFONO_NETMON_INFO_LAC, lac,
- *					OFONO_NETMON_INFO_CI, ci,
- *					OFONO_NETMON_INFO_RSSI, rssi,
- *					OFONO_NETMON_INFO_RXLEV, rxlev,
- *					OFONO_NETMON_INFO_INVALID);
- */
 void ofono_netmon_serving_cell_notify(struct ofono_netmon *netmon,
-					enum ofono_netmon_cell_type type,
-					int info_type, ...);
+					int total,
+					const struct ofono_cell_info* list);
 
 int ofono_netmon_driver_register(const struct ofono_netmon_driver *d);
 
@@ -110,8 +131,9 @@ void ofono_netmon_set_data(struct ofono_netmon *netmon, void *data);
 void *ofono_netmon_get_data(struct ofono_netmon *netmon);
 
 void ofono_netmon_neighbouring_cell_notify(struct ofono_netmon *netmon,
-					enum ofono_netmon_cell_type type,
-					int info_type, ...);
+					int total,
+					const struct ofono_cell_info* cell,
+					void *data);
 
 #ifdef __cplusplus
 }

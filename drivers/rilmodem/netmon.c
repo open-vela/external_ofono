@@ -76,52 +76,41 @@ static gboolean ril_delayed_register(gpointer user_data)
 	return FALSE;
 }
 
-static int ril_cell_type_to_size(int cell_type)
-{
-	switch (cell_type) {
-	case NETMON_RIL_CELLINFO_TYPE_GSM:
-		return NETMON_RIL_CELLINFO_SIZE_GSM;
-
-	case NETMON_RIL_CELLINFO_TYPE_CDMA:
-		return NETMON_RIL_CELLINFO_SIZE_CDMA;
-
-	case NETMON_RIL_CELLINFO_TYPE_LTE:
-		return NETMON_RIL_CELLINFO_SIZE_LTE;
-
-	case NETMON_RIL_CELLINFO_TYPE_UMTS:
-		return NETMON_RIL_CELLINFO_SIZE_UMTS;
-
-	case NETMON_RIL_CELLINFO_TYPE_TDSCDMA:
-		return NETMON_RIL_CELLINFO_SIZE_TDSCDMA;
-	}
-
-	return 0;
-}
-
 static int process_cellinfo_list(struct ril_msg *message,
-					struct ofono_netmon *netmon)
+					struct ofono_netmon *netmon, gpointer user_data)
 {
+	struct cb_data *cbd = user_data;
+	ofono_netmon_cell_list_cb_t cb;
 	struct parcel rilp;
-	int skip_len;
+	struct ofono_cell_info* list;
 	int cell_info_cnt;
 	int cell_type;
-	int registered = 0;
+	int registered;
 	int mcc, mnc;
-	int lac, cid, psc;
-	int rssi, ber;
-	int ci, pci, tac;
-	int rsrp, rsrq, rssnr;
-	int cqi, tadv;
-	char s_mcc[OFONO_MAX_MCC_LENGTH + 1];
-	char s_mnc[OFONO_MAX_MNC_LENGTH + 1];
-	int i, j;
+	int i;
 
-	if (message->error != RIL_E_SUCCESS)
+	if (message->error != RIL_E_SUCCESS) {
+		if (cbd) {
+			cb = cbd->cb;
+			CALLBACK_WITH_FAILURE(cb, 0, NULL, cbd->data);
+		}
+
 		return OFONO_ERROR_TYPE_FAILURE;
+	}
 
 	g_ril_init_parcel(message, &rilp);
 
 	cell_info_cnt = parcel_r_int32(&rilp);
+
+	list = g_new0(struct ofono_cell_info, cell_info_cnt);
+	if (list == NULL) {
+		if (cbd) {
+			cb = cbd->cb;
+			CALLBACK_WITH_FAILURE(cb, 0, NULL, cbd->data);
+		}
+
+		return OFONO_ERROR_TYPE_FAILURE;
+	}
 
 	for (i = 0; i < cell_info_cnt; i++) {
 		cell_type = parcel_r_int32(&rilp);
@@ -135,163 +124,91 @@ static int process_cellinfo_list(struct ril_msg *message,
 		(void)parcel_r_int32(&rilp);
 		(void)parcel_r_int32(&rilp);
 
-		if (registered)
-			break;
+		list[i].type = cell_type;
+		list[i].registered = registered;
 
-		/*
-		 * not serving cell,
-		 * skip remainder of current cell info
-		 */
-		skip_len = ril_cell_type_to_size(cell_type)/sizeof(int);
+		mcc = parcel_r_int32(&rilp);
+		mnc = parcel_r_int32(&rilp);
 
-		for (j = 0; j < skip_len; j++)
-			(void)parcel_r_int32(&rilp);
+		if (mcc >= 0 && mcc <= 999)
+			snprintf(list[i].mcc, sizeof(list[i].mcc), "%03d", mcc);
+		else
+			strcpy(list[i].mcc, "");
+
+		if (mnc >= 0 && mnc <= 999)
+			snprintf(list[i].mcc, sizeof(list[i].mnc), "%03d", mnc);
+		else
+			strcpy(list[i].mnc, "");
+
+		if (cell_type == NETMON_RIL_CELLINFO_TYPE_GSM) {
+			list[i].lac = parcel_r_int32(&rilp);
+			list[i].ci= parcel_r_int32(&rilp);
+			list[i].rssi = parcel_r_int32(&rilp);
+			list[i].ber = parcel_r_int32(&rilp);
+
+			list[i].lac = (list[i].lac >= 0 && list[i].lac <= 65535) ? list[i].lac : -1;
+			list[i].ci= (list[i].ci>= 0 && list[i].ci<= 65535) ? list[i].ci: -1;
+			list[i].rssi = (list[i].rssi >= 0 && list[i].rssi <= 31) ? list[i].rssi : -1;
+			list[i].ber = (list[i].ber >= 0 && list[i].ber <= 7) ? list[i].ber : -1;
+		} else if (cell_type == NETMON_RIL_CELLINFO_TYPE_UMTS) {
+			list[i].lac = parcel_r_int32(&rilp);
+			list[i].ci= parcel_r_int32(&rilp);
+			list[i].psc = parcel_r_int32(&rilp);
+			list[i].rssi = parcel_r_int32(&rilp);
+			list[i].ber = parcel_r_int32(&rilp);
+
+			list[i].lac = (list[i].lac >= 0 && list[i].lac <= 65535) ? list[i].lac : -1;
+			list[i].ci= (list[i].ci>= 0 && list[i].ci<= 268435455) ? list[i].ci: -1;
+			list[i].psc = (list[i].psc >= 0 && list[i].psc <= 511) ? list[i].psc : -1;
+			list[i].rssi = (list[i].rssi >= 0 && list[i].rssi <= 31) ? list[i].rssi : -1;
+			list[i].ber = (list[i].ber >= 0 && list[i].ber <= 7) ? list[i].ber : -1;
+		} else if (cell_type == NETMON_RIL_CELLINFO_TYPE_LTE) {
+			list[i].ci =  parcel_r_int32(&rilp);
+			list[i].pci = parcel_r_int32(&rilp);
+			list[i].tac = parcel_r_int32(&rilp);
+			list[i].rssi = parcel_r_int32(&rilp);
+			list[i].rsrp = parcel_r_int32(&rilp);
+			list[i].rsrq = parcel_r_int32(&rilp);
+			list[i].snr = parcel_r_int32(&rilp);
+			list[i].cqi = parcel_r_int32(&rilp);
+			list[i].tadv = parcel_r_int32(&rilp);
+
+			list[i].ci = (list[i].ci >= 0 && list[i].ci <= 268435455) ? list[i].ci : -1;
+			list[i].pci = (list[i].pci >= 0 && list[i].pci <= 503) ? list[i].pci : -1;
+			list[i].tac = (list[i].tac >= 0 && list[i].tac <= 65535) ? list[i].tac : -1;
+			list[i].rssi = (list[i].rssi >= 0 && list[i].rssi <= 31) ? list[i].rssi : -1;
+			list[i].rsrp = (list[i].rsrp >= 44 && list[i].rsrp <= 140) ? -list[i].rsrp : -1;
+			list[i].rsrq = (list[i].rsrq >= 3 && list[i].rsrq <= 20) ? -list[i].rsrq : -1;
+			list[i].snr = (list[i].snr >= -200 && list[i].snr <= 300) ? list[i].snr : -1;
+			list[i].cqi = (list[i].cqi >= 0 && list[i].cqi <= 15) ? list[i].cqi : -1;
+			list[i].tadv = (list[i].tadv >=0 && list[i].tadv <= 63) ? list[i].tadv : -1;
+		}
 	}
 
-	if (!registered)
-		return OFONO_ERROR_TYPE_FAILURE;
-
-	if (cell_type == NETMON_RIL_CELLINFO_TYPE_GSM) {
-		mcc = parcel_r_int32(&rilp);
-		mnc = parcel_r_int32(&rilp);
-		lac = parcel_r_int32(&rilp);
-		cid = parcel_r_int32(&rilp);
-		rssi = parcel_r_int32(&rilp);
-		ber = parcel_r_int32(&rilp);
-
-		if (mcc >= 0 && mcc <= 999)
-			snprintf(s_mcc, sizeof(s_mcc), "%03d", mcc);
-		else
-			strcpy(s_mcc, "");
-
-		if (mnc >= 0 && mnc <= 999)
-			snprintf(s_mnc, sizeof(s_mnc), "%03d", mnc);
-		else
-			strcpy(s_mnc, "");
-
-		lac = (lac >= 0 && lac <= 65535) ? lac : -1;
-		cid = (cid >= 0 && cid <= 65535) ? cid : -1;
-		rssi = (rssi >= 0 && rssi <= 31) ? rssi : -1;
-		ber = (ber >= 0 && ber <= 7) ? ber : -1;
-
-		ofono_netmon_serving_cell_notify(netmon,
-				OFONO_NETMON_CELL_TYPE_GSM,
-				OFONO_NETMON_INFO_MCC, s_mcc,
-				OFONO_NETMON_INFO_MNC, s_mnc,
-				OFONO_NETMON_INFO_LAC, lac,
-				OFONO_NETMON_INFO_CI, cid,
-				OFONO_NETMON_INFO_RSSI, rssi,
-				OFONO_NETMON_INFO_BER, ber,
-				OFONO_NETMON_INFO_INVALID);
-	} else if (cell_type == NETMON_RIL_CELLINFO_TYPE_UMTS) {
-		mcc = parcel_r_int32(&rilp);
-		mnc = parcel_r_int32(&rilp);
-		lac = parcel_r_int32(&rilp);
-		cid = parcel_r_int32(&rilp);
-		psc = parcel_r_int32(&rilp);
-		rssi = parcel_r_int32(&rilp);
-		ber = parcel_r_int32(&rilp);
-
-		if (mcc >= 0 && mcc <= 999)
-			snprintf(s_mcc, sizeof(s_mcc), "%03d", mcc);
-		else
-			strcpy(s_mcc, "");
-
-		if (mnc >= 0 && mnc <= 999)
-			snprintf(s_mnc, sizeof(s_mnc), "%03d", mnc);
-		else
-			strcpy(s_mnc, "");
-
-		lac = (lac >= 0 && lac <= 65535) ? lac : -1;
-		cid = (cid >= 0 && cid <= 268435455) ? cid : -1;
-		psc = (psc >= 0 && psc <= 511) ? psc : -1;
-		rssi = (rssi >= 0 && rssi <= 31) ? rssi : -1;
-		ber = (ber >= 0 && ber <= 7) ? ber : -1;
-
-		ofono_netmon_serving_cell_notify(netmon,
-				OFONO_NETMON_CELL_TYPE_UMTS,
-				OFONO_NETMON_INFO_MCC, s_mcc,
-				OFONO_NETMON_INFO_MNC, s_mnc,
-				OFONO_NETMON_INFO_LAC, lac,
-				OFONO_NETMON_INFO_CI, cid,
-				OFONO_NETMON_INFO_PSC, psc,
-				OFONO_NETMON_INFO_RSSI, rssi,
-				OFONO_NETMON_INFO_BER, ber,
-				OFONO_NETMON_INFO_INVALID);
-
-	} else if (cell_type == NETMON_RIL_CELLINFO_TYPE_LTE) {
-		mcc = parcel_r_int32(&rilp);
-		mnc = parcel_r_int32(&rilp);
-		ci =  parcel_r_int32(&rilp);
-		pci = parcel_r_int32(&rilp);
-		tac = parcel_r_int32(&rilp);
-		rssi = parcel_r_int32(&rilp);
-		rsrp = parcel_r_int32(&rilp);
-		rsrq = parcel_r_int32(&rilp);
-		rssnr = parcel_r_int32(&rilp);
-		cqi = parcel_r_int32(&rilp);
-		tadv = parcel_r_int32(&rilp);
-
-		if (mcc >= 0 && mcc <= 999)
-		snprintf(s_mcc, sizeof(s_mcc), "%03d", mcc);
-		else
-		strcpy(s_mcc, "");
-
-		if (mnc >= 0 && mnc <= 999)
-		snprintf(s_mnc, sizeof(s_mnc), "%03d", mnc);
-		else
-		strcpy(s_mnc, "");
-
-		ci = (ci >= 0 && ci <= 268435455) ? ci : -1;
-		pci = (pci >= 0 && pci <= 503) ? pci : -1;
-		tac = (tac >= 0 && tac <= 65535) ? tac : -1;
-		rssi = (rssi >= 0 && rssi <= 31) ? rssi : -1;
-		rsrp = (rsrp >= 44 && rsrp <= 140) ? -rsrp : -1;
-		rsrq = (rsrq >= 3 && rsrq <= 20) ? -rsrq : -1;
-		rssnr = (rssnr >= -200 && rssnr <= 300) ? rssnr : -1;
-		cqi = (cqi >= 0 && cqi <= 15) ? cqi : -1;
-		tadv = (tadv >=0 && tadv <= 63) ? tadv : -1;
-
-		ofono_netmon_serving_cell_notify(netmon,
-				OFONO_NETMON_CELL_TYPE_LTE,
-				OFONO_NETMON_INFO_MCC, s_mcc,
-				OFONO_NETMON_INFO_MNC, s_mnc,
-				OFONO_NETMON_INFO_CI, ci,
-				OFONO_NETMON_INFO_PCI, pci,
-				OFONO_NETMON_INFO_TAC, tac,
-				OFONO_NETMON_INFO_RSSI, rssi,
-				OFONO_NETMON_INFO_RSRP, rsrp,
-				OFONO_NETMON_INFO_RSRQ, rsrq,
-				OFONO_NETMON_INFO_SNR, rssnr,
-				OFONO_NETMON_INFO_CQI, cqi,
-				OFONO_NETMON_INFO_TIMING_ADVANCE, tadv,
-				OFONO_NETMON_INFO_INVALID);
-
+	if (cbd) {
+		cb = cbd->cb;
+		CALLBACK_WITH_SUCCESS(cb, i, list, cbd->data);
+	} else {
+		ofono_netmon_serving_cell_notify(netmon, i, list);
 	}
 
+	g_free(list);
 	return OFONO_ERROR_TYPE_NO_ERROR;
 }
 
 static void ril_netmon_update_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
-	ofono_netmon_cb_t cb = cbd->cb;
 	struct ofono_netmon *netmon = cbd->data;
 
-	if (process_cellinfo_list(message, netmon) ==
-			OFONO_ERROR_TYPE_NO_ERROR) {
-		CALLBACK_WITH_SUCCESS(cb, cbd->data);
-		return;
-	}
-
-	CALLBACK_WITH_FAILURE(cb, cbd->data);
+	process_cellinfo_list(message, netmon, cbd);
 }
 
 static void ril_cellinfo_notify(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_netmon *netmon = user_data;
 
-	process_cellinfo_list(message, netmon);
+	process_cellinfo_list(message, netmon, NULL);
 }
 
 static void setup_cell_info_notify(struct ofono_netmon *netmon)
@@ -340,7 +257,7 @@ static void ril_netmon_remove(struct ofono_netmon *netmon)
 }
 
 static void ril_netmon_request_update(struct ofono_netmon *netmon,
-		ofono_netmon_cb_t cb, void *data)
+		ofono_netmon_cell_list_cb_t cb, void *data)
 {
 	struct netmon_data *nmd = ofono_netmon_get_data(netmon);
 	struct cb_data *cbd = cb_data_new(cb, data, nmd);
@@ -350,7 +267,7 @@ static void ril_netmon_request_update(struct ofono_netmon *netmon,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, data);
+	CALLBACK_WITH_FAILURE(cb, 0, NULL, data);
 }
 
 static void periodic_update_cb(struct ril_msg *message, gpointer user_data)
@@ -391,12 +308,27 @@ static void ril_netmon_periodic_update(struct ofono_netmon *netmon,
 	CALLBACK_WITH_FAILURE(cb, cbd->data);
 }
 
+static void ril_netmon_neighbouring_cell_update(struct ofono_netmon *netmon,
+					ofono_netmon_cell_list_cb_t cb, void *data)
+{
+	struct netmon_data *nmd = ofono_netmon_get_data(netmon);
+	struct cb_data *cbd = cb_data_new(cb, data, nmd);
+
+	if (g_ril_send(nmd->ril, RIL_REQUEST_GET_NEIGHBORING_CELL_IDS, NULL,
+			ril_netmon_update_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, 0, NULL, data);
+}
+
 static const struct ofono_netmon_driver driver = {
-	.name			= RILMODEM,
-	.probe			= ril_netmon_probe,
-	.remove			= ril_netmon_remove,
-	.request_update		= ril_netmon_request_update,
-	.enable_periodic_update	= ril_netmon_periodic_update,
+	.name				= RILMODEM,
+	.probe				= ril_netmon_probe,
+	.remove				= ril_netmon_remove,
+	.request_update			= ril_netmon_request_update,
+	.enable_periodic_update		= ril_netmon_periodic_update,
+	.neighbouring_cell_update	= ril_netmon_neighbouring_cell_update,
 };
 
 void ril_netmon_init(void)

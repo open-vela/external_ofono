@@ -23,7 +23,7 @@ void at_list_operators(struct ofono_netreg *netreg,
 void at_register_auto(struct ofono_netreg *netreg,
 				ofono_netreg_register_cb_t cb, void *data);
 void at_register_manual(struct ofono_netreg *netreg,
-				const char *mcc, const char *mnc,
+				const char *mcc, const char *mnc, const char *tech,
 				ofono_netreg_register_cb_t cb, void *data);
 void at_signal_strength(struct ofono_netreg *netreg,
 				ofono_netreg_strength_cb_t cb, void *data);

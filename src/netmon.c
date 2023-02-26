@@ -72,241 +72,185 @@ static const char *cell_type_to_tech_name(enum ofono_netmon_cell_type type)
 }
 
 static void netmon_cell_info_dict_append(DBusMessageIter *dict,
-					va_list *arglist, int info_type)
+					const struct ofono_cell_info* cell)
 {
-	char *mcc;
-	char *mnc;
-	int intval;
-	enum ofono_netmon_info next_info_type = info_type;
+	char *mcc, *mnc;
+	const char *technology;
 
-	while (next_info_type != OFONO_NETMON_INFO_INVALID) {
-		switch (next_info_type) {
-		case OFONO_NETMON_INFO_MCC:
-			mcc = va_arg(*arglist, char *);
+	if (cell == NULL)
+		return;
 
-			if (mcc && strlen(mcc))
-				ofono_dbus_dict_append(dict,
-						"MobileCountryCode",
-						DBUS_TYPE_STRING, &mcc);
-			break;
+	mcc = g_strdup(cell->mcc);
+	mnc = g_strdup(cell->mnc);
 
-		case OFONO_NETMON_INFO_MNC:
-			mnc = va_arg(*arglist, char *);
+	if (mcc && strlen(mcc))
+		ofono_dbus_dict_append(dict, "MobileCountryCode", DBUS_TYPE_STRING, &mcc);
 
-			if (mnc && strlen(mnc))
-				ofono_dbus_dict_append(dict,
-						"MobileNetworkCode",
-						DBUS_TYPE_STRING, &mnc);
-			break;
+	if (mnc && strlen(mnc))
+		ofono_dbus_dict_append(dict, "MobileNetworkCode", DBUS_TYPE_STRING, &mnc);
 
-		case OFONO_NETMON_INFO_LAC:
-			intval = va_arg(*arglist, int);
+	technology = cell_type_to_tech_name(cell->type);
+	if (technology != NULL)
+		ofono_dbus_dict_append(dict, "Technology", DBUS_TYPE_STRING, &technology);
 
-			CELL_INFO_DICT_APPEND(dict, "LocationAreaCode",
-					intval, uint16_t, DBUS_TYPE_UINT16);
-			break;
+	ofono_dbus_dict_append(dict, "Registered", DBUS_TYPE_INT32, &cell->registered);
 
-		case OFONO_NETMON_INFO_CI:
-			intval = va_arg(*arglist, int);
+	if (cell->lac >=0)
+		ofono_dbus_dict_append(dict, "LocationAreaCode", DBUS_TYPE_UINT16, &cell->lac);
 
-			CELL_INFO_DICT_APPEND(dict, "CellId",
-					intval, uint32_t, DBUS_TYPE_UINT32);
-			break;
+	if (cell->ci >= 0)
+		ofono_dbus_dict_append(dict, "CellId", DBUS_TYPE_UINT32, &cell->ci);
 
-		case OFONO_NETMON_INFO_ARFCN:
-			intval = va_arg(*arglist, int);
+	if (cell->arfcn >= 0)
+		ofono_dbus_dict_append(dict, "ARFCN", DBUS_TYPE_UINT16, &cell->arfcn);
 
-			CELL_INFO_DICT_APPEND(dict, "ARFCN",
-					intval, uint16_t, DBUS_TYPE_UINT16);
-			break;
+	if (cell->bsic >= 0)
+		ofono_dbus_dict_append(dict, "BSIC", DBUS_TYPE_BYTE, &cell->bsic);
 
-		case OFONO_NETMON_INFO_BSIC:
-				intval = va_arg(*arglist, int);
+	if (cell->rxlev >= 0)
+		ofono_dbus_dict_append(dict, "ReceivedSignalStrength", DBUS_TYPE_BYTE, &cell->rxlev);
 
-			CELL_INFO_DICT_APPEND(dict, "BSIC",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	if (cell->tadv >= 0)
+		ofono_dbus_dict_append(dict, "TimingAdvance", DBUS_TYPE_BYTE, &cell->tadv);
 
-		case OFONO_NETMON_INFO_RXLEV:
-				intval = va_arg(*arglist, int);
+	if (cell->psc >= 0)
+		ofono_dbus_dict_append(dict, "PrimaryScramblingCode", DBUS_TYPE_UINT16, &cell->psc);
 
-			CELL_INFO_DICT_APPEND(dict, "ReceivedSignalStrength",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	if (cell->ber >= 0)
+		ofono_dbus_dict_append(dict, "BitErrorRate", DBUS_TYPE_BYTE, &cell->ber);
 
-		case OFONO_NETMON_INFO_TIMING_ADVANCE:
-			intval = va_arg(*arglist, int);
+	if (cell->rssi >= 0)
+		ofono_dbus_dict_append(dict, "Strength", DBUS_TYPE_BYTE, &cell->rssi);
 
-			CELL_INFO_DICT_APPEND(dict, "TimingAdvance",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	if (cell->rscp >= 0)
+		ofono_dbus_dict_append(dict, "ReceivedSignalCodePower", DBUS_TYPE_BYTE, &cell->rscp);
 
-		case OFONO_NETMON_INFO_PSC:
-			intval = va_arg(*arglist, int);
+	if (cell->ecno >= 0)
+		ofono_dbus_dict_append(dict, "ReceivedEnergyRatio", DBUS_TYPE_BYTE, &cell->ecno);
 
-			CELL_INFO_DICT_APPEND(dict, "PrimaryScramblingCode",
-					intval, uint16_t, DBUS_TYPE_UINT16);
-			break;
+	if (cell->rsrq >= 0)
+		ofono_dbus_dict_append(dict, "ReferenceSignalReceivedQuality", DBUS_TYPE_BYTE, &cell->rsrq);
 
-		case OFONO_NETMON_INFO_BER:
-			intval = va_arg(*arglist, int);
+	if (cell->rsrp >= 0)
+		ofono_dbus_dict_append(dict, "ReferenceSignalReceivedPower", DBUS_TYPE_BYTE, &cell->rsrp);
 
-			CELL_INFO_DICT_APPEND(dict, "BitErrorRate",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	if (cell->earfcn >= 0)
+		ofono_dbus_dict_append(dict, "EARFCN", DBUS_TYPE_UINT16, &cell->earfcn);
 
-		case OFONO_NETMON_INFO_RSSI:
-			intval = va_arg(*arglist, int);
+	if (cell->eband >= 0)
+		ofono_dbus_dict_append(dict, "EBand", DBUS_TYPE_BYTE, &cell->eband);
 
-			CELL_INFO_DICT_APPEND(dict, "Strength",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	if (cell->cqi >= 0)
+		ofono_dbus_dict_append(dict, "ChannelQualityIndicator", DBUS_TYPE_BYTE, &cell->cqi);
 
-		case OFONO_NETMON_INFO_RSCP:
-			intval = va_arg(*arglist, int);
+	if (cell->pci >= 0)
+		ofono_dbus_dict_append(dict, "PhysicalCellId", DBUS_TYPE_UINT16, &cell->pci);
 
-			CELL_INFO_DICT_APPEND(dict, "ReceivedSignalCodePower",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	if (cell->tac >= 0)
+		ofono_dbus_dict_append(dict, "TrackingAreaCode", DBUS_TYPE_UINT16, &cell->tac);
 
-		case OFONO_NETMON_INFO_ECN0:
-			intval = va_arg(*arglist, int);
+	ofono_dbus_dict_append(dict, "SingalToNoiseRatio", DBUS_TYPE_INT32, &cell->snr);
 
-			CELL_INFO_DICT_APPEND(dict, "ReceivedEnergyRatio",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
+	g_free(mcc);
+	g_free(mnc);
+}
 
-		case OFONO_NETMON_INFO_RSRQ:
-			intval = va_arg(*arglist, int);
+static void append_cell_struct(const struct ofono_cell_info *cell,
+					DBusMessageIter *iter)
+{
+	DBusMessageIter entry, dict;
 
-			CELL_INFO_DICT_APPEND(dict,
-					"ReferenceSignalReceivedQuality",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
-
-		case OFONO_NETMON_INFO_RSRP:
-			intval = va_arg(*arglist, int);
-
-			CELL_INFO_DICT_APPEND(dict,
-					"ReferenceSignalReceivedPower",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
-
-		case OFONO_NETMON_INFO_EARFCN:
-			intval = va_arg(*arglist, int);
-
-			CELL_INFO_DICT_APPEND(dict, "EARFCN",
-					intval, uint16_t, DBUS_TYPE_UINT16);
-			break;
-
-		case OFONO_NETMON_INFO_EBAND:
-			intval = va_arg(*arglist, int);
-
-			CELL_INFO_DICT_APPEND(dict, "EBand",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
-
-		case OFONO_NETMON_INFO_CQI:
-			intval = va_arg(*arglist, int);
-
-			CELL_INFO_DICT_APPEND(dict, "ChannelQualityIndicator",
-					intval, uint8_t, DBUS_TYPE_BYTE);
-			break;
-
-		case OFONO_NETMON_INFO_PCI:
-			intval = va_arg(*arglist, int);
-
-			CELL_INFO_DICT_APPEND(dict, "PhysicalCellId",
-					intval, uint16_t, DBUS_TYPE_UINT16);
-			break;
-
-		case OFONO_NETMON_INFO_TAC:
-			intval = va_arg(*arglist, int);
-
-			CELL_INFO_DICT_APPEND(dict, "TrackingAreaCode",
-					intval, uint16_t, DBUS_TYPE_UINT16);
-			break;
-
-		case OFONO_NETMON_INFO_SNR:
-			intval = va_arg(*arglist, int);
-
-			ofono_dbus_dict_append(dict, "SingalToNoiseRatio",
-					DBUS_TYPE_INT32, &intval);
-			break;
-
-		case OFONO_NETMON_INFO_INVALID:
-			break;
-		}
-
-		next_info_type = va_arg(*arglist, int);
-	}
+	dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &entry);
+	dbus_message_iter_open_container(&entry, DBUS_TYPE_ARRAY,
+					OFONO_PROPERTIES_ARRAY_SIGNATURE,
+					&dict);
+	netmon_cell_info_dict_append(&dict, cell);
+	dbus_message_iter_close_container(&entry, &dict);
+	dbus_message_iter_close_container(iter, &entry);
 }
 
 void ofono_netmon_serving_cell_notify(struct ofono_netmon *netmon,
-					enum ofono_netmon_cell_type type,
-					int info_type, ...)
+					int total,
+					const struct ofono_cell_info* list)
 {
-	va_list arglist;
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(netmon->atom);
 	DBusMessage *signal;
 	DBusMessageIter iter;
-	DBusMessageIter dict;
-	const char *technology = cell_type_to_tech_name(type);
-	const char *path = __ofono_atom_get_path(netmon->atom);
-	DBusConnection *conn = ofono_dbus_get_connection();
+	DBusMessageIter array;
+	const char *key = "CellList";
+	int i;
 
-	if (technology == NULL)
+	if (total == 0 || list == NULL)
 		return;
 
 	signal = dbus_message_new_signal(path, OFONO_NETMON_INTERFACE,
-						"CellInfoPropertyChanged");
+						"PropertyChanged");
 
 	if (signal == NULL)
 		return;
 
 	dbus_message_iter_init_append(signal, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
 
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
-					OFONO_PROPERTIES_ARRAY_SIGNATURE,
-					&dict);
+					DBUS_STRUCT_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_ARRAY_AS_STRING
+					DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_STRING_AS_STRING
+					DBUS_TYPE_VARIANT_AS_STRING
+					DBUS_DICT_ENTRY_END_CHAR_AS_STRING
+					DBUS_STRUCT_END_CHAR_AS_STRING,
+					&array);
 
-	va_start(arglist, info_type);
+	for (i = 0; i < total; i++) {
+		if (list[i].registered)
+			append_cell_struct(&list[i], &array);
+	}
 
-	ofono_dbus_dict_append(&dict, "Technology",
-						DBUS_TYPE_STRING, &technology);
-
-	netmon_cell_info_dict_append(&dict, &arglist, info_type);
-
-	va_end(arglist);
-
-	dbus_message_iter_close_container(&iter, &dict);
-
+	dbus_message_iter_close_container(&iter, &array);
 	g_dbus_send_message(conn, signal);
 }
 
 static void serving_cell_info_callback(const struct ofono_error *error,
-		void *data)
+					int total,
+					const struct ofono_cell_info* list,
+					void *data)
 {
 	struct ofono_netmon *netmon = data;
-	DBusMessage *reply = netmon->reply;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter array;
+	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		if (reply)
-			dbus_message_unref(reply);
-
-		reply = __ofono_error_failed(netmon->pending);
-        } else if (!reply) {
-		DBusMessageIter iter;
-		DBusMessageIter dict;
-
-		reply = dbus_message_new_method_return(netmon->pending);
-		dbus_message_iter_init_append(reply, &iter);
-		dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
-					OFONO_PROPERTIES_ARRAY_SIGNATURE,
-					&dict);
-		dbus_message_iter_close_container(&iter, &dict);
+		DBG("Error occurred during cell list");
+		__ofono_dbus_pending_reply(&netmon->pending,
+					__ofono_error_failed(netmon->pending));
+		return;
 	}
 
-	netmon->reply = NULL;
+	reply = dbus_message_new_method_return(netmon->pending);
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_STRUCT_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_ARRAY_AS_STRING
+					DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_STRING_AS_STRING
+					DBUS_TYPE_VARIANT_AS_STRING
+					DBUS_DICT_ENTRY_END_CHAR_AS_STRING
+					DBUS_STRUCT_END_CHAR_AS_STRING,
+					&array);
+
+	for (i = 0; i < total; i++) {
+		if (list[i].registered)
+			append_cell_struct(&list[i], &array);
+	}
+
+	dbus_message_iter_close_container(&iter, &array);
+
 	__ofono_dbus_pending_reply(&netmon->pending, reply);
 }
 
@@ -432,22 +376,36 @@ static DBusMessage *netmon_unregister_agent(DBusConnection *conn,
 
 
 void ofono_netmon_neighbouring_cell_notify(struct ofono_netmon *netmon,
-					enum ofono_netmon_cell_type type,
-					int info_type, ...)
+					int total,
+					const struct ofono_cell_info* list,
+					void *data)
 {
-	va_list arglist;
-	DBusMessageIter dict;
-	DBusMessageIter strct;
-	const char *tech = cell_type_to_tech_name(type);
+	// like AOSP, no indication message for neighbouring cell list.
+}
 
-	if (netmon->pending == NULL)
+static void neighbouring_cell_info_callback(const struct ofono_error *error,
+						int total,
+						const struct ofono_cell_info* list,
+						void *data)
+{
+	struct ofono_netmon *netmon = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter array;
+	int i;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during neighbouring cell list");
+		__ofono_dbus_pending_reply(&netmon->pending,
+					__ofono_error_failed(netmon->pending));
 		return;
+	}
 
-	if (!netmon->reply) {
-		netmon->reply = dbus_message_new_method_return(netmon->pending);
-		dbus_message_iter_init_append(netmon->reply, &netmon->iter);
+	reply = dbus_message_new_method_return(netmon->pending);
 
-		dbus_message_iter_open_container(&netmon->iter, DBUS_TYPE_ARRAY,
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
 					DBUS_STRUCT_BEGIN_CHAR_AS_STRING
 					DBUS_TYPE_ARRAY_AS_STRING
 					DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
@@ -455,62 +413,14 @@ void ofono_netmon_neighbouring_cell_notify(struct ofono_netmon *netmon,
 					DBUS_TYPE_VARIANT_AS_STRING
 					DBUS_DICT_ENTRY_END_CHAR_AS_STRING
 					DBUS_STRUCT_END_CHAR_AS_STRING,
-					&netmon->arr);
+					&array);
+
+	for (i = 0; i < total; i++) {
+		append_cell_struct(&list[i], &array);
 	}
 
-	tech = cell_type_to_tech_name(type);
+	dbus_message_iter_close_container(&iter, &array);
 
-	dbus_message_iter_open_container(&netmon->arr, DBUS_TYPE_STRUCT,
-						NULL, &strct);
-	dbus_message_iter_open_container(&strct, DBUS_TYPE_ARRAY,
-					OFONO_PROPERTIES_ARRAY_SIGNATURE,
-					&dict);
-
-	va_start(arglist, info_type);
-
-	if (tech == NULL)
-		goto done;
-
-	ofono_dbus_dict_append(&dict, "Technology",
-					DBUS_TYPE_STRING, &tech);
-
-	netmon_cell_info_dict_append(&dict, &arglist, info_type);
-
-done:
-	va_end(arglist);
-
-	dbus_message_iter_close_container(&strct, &dict);
-	dbus_message_iter_close_container(&netmon->arr, &strct);
-}
-
-static void neighbouring_cell_info_callback(const struct ofono_error *error,
-						void *data)
-{
-	struct ofono_netmon *netmon = data;
-	DBusMessage *reply = netmon->reply;
-
-	DBG("");
-
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		if (reply)
-			dbus_message_unref(reply);
-
-		reply = __ofono_error_failed(netmon->pending);
-        } else if (!reply) {
-		DBusMessageIter iter;
-		DBusMessageIter dict;
-
-		reply = dbus_message_new_method_return(netmon->pending);
-		dbus_message_iter_init_append(reply, &iter);
-		dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
-					OFONO_PROPERTIES_ARRAY_SIGNATURE,
-					&dict);
-		dbus_message_iter_close_container(&iter, &dict);
-	} else {
-		dbus_message_iter_close_container(&netmon->iter, &netmon->arr);
-	}
-
-	netmon->reply = NULL;
 	__ofono_dbus_pending_reply(&netmon->pending, reply);
 }
 
@@ -535,7 +445,7 @@ static DBusMessage *netmon_get_neighbouring_cell_info(DBusConnection *conn,
 
 static const GDBusMethodTable netmon_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetServingCellInformation",
-			NULL, GDBUS_ARGS({ "cellinfo", "a{sv}" }),
+			NULL, GDBUS_ARGS({ "cellinfo", "a(a{sv})" }),
 			netmon_get_serving_cell_info) },
 	{ GDBUS_METHOD("RegisterAgent",
 			GDBUS_ARGS({ "path", "o"}, { "period", "u"}), NULL,
@@ -550,8 +460,8 @@ static const GDBusMethodTable netmon_methods[] = {
 };
 
 static const GDBusSignalTable netmon_signals[] = {
-	{ GDBUS_SIGNAL("CellInfoPropertyChanged",
-			GDBUS_ARGS({ "cellinfo", "a(a{sv})" })) },
+	{ GDBUS_SIGNAL("PropertyChanged",
+			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
 	{ }
 };
 
