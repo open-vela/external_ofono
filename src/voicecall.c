@@ -2320,6 +2320,7 @@ static const GDBusSignalTable manager_signals[] = {
 		GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("CallRemoved", GDBUS_ARGS({ "path", "o"})) },
 	{ GDBUS_SIGNAL("PhoneStatusChanged", GDBUS_ARGS({ "status", "i" })) },
+	{ GDBUS_SIGNAL("RingBackTone", GDBUS_ARGS({ "status", "i" })) },
 	{ }
 };
 
@@ -4262,6 +4263,17 @@ void ofono_voicecall_ssn_mo_notify(struct ofono_voicecall *vc,
 		ssn_mo_forwarded_notify(vc, id, code);
 		break;
 	}
+}
+
+void ofono_voicecall_ringback_tone_notify(struct ofono_voicecall *vc,
+					unsigned int id, int value)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(vc->atom);
+
+	g_dbus_emit_signal(conn, path, OFONO_VOICECALL_MANAGER_INTERFACE,
+				"RingBackTone", DBUS_TYPE_INT32, &value,
+				DBUS_TYPE_INVALID);
 }
 
 ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
