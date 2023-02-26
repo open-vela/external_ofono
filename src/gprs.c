@@ -2413,35 +2413,20 @@ static DBusMessage *gprs_add_context(DBusConnection *conn,
 	int authtype;
 	const char *path;
 	enum ofono_gprs_context_type type;
-	DBusMessageIter iter;
 
-	if (!dbus_message_iter_init(msg, &iter))
-		return __ofono_error_invalid_args(msg);
-
-	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
-					DBUS_TYPE_INVALID))
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_STRING, &typestr,
+				DBUS_TYPE_STRING, &name,
+				DBUS_TYPE_STRING, &apn,
+				DBUS_TYPE_STRING, &username,
+				DBUS_TYPE_STRING, &password,
+				DBUS_TYPE_INT32, &protocal,
+				DBUS_TYPE_INT32, &authtype,
+				DBUS_TYPE_INVALID) == FALSE)
 		return __ofono_error_invalid_args(msg);
 
 	if (gprs_context_string_to_type(typestr, &type) == FALSE)
 		return __ofono_error_invalid_format(msg);
-
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_get_basic(&iter, &name);
-
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_get_basic(&iter, &apn);
-
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_get_basic(&iter, &username);
-
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_get_basic(&iter, &password);
-
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_get_basic(&iter, &protocal);
-
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_get_basic(&iter, &authtype);
 
 	if (name == NULL)
 		name = gprs_context_default_name(type);

@@ -611,6 +611,7 @@ static DBusMessage *network_operator_register(DBusConnection *conn,
 	netreg->pending = dbus_message_ref(msg);
 
 	netreg->driver->register_manual(netreg, opd->mcc, opd->mnc,
+					registration_tech_to_string(opd->techs),
 					register_callback, netreg);
 
 	set_registration_mode(netreg, NETWORK_REGISTRATION_MODE_MANUAL);
@@ -1009,6 +1010,37 @@ static DBusMessage *network_scan(DBusConnection *conn,
 	return NULL;
 }
 
+static DBusMessage *network_register_manual(DBusConnection *conn,
+						DBusMessage *msg, void *data)
+{
+	struct ofono_netreg *netreg = data;
+	const char *mcc, *mnc, *tech;
+
+	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY)
+		return __ofono_error_access_denied(msg);
+
+	if (netreg->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &mcc,
+					DBUS_TYPE_STRING, &mnc,
+					DBUS_TYPE_STRING, &tech,
+					DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (netreg->driver->register_manual == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	netreg->pending = dbus_message_ref(msg);
+
+	netreg->driver->register_manual(netreg, mcc, mnc, tech,
+					register_callback, netreg);
+
+	set_registration_mode(netreg, NETWORK_REGISTRATION_MODE_MANUAL);
+
+	return NULL;
+}
+
 static DBusMessage *network_get_operators(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
@@ -1045,6 +1077,9 @@ static const GDBusMethodTable network_registration_methods[] = {
 			network_get_properties) },
 	{ GDBUS_ASYNC_METHOD("Register",
 				NULL, NULL, network_register) },
+	{ GDBUS_ASYNC_METHOD("RegisterManual",
+		GDBUS_ARGS({ "mcc", "s"}, { "mnc", "s"}, { "tech", "s"}), NULL,
+		network_register_manual) },
 	{ GDBUS_METHOD("GetOperators",
 		NULL, GDBUS_ARGS({ "operators_with_properties", "a(oa{sv})" }),
 		network_get_operators) },
