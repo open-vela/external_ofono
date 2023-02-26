@@ -659,18 +659,30 @@ static void ril_ss_notify(struct ril_msg *message, gpointer user_data)
 		ofono_voicecall_ssn_mo_notify(vc, 0, code, index);
 }
 
-static void ril_ecc_list_notify(struct ril_msg* message, gpointer user_data)
+static void ril_ecc_list_notify(struct ril_msg *message, gpointer user_data)
 {
-		struct ofono_voicecall *vc = user_data;
-		struct parcel rilp;
+	struct ofono_voicecall *vc = user_data;
+	struct parcel rilp;
 
-		g_ril_init_parcel(message, &rilp);
-		struct parcel_str_array* ecc_list_st = parcel_r_str_array(&rilp);
+	g_ril_init_parcel(message, &rilp);
+	struct parcel_str_array *ecc_list_st = parcel_r_str_array(&rilp);
 
-		if (ecc_list_st) {
-			ofono_voicecall_en_list_notify(vc, ecc_list_st->str);
-			parcel_free_str_array(ecc_list_st);
-		}
+	if (ecc_list_st) {
+		ofono_voicecall_en_list_notify(vc, ecc_list_st->str);
+		parcel_free_str_array(ecc_list_st);
+	}
+}
+
+static void ril_ringback_tone_notify(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_voicecall *vc = user_data;
+	struct parcel rilp;
+	int ring_back;
+
+	g_ril_init_parcel(message, &rilp);
+
+	ring_back = parcel_r_int32(&rilp);
+	ofono_voicecall_ringback_tone_notify(vc, 0, ring_back);
 }
 
 void ril_answer(struct ofono_voicecall* vc, ofono_voicecall_cb_t cb, void* data)
@@ -840,6 +852,9 @@ static gboolean ril_delayed_register(gpointer user_data)
 
 	g_ril_register(vd->ril, RIL_UNSOL_EMERGENCY_NUMBER_LIST,
 			ril_ecc_list_notify, vc);
+
+	g_ril_register(vd->ril, RIL_UNSOL_RINGBACK_TONE,
+			ril_ringback_tone_notify, vc);
 
 	/* request supplementary service notifications*/
 	parcel_init(&rilp);

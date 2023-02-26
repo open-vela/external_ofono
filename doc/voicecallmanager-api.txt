@@ -271,6 +271,15 @@ Signals		CallAdded(object path, dict properties)
 			In this case the type parameter in the signal is set to
 			"incoming".
 
+		RingBackTone(int32 value) [readonly]
+
+			Signal that is sent when nework doesn't have in-band
+			information. need to play out-band tone.
+
+			Possible values are
+			0 for stop play ringback tone
+			1 for start play ringback tone
+
 Properties	array{string} EmergencyNumbers [readonly]
 
 			Contains the list of emergency numbers recognized
