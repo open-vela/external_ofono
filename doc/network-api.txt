@@ -52,6 +52,16 @@ Methods		dict GetProperties()
 					 [service].Error.Failed
 					 [service].Error.AccessDenied
 
+		void RegisterManual(string mcc, string mnc, string tech)
+
+			Attempts to register to the specific network. The
+			specific network is normally selected by network search list.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.Failed
+					 [service].Error.AccessDenied
+
 Signals		PropertyChanged(string property, variant value)
 
 			This signal indicates a changed value of the given

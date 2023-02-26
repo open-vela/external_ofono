@@ -657,7 +657,7 @@ static void ril_register_auto(struct ofono_netreg *netreg,
 }
 
 static void ril_register_manual(struct ofono_netreg *netreg,
-				const char *mcc, const char *mnc,
+				const char *mcc, const char *mnc, const char *tech,
 				ofono_netreg_register_cb_t cb, void *data)
 {
 	struct netreg_data *nd = ofono_netreg_get_data(netreg);
@@ -672,6 +672,7 @@ static void ril_register_manual(struct ofono_netreg *netreg,
 
 	parcel_init(&rilp);
 	parcel_w_string(&rilp, buf);
+	parcel_w_int32(&rilp, registration_tech_from_string(tech));
 
 	g_ril_append_print_buf(nd->ril, "(%s)", buf);
 
