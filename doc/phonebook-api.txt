@@ -16,3 +16,51 @@ Methods		string Import()
 			string with zero or more VCard entries.
 
 			Possible Errors: [service].Error.InProgress
+
+		array{string, string, int32} ImportFdn()
+
+			Query the FDN records in the SIM phonebook. An array
+			of structures consisting of contact name, number and
+			corresponding EFFDN record number will be returned.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.Failed
+
+		int32 InsertFdn(string name, string number, string pin2)
+
+			Insert the FDN record into the SIM phonebook. A new contact
+			name and number record will be added, and the record number
+			inserted into EFFDN will be returned. The current PIN2 is
+			required for the operation to succeed.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		void UpdateFdn(string name, string number, string pin2, int32 fdn_idx)
+
+			Update the FDN record to the SIM phonebook. The record with
+			the new name and number corresponding to the fdn index on
+			EFFDN will be updated. The current PIN2 is required for the
+			operation to succeed.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		void DeleteFdn(string pin2, int32 fdn_idx)
+
+			Delete the FDN record in the SIM phonebook. The record in the
+			EFFDN with the corresponding fdn index will be deleted. The
+			current PIN2 is required for the operation to succeed.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
