@@ -60,6 +60,14 @@ struct ofono_phonebook {
 	const struct ofono_phonebook_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
+	int fdn_flags;
+	GTree *fdn_entries;	/* Container of fdn_entry structures */
+};
+
+struct fdn_entry {
+	int entry;
+	char *name;
+	char *number;
 };
 
 struct phonebook_number {
@@ -482,10 +490,339 @@ static DBusMessage *import_entries(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static gboolean append_fdn_entry_struct_list(gpointer key, gpointer value, gpointer data)
+{
+	DBusMessageIter entry;
+	DBusMessageIter *array = data;
+	struct fdn_entry *fdn = value;
+	int fdn_idx = GPOINTER_TO_INT(key);
+
+	dbus_message_iter_open_container(array, DBUS_TYPE_STRUCT, NULL, &entry);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_INT32, &fdn_idx);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &fdn->name);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &fdn->number);
+	dbus_message_iter_close_container(array, &entry);
+
+	return FALSE;
+}
+
+static DBusMessage *generate_fdn_export_entries_reply(struct ofono_phonebook *pb,
+							DBusMessage *msg)
+{
+	DBusMessage *reply;
+	DBusMessageIter iter, array;
+
+	reply = dbus_message_new_method_return(msg);
+	if (reply == NULL)
+		return NULL;
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_STRUCT_BEGIN_CHAR_AS_STRING
+					DBUS_TYPE_INT32_AS_STRING
+					DBUS_TYPE_STRING_AS_STRING
+					DBUS_TYPE_STRING_AS_STRING
+					DBUS_STRUCT_END_CHAR_AS_STRING,
+					&array);
+
+	g_tree_foreach(pb->fdn_entries, append_fdn_entry_struct_list, &array);
+
+	dbus_message_iter_close_container(&iter, &array);
+
+	return reply;
+}
+
+static void export_fdn_entries_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during fdn entries export");
+		reply = __ofono_error_failed(phonebook->pending);
+		__ofono_dbus_pending_reply(&phonebook->pending, reply);
+		return;
+	}
+
+	reply = generate_fdn_export_entries_reply(phonebook, phonebook->pending);
+	if (reply == NULL) {
+		dbus_message_unref(phonebook->pending);
+		return;
+	}
+
+	__ofono_dbus_pending_reply(&phonebook->pending, reply);
+	phonebook->fdn_flags |= PHONEBOOK_FLAG_CACHED;
+}
+
+static DBusMessage *import_fdn_entries(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	DBusMessage *reply;
+
+	if (phonebook->driver->read_fdn_entries == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (phonebook->pending) {
+		reply = __ofono_error_busy(phonebook->pending);
+		g_dbus_send_message(conn, reply);
+		return NULL;
+	}
+
+	// already read
+	if (phonebook->fdn_flags & PHONEBOOK_FLAG_CACHED) {
+		reply = generate_fdn_export_entries_reply(phonebook, msg);
+		g_dbus_send_message(conn, reply);
+		return NULL;
+	}
+
+	phonebook->pending = dbus_message_ref(msg);
+	phonebook->driver->read_fdn_entries(phonebook,
+					export_fdn_entries_cb, phonebook);
+
+	return NULL;
+}
+
+static void insert_fdn_entry_cb(const struct ofono_error *error, int record, void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	char *new_name, *new_number, *pin2;
+	struct fdn_entry *new_entry;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during fdn entry insert");
+		reply = __ofono_error_failed(phonebook->pending);
+		__ofono_dbus_pending_reply(&phonebook->pending, reply);
+		return;
+	}
+
+	//update phonebook->fdn_entries
+	dbus_message_get_args(phonebook->pending, NULL,
+			DBUS_TYPE_STRING, &new_name,
+			DBUS_TYPE_STRING, &new_number,
+			DBUS_TYPE_STRING, &pin2,
+			DBUS_TYPE_INVALID);
+
+	new_entry = l_new(struct fdn_entry, 1);
+	new_entry->name = l_strdup(new_name);
+	new_entry->number = l_strdup(new_number);
+
+	g_tree_insert(phonebook->fdn_entries, GINT_TO_POINTER(record), new_entry);
+
+	reply = dbus_message_new_method_return(phonebook->pending);
+	dbus_message_iter_init_append(reply, &iter);
+
+	// returns the inserted fdnrecord number
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &record);
+
+	__ofono_dbus_pending_reply(&phonebook->pending, reply);
+}
+
+static DBusMessage *insert_fdn_entry(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	char *new_name, *new_number, *pin2;
+	DBusMessage *reply;
+
+	if (phonebook->driver->insert_fdn_entry == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (phonebook->pending) {
+		reply = __ofono_error_busy(phonebook->pending);
+		g_dbus_send_message(conn, reply);
+		return NULL;
+	}
+
+	if (phonebook->fdn_flags ^ PHONEBOOK_FLAG_CACHED) {
+		ofono_error("%s: read fdn file first ! \n", __func__);
+		return __ofono_error_failed(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &new_name,
+				DBUS_TYPE_STRING, &new_number,
+				DBUS_TYPE_STRING, &pin2,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if ( !valid_phone_number_format(new_number) ||
+		!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2))
+		return __ofono_error_invalid_format(msg);
+
+	phonebook->pending = dbus_message_ref(msg);
+	phonebook->driver->insert_fdn_entry(phonebook, new_name, new_number,
+					pin2, insert_fdn_entry_cb, phonebook);
+
+	return NULL;
+}
+
+static void update_fdn_entry_cb(const struct ofono_error *error, int record, void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	char *new_name, *new_number, *pin2;
+	DBusMessage *reply;
+	struct fdn_entry *entry;
+	int fdn_idx;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during fdn entry update");
+		reply = __ofono_error_failed(phonebook->pending);
+		__ofono_dbus_pending_reply(&phonebook->pending, reply);
+		return;
+	}
+
+	// update phonebook->fdn_entries
+	dbus_message_get_args(phonebook->pending, NULL,
+			DBUS_TYPE_STRING, &new_name,
+			DBUS_TYPE_STRING, &new_number,
+			DBUS_TYPE_STRING, &pin2,
+			DBUS_TYPE_INT32, &fdn_idx,
+			DBUS_TYPE_INVALID);
+
+	entry = g_tree_lookup(phonebook->fdn_entries, GINT_TO_POINTER(fdn_idx));
+	if (entry) {
+		/* If one already exists, delete it */
+		if (entry->name)
+			l_free(entry->name);
+		entry->name = l_strdup(new_name);
+
+		if (entry->number)
+			l_free(entry->number);
+		entry->number = l_strdup(new_number);
+	}
+
+	reply = dbus_message_new_method_return(phonebook->pending);
+
+	__ofono_dbus_pending_reply(&phonebook->pending, reply);
+}
+
+static DBusMessage *update_fdn_entry(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	char *new_name, *new_number, *pin2;
+	DBusMessage *reply;
+	int fdn_idx;
+
+	if (phonebook->driver->update_fdn_entry == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (phonebook->pending) {
+		reply = __ofono_error_busy(phonebook->pending);
+		g_dbus_send_message(conn, reply);
+		return NULL;
+	}
+
+	if (phonebook->fdn_flags ^ PHONEBOOK_FLAG_CACHED) {
+		ofono_error("%s: read fdn file first ! \n", __func__);
+		return __ofono_error_failed(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &new_name,
+				DBUS_TYPE_STRING, &new_number,
+				DBUS_TYPE_STRING, &pin2,
+				DBUS_TYPE_INT32, &fdn_idx,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if ( !valid_phone_number_format(new_number) ||
+		!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2))
+		return __ofono_error_invalid_format(msg);
+
+	phonebook->pending = dbus_message_ref(msg);
+	phonebook->driver->update_fdn_entry(phonebook,
+					update_fdn_entry_cb, phonebook);
+
+	return NULL;
+}
+
+static void delete_fdn_entry_cb(const struct ofono_error *error, int record, void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	DBusMessage *reply;
+	struct fdn_entry *entry;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during fdn entry delete");
+		reply = __ofono_error_failed(phonebook->pending);
+		__ofono_dbus_pending_reply(&phonebook->pending, reply);
+		return;
+	}
+
+	// update phonebook->fdn_entries
+	entry = g_tree_lookup(phonebook->fdn_entries, GINT_TO_POINTER(record));
+	if (entry) {
+		g_tree_remove(phonebook->fdn_entries, GINT_TO_POINTER(record));
+
+		l_free(entry->name);
+		l_free(entry->number);
+		l_free(entry);
+	}
+
+	reply = dbus_message_new_method_return(phonebook->pending);
+
+	__ofono_dbus_pending_reply(&phonebook->pending, reply);
+}
+
+static DBusMessage *delete_fdn_entry(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_phonebook *phonebook = data;
+	DBusMessage *reply;
+	char *pin2;
+	int fdn_idx;
+
+	if (phonebook->driver->delete_fdn_entry == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (phonebook->pending) {
+		reply = __ofono_error_busy(phonebook->pending);
+		g_dbus_send_message(conn, reply);
+		return NULL;
+	}
+
+	if (phonebook->fdn_flags ^ PHONEBOOK_FLAG_CACHED) {
+		ofono_error("%s: read fdn file first ! \n", __func__);
+		return __ofono_error_failed(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &pin2,
+				DBUS_TYPE_INT32, &fdn_idx,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2))
+		return __ofono_error_invalid_format(msg);
+
+	phonebook->pending = dbus_message_ref(msg);
+	phonebook->driver->delete_fdn_entry(phonebook,
+					delete_fdn_entry_cb, phonebook);
+
+	return NULL;
+}
+
 static const GDBusMethodTable phonebook_methods[] = {
 	{ GDBUS_ASYNC_METHOD("Import",
 			NULL, GDBUS_ARGS({ "entries", "s" }),
 			import_entries) },
+	{ GDBUS_ASYNC_METHOD("ImportFdn",
+			NULL, GDBUS_ARGS({ "entries", "a(iss)}" }),
+			import_fdn_entries) },
+	{ GDBUS_ASYNC_METHOD("InsertFdn",
+			GDBUS_ARGS({ "name", "s" }, { "number", "s" },
+			{ "pin2", "s" }),
+			GDBUS_ARGS({ "fdn_idx", "i" }),
+			insert_fdn_entry) },
+	{ GDBUS_ASYNC_METHOD("UpdateFdn",
+			GDBUS_ARGS({ "name", "s" }, { "number", "s" },
+			{ "pin2", "s" }, { "fdn_idx", "i" }),
+			NULL, update_fdn_entry) },
+	{ GDBUS_ASYNC_METHOD("DeleteFdn",
+			GDBUS_ARGS({ "pin2", "s" }, { "fdn_idx", "i" }),
+			NULL, delete_fdn_entry) },
 	{ }
 };
 
@@ -607,4 +944,9 @@ void ofono_phonebook_set_data(struct ofono_phonebook *pb, void *data)
 void *ofono_phonebook_get_data(struct ofono_phonebook *pb)
 {
 	return pb->driver_data;
+}
+
+void ofono_phonebook_set_fdn_data(struct ofono_phonebook *pb, void *data)
+{
+	pb->fdn_entries = data;
 }

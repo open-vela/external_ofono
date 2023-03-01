@@ -54,6 +54,7 @@
 
 #define EXT1_CP_SUBADDRESS	1
 #define EXT1_ADDITIONAL_DATA	2
+#define EXT2_ADDITIONAL_DATA	2
 
 /* TON (Type Of Number) See TS 24.008 */
 #define TON_MASK		0x70
@@ -109,6 +110,7 @@ struct phonebook_entry {
 
 unsigned char sim_path[] = { 0x3F, 0x00, 0x7F, 0x10 };
 unsigned char usim_path[] = { 0x3F, 0x00, 0x7F, 0x10, 0x5F, 0x3A };
+unsigned char usim_adf_path[] = { 0x3F, 0x00, 0x7F, 0xFF }; // MF_SIM + DF_ADF
 
 /*
  * Table for BCD to utf8 conversion. See table 4.4 in TS 31.102.
@@ -136,6 +138,13 @@ struct pb_data {
 	struct ofono_sim_context *sim_context;
 	const unsigned char *df_path;
 	size_t df_size;
+	GSList *pb_fdn_refs;
+	GSList *pb_fdn_ref_next;
+	const unsigned char *fdn_df_path;
+	size_t fdn_df_size;
+	int fdn_file_length;
+	int fdn_record_length;
+	GTree *fdn_entries;	/* Container of fdn_entry structures */
 };
 
 static void read_info_cb(int ok, unsigned char file_status,
@@ -157,6 +166,32 @@ ext1_info(const GSList *pb_files)
 	for (l = pb_files; l; l = l->next) {
 		const struct pb_file_info *f_info = l->data;
 		if (f_info->file_type == TYPE_EXT1)
+			return f_info;
+	}
+
+	return NULL;
+}
+
+static const struct pb_file_info *
+fdn_info(const GSList *pb_files)
+{
+	const GSList *l;
+	for (l = pb_files; l; l = l->next) {
+		const struct pb_file_info *f_info = l->data;
+		if (f_info->file_id == SIM_EFFDN_FILEID)
+			return f_info;
+	}
+
+	return NULL;
+}
+
+static const struct pb_file_info *
+ext2_info(const GSList *pb_files)
+{
+	const GSList *l;
+	for (l = pb_files; l; l = l->next) {
+		const struct pb_file_info *f_info = l->data;
+		if (f_info->file_id == SIM_EFEXT2_FILEID)
 			return f_info;
 	}
 
@@ -226,6 +261,83 @@ static struct phonebook_entry *handle_adn(size_t len, const unsigned char *msg,
 			ext_rec->record_length = f_info->record_length;
 			ext_rec->record = extension_record;
 			ext_rec->adn_idx = adn_idx;
+
+			ref->pending_records =
+				g_slist_prepend(ref->pending_records, ext_rec);
+		}
+	}
+
+	return new_entry;
+
+end:
+	l_free(name);
+	l_free(number);
+
+	return NULL;
+}
+
+static struct phonebook_entry *handle_fdn(size_t len, const unsigned char *msg,
+					struct pb_ref_rec *ref, int fdn_idx)
+{
+	unsigned name_length = len - 14;
+	unsigned number_start = name_length;
+	unsigned number_length;
+	unsigned extension_record = UNUSED;
+	unsigned i, prefix;
+	char *number = NULL;
+	char *name = sim_string_to_utf8(msg, name_length);
+	struct phonebook_entry *new_entry;
+
+	/* Length contains also TON & NPI */
+	number_length = msg[number_start];
+
+	if (number_length != UNUSED && number_length != 0) {
+		number_length--;
+		/* '+' + number + terminator */
+		number = g_new(char, 2 * number_length + 2);
+		prefix = 0;
+
+		if ((msg[number_start + 1] & TON_MASK) == TON_INTERNATIONAL) {
+			number[0] = '+';
+			prefix = 1;
+		}
+
+		for (i = 0; i < number_length; i++) {
+			number[2 * i + prefix] =
+				digit_to_utf8[msg[number_start + 2 + i] & 0x0f];
+			number[2 * i + 1 + prefix] =
+				digit_to_utf8[msg[number_start + 2 + i] >> 4];
+		}
+
+		extension_record = msg[len - 1];
+	}
+
+	DBG("FDN name %s, number %s ", name, number);
+	DBG("number length %d extension_record %d",
+		2 * number_length, extension_record);
+
+	if ((name == NULL || *name == '\0') && number == NULL)
+		goto end;
+
+	new_entry = l_new(struct fdn_entry, 1);
+	new_entry->name = name;
+	new_entry->number = number;
+
+	DBG("Creating fdn entry %d with", fdn_idx);
+	DBG("name %s and number %s", new_entry->name, new_entry->number);
+
+	g_tree_insert(ref->phonebook, GINT_TO_POINTER(fdn_idx), new_entry);
+
+	if (extension_record != UNUSED) {
+		struct record_to_read *ext_rec =
+			g_try_malloc0(sizeof(*ext_rec));
+		const struct pb_file_info *f_info = ext2_info(ref->pb_files);
+
+		if (ext_rec && f_info) {
+			ext_rec->file_id = f_info->file_id;
+			ext_rec->record_length = f_info->record_length;
+			ext_rec->record = extension_record;
+			ext_rec->adn_idx = fdn_idx;
 
 			ref->pending_records =
 				g_slist_prepend(ref->pending_records, ext_rec);
@@ -509,6 +621,73 @@ static void handle_ext1(size_t len, const unsigned char *msg,
 	g_free(ext_number);
 }
 
+static void handle_ext2(size_t len, const unsigned char *msg,
+			struct pb_ref_rec *ref,
+			const struct record_to_read *rec_data)
+{
+	unsigned number_length, i, next_extension_record;
+	struct phonebook_entry *entry;
+	char *ext_number;
+
+	if (len < 13) {
+		ofono_error("%s: bad EF_EXT2 record size", __func__);
+		return;
+	}
+
+	/* Check if there is more extension data */
+	next_extension_record = msg[12];
+	if (next_extension_record != UNUSED) {
+		struct record_to_read *ext_rec =
+			g_try_malloc0(sizeof(*ext_rec));
+		const struct pb_file_info *f_info = ext2_info(ref->pb_files);
+
+		if (ext_rec && f_info) {
+			DBG("next_extension_record %d", next_extension_record);
+
+			ext_rec->file_id = f_info->file_id;
+			ext_rec->record_length = f_info->record_length;
+			ext_rec->record = next_extension_record;
+			ext_rec->adn_idx = rec_data->adn_idx;
+
+			ref->pending_records =
+				g_slist_prepend(ref->pending_records, ext_rec);
+		}
+	}
+
+	if (msg[0] != EXT2_ADDITIONAL_DATA) {
+		DBG("EXT2 record with subaddress ignored");
+		return;
+	}
+
+	number_length = msg[1];
+	ext_number = g_try_malloc0(2 * number_length + 1);
+	if (ext_number == NULL)
+		return;
+
+	for (i = 0; i < number_length; i++) {
+		ext_number[2 * i] = digit_to_utf8[msg[2 + i] & 0x0f];
+		ext_number[2 * i + 1] = digit_to_utf8[msg[2 + i] >> 4];
+	}
+
+	DBG("Number extension %s", ext_number);
+	DBG("number length %d", number_length);
+
+	DBG("Looking for FDN entry %d", rec_data->adn_idx);
+	entry = g_tree_lookup(ref->phonebook,
+				GINT_TO_POINTER(rec_data->adn_idx));
+	if (entry == NULL) {
+		g_free(ext_number);
+		return;
+	}
+
+	char *number = entry->number;
+	entry->number = g_strconcat(number, ext_number, NULL);
+	g_free(number);
+
+
+	g_free(ext_number);
+}
+
 static const char *file_tag_to_string(enum file_type_tag tag)
 {
 	switch (tag) {
@@ -555,6 +734,18 @@ static void decode_read_response(const struct record_to_read *rec_data,
 	}
 }
 
+static gboolean free_fdn_entries(gpointer key, gpointer value, gpointer data)
+{
+	struct ofono_phonebook *pb = data;
+	struct fdn_entry *entry = value;
+
+	l_free(entry->name);
+	l_free(entry->number);
+	l_free(entry);
+
+	return FALSE;
+}
+
 static gboolean export_entry(gpointer key, gpointer value, gpointer data)
 {
 	struct ofono_phonebook *pb = data;
@@ -599,6 +790,42 @@ static void export_and_return(gboolean ok, struct cb_data *cbd)
 
 	g_slist_free_full(pbd->pb_refs, g_free);
 	pbd->pb_refs = NULL;
+
+	if (ok)
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+	else
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+
+	g_free(cbd);
+}
+
+static void fdn_export_and_return(gboolean ok, struct cb_data *cbd)
+{
+	struct ofono_phonebook *pb = cbd->user;
+	ofono_phonebook_cb_t cb = cbd->cb;
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	GSList *l;
+
+	DBG("fdn fully read");
+
+	// For fdn, there is only one node in pb_fdn_refs.
+	l = pbd->pb_fdn_refs;
+	if (l != NULL) {
+		struct pb_ref_rec *ref = l->data;
+		struct pb_file_info *f_info = fdn_info(ref->pb_files);
+
+		pbd->fdn_entries = ref->phonebook; /*ref->phonebook cannot be recycled here*/
+		ofono_phonebook_set_fdn_data(pb, pbd->fdn_entries);
+
+		pbd->fdn_file_length = f_info->file_length;
+		pbd->fdn_record_length = f_info->record_length;
+
+		g_slist_free_full(ref->pending_records, g_free);
+		g_slist_free_full(ref->pb_files, g_free);
+	}
+
+	g_slist_free_full(pbd->pb_fdn_refs, g_free);
+	pbd->pb_fdn_refs = NULL;
 
 	if (ok)
 		CALLBACK_WITH_SUCCESS(cb, cbd->data);
@@ -743,6 +970,92 @@ static void pb_adn_cb(int ok, int total_length, int record,
 	}
 }
 
+static void read_fdn_record_cb(int ok, int total_length, int record,
+			const unsigned char *data,
+			int record_length, void *userdata)
+{
+	struct cb_data *cbd = userdata;
+	struct ofono_phonebook *pb = cbd->user;
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct pb_ref_rec *ref = pbd->pb_fdn_ref_next->data;
+	struct record_to_read *rec;
+
+	if (!ok) {
+		ofono_error("%s: error %d", __func__, ok);
+		fdn_export_and_return(FALSE, cbd);
+		return;
+	}
+
+	DBG("ok %d; total_length %d; record %d; record_length %d",
+		ok, total_length, record, record_length);
+
+	rec = ref->next_record->data;
+
+	/* This call might add elements to pending_records */
+	handle_ext2(record_length, data, ref, rec);
+
+	ref->pending_records = g_slist_remove(ref->pending_records, rec);
+	g_free(rec);
+
+	if (ref->pending_records) {
+		struct record_to_read *rec;
+
+		ref->next_record = ref->pending_records;
+		rec = ref->next_record->data;
+
+		ofono_sim_read_record(pbd->sim_context, rec->file_id,
+				OFONO_SIM_FILE_STRUCTURE_FIXED,
+				rec->record,
+				rec->record_length,
+				pbd->fdn_df_path, pbd->fdn_df_size,
+				read_fdn_record_cb, cbd);
+	} else {
+		fdn_export_and_return(TRUE, cbd);
+	}
+}
+
+static void pb_fdn_cb(int ok, int total_length, int record,
+			const unsigned char *data,
+			int record_length, void *userdata)
+{
+	struct cb_data *cbd = userdata;
+	struct ofono_phonebook *pb = cbd->user;
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct pb_ref_rec *ref = pbd->pb_fdn_ref_next->data;
+	GSList *l;
+
+	if (!ok) {
+		ofono_error("%s: error %d", __func__, ok);
+		fdn_export_and_return(FALSE, cbd);
+		return;
+	}
+
+	DBG("ok %d; total_length %d; record %d; record_length %d",
+		ok, total_length, record, record_length);
+
+	handle_fdn(record_length, data, ref, record);
+
+	if (record*record_length >= total_length) {
+		DBG("All FDN records read: reading additional files");
+
+		if (ref->pending_records) {
+			struct record_to_read *rec;
+
+			ref->next_record = ref->pending_records;
+			rec = ref->next_record->data;
+
+			ofono_sim_read_record(pbd->sim_context, rec->file_id,
+					OFONO_SIM_FILE_STRUCTURE_FIXED,
+					rec->record,
+					rec->record_length,
+					pbd->fdn_df_path, pbd->fdn_df_size,
+					read_fdn_record_cb, cbd);
+		} else {
+			fdn_export_and_return(TRUE, cbd);
+		}
+	}
+}
+
 static void read_info_cb(int ok, unsigned char file_status,
 				int total_length, int record_length,
 				void *userdata)
@@ -848,6 +1161,236 @@ static void start_sim_app_read(struct cb_data *cbd)
 				OFONO_SIM_FILE_STRUCTURE_FIXED,
 				pbd->df_path, pbd->df_size,
 				read_info_cb, cbd);
+}
+
+static void read_fdn_info_cb(int ok, unsigned char file_status,
+				int total_length, int record_length,
+				void *userdata)
+{
+	struct cb_data *cbd = userdata;
+	struct ofono_phonebook *pb = cbd->user;
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct pb_file_info *file_info;
+	struct pb_ref_rec *ref = pbd->pb_fdn_ref_next->data;
+
+	file_info = ref->pb_next->data;
+	ref->pb_next = ref->pb_next->next;
+
+	if (ok) {
+		file_info->record_length = record_length;
+		file_info->file_length = total_length;
+
+		DBG("file id %x record length %d total_length %d",
+			file_info->file_id, record_length, total_length);
+	} else {
+		ofono_warn("%s: %x not found", __func__, file_info->file_id);
+		ref->pb_files = g_slist_remove(ref->pb_files, file_info);
+		g_free(file_info);
+	}
+
+	if (ref->pb_next == NULL) {
+		if (ref->pb_files == NULL) {
+			ofono_warn("%s: no fdn on SIM", __func__);
+			fdn_export_and_return(FALSE, cbd);
+			return;
+		}
+
+		/* Read full contents of the master file */
+		file_info = ref->pb_files->data;
+
+		ofono_sim_read_path(pbd->sim_context, file_info->file_id,
+				OFONO_SIM_FILE_STRUCTURE_FIXED,
+				pbd->fdn_df_path, pbd->fdn_df_size,
+				pb_fdn_cb, cbd);
+	} else {
+		file_info = ref->pb_next->data;
+
+		ofono_sim_read_info(pbd->sim_context, file_info->file_id,
+				OFONO_SIM_FILE_STRUCTURE_FIXED,
+				pbd->fdn_df_path, pbd->fdn_df_size,
+				read_fdn_info_cb, cbd);
+	}
+}
+
+static void ril_read_fdn_entries(struct ofono_phonebook *pb,
+				ofono_phonebook_cb_t cb, void *data)
+{
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct pb_ref_rec *ref_rec;
+	struct pb_file_info *f_fdn;
+	struct pb_file_info *f_ext2;
+	struct cb_data *cbd;
+
+	cbd = cb_data_new(cb, data, pb);
+
+	/* Assume USIM */
+	pbd->fdn_df_path = usim_adf_path;
+	pbd->fdn_df_size = sizeof(usim_adf_path);
+
+	ref_rec = g_try_malloc0(sizeof(*ref_rec));
+	if (ref_rec == NULL) {
+		ofono_error("%s: OOM", __func__);
+		fdn_export_and_return(FALSE, cbd);
+		return;
+	}
+
+	ref_rec->phonebook = g_tree_new(comp_int);
+
+	/* Only EF_FDN and EF_EXT2 read for USIM */
+
+	f_fdn = g_try_malloc0(sizeof(*f_fdn));
+	if (f_fdn == NULL) {
+		ofono_error("%s: OOM", __func__);
+		fdn_export_and_return(FALSE, cbd);
+		return;
+	}
+
+	f_fdn->file_id = SIM_EFFDN_FILEID;
+	ref_rec->pb_files = g_slist_append(ref_rec->pb_files, f_fdn);
+
+	f_ext2 = g_try_malloc0(sizeof(*f_ext2));
+	if (f_ext2 == NULL) {
+		ofono_error("%s: OOM", __func__);
+		fdn_export_and_return(FALSE, cbd);
+		return;
+	}
+
+	f_ext2->file_id = SIM_EFEXT2_FILEID;
+	ref_rec->pb_files = g_slist_append(ref_rec->pb_files, f_ext2);
+
+	pbd->pb_fdn_refs = g_slist_append(pbd->pb_fdn_refs, ref_rec);
+	pbd->pb_fdn_ref_next = pbd->pb_fdn_refs;
+
+	ref_rec->pb_next = ref_rec->pb_files;
+
+	/* Start reading process for MF */
+	ofono_sim_read_info(pbd->sim_context, f_fdn->file_id,
+			OFONO_SIM_FILE_STRUCTURE_FIXED,
+			pbd->fdn_df_path, pbd->fdn_df_size,
+			read_fdn_info_cb, cbd);
+}
+
+static void ril_insert_fdn_entry(struct ofono_phonebook *pb, char *name,
+				char *number, char *pin2, ofono_phonebook_update_cb_t cb, void *data)
+{
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct phonebook_entry *entry;
+	int i, rec_len, file_len, rec_count;
+
+	rec_len = pbd->fdn_record_length;
+	file_len = pbd->fdn_file_length;
+
+	if (rec_len <= 0 || file_len <= 0) {
+		ofono_error("%s: read fdn file info first ! \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	rec_count = file_len / rec_len;
+
+	// fdn record index 1-based
+	for (i = 1; i <= rec_count; ++i) {
+		//find an empty available index, then update
+		entry = g_tree_lookup(pbd->fdn_entries,
+					GINT_TO_POINTER(i));
+		if (entry == NULL)
+			break;
+	}
+
+	if (i > rec_count) {
+		ofono_error("%s: FDN no space left \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	ril_update_fdn_entry(pb, i, name, number, pin2, cb, data);
+}
+
+static void ril_delete_fdn_entry(struct ofono_phonebook *pb, int record,
+				const char *pin2, ofono_phonebook_cb_t cb, void *data)
+{
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	int rec_len, file_len, rec_count;
+	unsigned char effdn[255];
+	struct cb_data *cbd;
+
+	rec_len = pbd->fdn_record_length;
+	file_len = pbd->fdn_file_length;
+
+	if (rec_len <= 0 || file_len <= 0) {
+		ofono_error("%s: read fdn file info first ! \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	rec_count = file_len / rec_len;
+
+	if (record > rec_count) {
+		ofono_error("%s: the record to be deleted is invalid \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	cbd = cb_data_new(cb, data, pb);
+
+	//update with 0xff
+	memset(effdn, 0xff, rec_len);
+
+	ofono_sim_write(pbd->sim_context, SIM_EFFDN_FILEID,
+			fdn_update_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,
+			record, effdn, rec_len, pin2, cbd);
+}
+
+static void fdn_update_cb(int ok, int record, void *data)
+{
+	struct cb_data *cbd = data;
+
+	if (ok)
+		CALLBACK_WITH_SUCCESS(cbd->cb, record, cbd->data);
+	else {
+		ofono_info("Failed to update EFfdn");
+		CALLBACK_WITH_FAILURE(cbd->cb, record, cbd->data);
+	}
+
+	g_free(cbd);
+}
+
+static void ril_update_fdn_entry(struct ofono_phonebook *pb, int record,
+				const char *identifier, const char *new_number, const char *pin2,
+				ofono_phonebook_update_cb_t cb, void *data)
+{
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct ofono_phone_number *number;
+	int rec_len, file_len, rec_count;
+	unsigned char effdn[255];
+	struct cb_data *cbd;
+
+	rec_len = pbd->fdn_record_length;
+	file_len = pbd->fdn_file_length;
+
+	if (rec_len <= 0 || file_len <= 0) {
+		ofono_error("%s: read fdn file info first ! \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	rec_count = file_len / rec_len;
+
+	if (record > rec_count) {
+		ofono_error("%s: the record to be deleted is invalid \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	cbd = cb_data_new(cb, data, pb);
+
+	string_to_phone_number(new_number, number);
+
+	sim_adn_build(effdn, rec_len, number, identifier);
+
+	ofono_sim_write(pbd->sim_context, SIM_EFFDN_FILEID,
+			fdn_update_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,
+			record, effdn, rec_len, pin2, cbd);
 }
 
 static void pb_reference_data_cb(int ok, int total_length, int record,
@@ -1020,6 +1563,10 @@ static void ril_phonebook_remove(struct ofono_phonebook *pb)
 	ofono_phonebook_set_data(pb, NULL);
 	ofono_sim_context_free(pbd->sim_context);
 
+	ofono_phonebook_set_fdn_data(pb, NULL);
+	g_tree_foreach(pbd->fdn_entries, free_fdn_entries, pb);
+	g_tree_destroy(pbd->fdn_entries);
+
 	g_free(pbd);
 }
 
@@ -1027,7 +1574,11 @@ static const struct ofono_phonebook_driver driver = {
 	.name		= RILMODEM,
 	.probe		= ril_phonebook_probe,
 	.remove		= ril_phonebook_remove,
-	.export_entries	= ril_export_entries
+	.export_entries	= ril_export_entries,
+	.read_fdn_entries	= ril_read_fdn_entries,
+	.insert_fdn_entry	= ril_insert_fdn_entry,
+	.update_fdn_entry	= ril_update_fdn_entry,
+	.delete_fdn_entry	= ril_delete_fdn_entry,
 };
 
 void ril_phonebook_init(void)

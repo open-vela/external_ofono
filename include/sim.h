@@ -112,7 +112,7 @@ typedef void (*ofono_sim_file_read_cb_t)(int ok, int total_length, int record,
 					int record_length, void *userdata);
 typedef void (*ofono_sim_file_changed_cb_t)(int id, void *userdata);
 
-typedef void (*ofono_sim_file_write_cb_t)(int ok, void *userdata);
+typedef void (*ofono_sim_file_write_cb_t)(int ok, int record, void *userdata);
 
 typedef void (*ofono_sim_passwd_cb_t)(const struct ofono_error *error,
 					enum ofono_sim_password_type type,
@@ -323,7 +323,8 @@ int ofono_sim_read(struct ofono_sim_context *context, int id,
 int ofono_sim_write(struct ofono_sim_context *context, int id,
 			ofono_sim_file_write_cb_t cb,
 			enum ofono_sim_file_structure structure, int record,
-			const unsigned char *data, int length, void *userdata);
+			const unsigned char *data, int length,
+			const char *pin2, void *userdata);
 
 int ofono_sim_read_bytes(struct ofono_sim_context *context, int id,
 			unsigned short offset, unsigned short num_bytes,

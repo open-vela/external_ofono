@@ -185,13 +185,13 @@ static const char *cf_type_lut[] = {
 	"AllConditional"
 };
 
-static void sim_cfis_update_cb(int ok, void *data)
+static void sim_cfis_update_cb(int ok, int record, void *data)
 {
 	if (!ok)
 		ofono_info("Failed to update EFcfis");
 }
 
-static void sim_cphs_cff_update_cb(int ok, void *data)
+static void sim_cphs_cff_update_cb(int ok, int record, void *data)
 {
 	if (!ok)
 		ofono_info("Failed to update EFcphs-cff");
@@ -240,7 +240,7 @@ static void sim_set_cf_indicator(struct ofono_call_forwarding *cf)
 					sim_cfis_update_cb,
 					OFONO_SIM_FILE_STRUCTURE_FIXED,
 					cf->cfis_record_id, data,
-					sizeof(data), cf);
+					sizeof(data), NULL, cf);
 		return;
 	}
 
@@ -250,7 +250,7 @@ static void sim_set_cf_indicator(struct ofono_call_forwarding *cf)
 		ofono_sim_write(cf->sim_context, SIM_EF_CPHS_CFF_FILEID,
 					sim_cphs_cff_update_cb,
 					OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
-					0, &cff_voice, sizeof(cff_voice), cf);
+					0, &cff_voice, sizeof(cff_voice), NULL, cf);
 	}
 }
 

@@ -68,6 +68,7 @@ struct sim_fs_op {
 	int current;
 	unsigned char path[6];
 	unsigned char path_len;
+	char *pin2; /* pin2; only for FDN/BDN */
 	gconstpointer cb;
 	gboolean is_read;
 	void *userdata;
@@ -97,6 +98,7 @@ static void sim_fs_op_free(gpointer pointer)
 	struct sim_fs_op *node = pointer;
 
 	g_free(node->buffer);
+	g_free(node->pin2);
 	g_free(node);
 }
 
@@ -301,7 +303,7 @@ static void sim_fs_op_error(struct sim_fs *fs)
 			(0, 0, 0, 0, 0, op->userdata);
 	else
 		((ofono_sim_file_write_cb_t) op->cb)
-			(0, op->userdata);
+			(0, op->current, op->userdata);
 
 	sim_fs_end_current(fs);
 }
@@ -358,9 +360,9 @@ static void sim_fs_op_write_cb(const struct ofono_error *error, void *data)
 	}
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
-		cb(1, op->userdata);
+		cb(1, op->current, op->userdata);
 	else
-		cb(0, op->userdata);
+		cb(0, op->current, op->userdata);
 
 	sim_fs_end_current(fs);
 }
@@ -971,7 +973,7 @@ static gboolean sim_fs_op_next(gpointer user_data)
 		case OFONO_SIM_FILE_STRUCTURE_FIXED:
 			driver->write_file_linear(fs->sim, op->id, op->current,
 					op->length, op->buffer,
-					NULL, 0, NULL, sim_fs_op_write_cb, fs);
+					NULL, 0, op->pin2, sim_fs_op_write_cb, fs);
 			break;
 		case OFONO_SIM_FILE_STRUCTURE_CYCLIC:
 			driver->write_file_cyclic(fs->sim, op->id,
@@ -985,6 +987,9 @@ static gboolean sim_fs_op_next(gpointer user_data)
 
 		g_free(op->buffer);
 		op->buffer = NULL;
+
+		g_free(op->pin2);
+		op->pin2 = NULL;
 	}
 
 	return FALSE;
@@ -1088,7 +1093,8 @@ int sim_fs_read(struct ofono_sim_context *context, int id,
 int sim_fs_write(struct ofono_sim_context *context, int id,
 			ofono_sim_file_write_cb_t cb,
 			enum ofono_sim_file_structure structure, int record,
-			const unsigned char *data, int length, void *userdata)
+			const unsigned char *data, int length,
+			const char *pin2, void *userdata)
 {
 	struct sim_fs *fs = context->fs;
 	struct sim_fs_op *op;
@@ -1133,6 +1139,7 @@ int sim_fs_write(struct ofono_sim_context *context, int id,
 	op->length = length;
 	op->current = record;
 	op->context = context;
+	op->pin2 = g_strdup(pin2);
 
 	g_queue_push_tail(fs->op_q, op);
 

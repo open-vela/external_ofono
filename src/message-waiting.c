@@ -107,7 +107,7 @@ static const int mw_mailbox_to_cphs_record[5] = {
 	0,
 };
 
-static void mbdn_set_cb(int ok, void *data);
+static void mbdn_set_cb(int ok, int record, void *data);
 
 static DBusMessage *mw_get_properties(DBusConnection *conn,
 					DBusMessage *msg, void *data)
@@ -161,7 +161,7 @@ static DBusMessage *mw_get_properties(DBusConnection *conn,
 	return reply;
 }
 
-static void cphs_mbdn_sync_cb(int ok, void *data)
+static void cphs_mbdn_sync_cb(int ok, int record, void *data)
 {
 	struct mbdn_set_request *req = data;
 
@@ -209,7 +209,7 @@ static DBusMessage *set_cphs_mbdn(struct ofono_message_waiting *mw,
 			sync ? cphs_mbdn_sync_cb : mbdn_set_cb,
 			OFONO_SIM_FILE_STRUCTURE_FIXED,
 			mw_mailbox_to_cphs_record[mailbox],
-			efmbdn, mw->ef_cphs_mbdn_length, req) == -1) {
+			efmbdn, mw->ef_cphs_mbdn_length, NULL, req) == -1) {
 		g_free(req);
 
 		if (msg)
@@ -220,7 +220,7 @@ static DBusMessage *set_cphs_mbdn(struct ofono_message_waiting *mw,
 	return NULL;
 }
 
-static void mbdn_set_cb(int ok, void *data)
+static void mbdn_set_cb(int ok, int record, void *data)
 {
 	struct mbdn_set_request *req = data;
 	struct ofono_phone_number *old = &req->mw->mailbox_number[req->mailbox];
@@ -306,7 +306,7 @@ static DBusMessage *set_mbdn(struct ofono_message_waiting *mw, int mailbox,
 	if (ofono_sim_write(req->mw->sim_context, SIM_EFMBDN_FILEID,
 				mbdn_set_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,
 				req->mw->efmbdn_record_id[mailbox],
-				efmbdn, req->mw->efmbdn_length, req) == -1) {
+				efmbdn, req->mw->efmbdn_length, NULL, req) == -1) {
 		g_free(req);
 
 		if (msg)
@@ -667,7 +667,7 @@ out:
 	}
 }
 
-static void mw_mwis_write_cb(int ok, void *userdata)
+static void mw_mwis_write_cb(int ok, int record, void *userdata)
 {
 	if (!ok)
 		ofono_error("Writing new EF-MWIS failed");
@@ -740,7 +740,7 @@ static void mw_set_indicator(struct ofono_message_waiting *mw, int profile,
 	if (ofono_sim_write(mw->sim_context, SIM_EFMWIS_FILEID,
 				mw_mwis_write_cb,
 				OFONO_SIM_FILE_STRUCTURE_FIXED, 1,
-				efmwis, mw->efmwis_length, mw) != 0) {
+				efmwis, mw->efmwis_length, NULL, mw) != 0) {
 		ofono_error("Queuing a EF-MWI write to SIM failed");
 	}
 
@@ -759,7 +759,7 @@ try_cphs:
 	if (ofono_sim_write(mw->sim_context, SIM_EF_CPHS_MWIS_FILEID,
 				mw_mwis_write_cb,
 				OFONO_SIM_FILE_STRUCTURE_TRANSPARENT, 0,
-				efmwis, mw->ef_cphs_mwis_length, mw) != 0)
+				efmwis, mw->ef_cphs_mwis_length, NULL, mw) != 0)
 		ofono_error("Queuing a EF-MWIS write to SIM failed (CPHS)");
 }
 

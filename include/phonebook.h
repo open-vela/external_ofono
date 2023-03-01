@@ -33,6 +33,9 @@ struct ofono_phonebook;
 typedef void (*ofono_phonebook_cb_t)(const struct ofono_error *error,
 					void *data);
 
+typedef void (*ofono_phonebook_update_cb_t)(const struct ofono_error *error,
+					int record, void *data);
+
 /* Export entries reports results through ofono_phonebook_entry, if an error
  * occurs, ofono_phonebook_entry should not be called
  */
@@ -43,6 +46,15 @@ struct ofono_phonebook_driver {
 	void (*remove)(struct ofono_phonebook *pb);
 	void (*export_entries)(struct ofono_phonebook *pb, const char *storage,
 				ofono_phonebook_cb_t cb, void *data);
+	void (*read_fdn_entries)(struct ofono_phonebook *pb,
+				ofono_phonebook_cb_t cb, void *data);
+	void (*insert_fdn_entry)(struct ofono_phonebook *pb, const char *new_name,
+				const char *new_number, const char *pin2,
+				ofono_phonebook_update_cb_t cb, void *data);
+	void (*update_fdn_entry)(struct ofono_phonebook *pb,
+				ofono_phonebook_update_cb_t cb, void *data);
+	void (*delete_fdn_entry)(struct ofono_phonebook *pb,
+				ofono_phonebook_update_cb_t cb, void *data);
 };
 
 void ofono_phonebook_entry(struct ofono_phonebook *pb, int index,

@@ -619,7 +619,7 @@ static void msisdn_set_done(struct msisdn_set_request *req)
 	g_free(req);
 }
 
-static void msisdn_set_cb(int ok, void *data)
+static void msisdn_set_cb(int ok, int record, void *data)
 {
 	struct msisdn_set_request *req = data;
 
@@ -663,7 +663,7 @@ static gboolean set_own_numbers(struct ofono_sim *sim,
 		if (ofono_sim_write(req->sim->context, SIM_EFMSISDN_FILEID,
 				msisdn_set_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,
 				record, efmsisdn,
-				sim->efmsisdn_length, req) == 0)
+				sim->efmsisdn_length, NULL, req) == 0)
 			req->pending++;
 		else
 			req->failed++;
@@ -2961,10 +2961,11 @@ int ofono_sim_read(struct ofono_sim_context *context, int id,
 int ofono_sim_write(struct ofono_sim_context *context, int id,
 			ofono_sim_file_write_cb_t cb,
 			enum ofono_sim_file_structure structure, int record,
-			const unsigned char *data, int length, void *userdata)
+			const unsigned char *data, int length,
+			const char *pin2, void *userdata)
 {
 	return sim_fs_write(context, id, cb, structure, record, data, length,
-				userdata);
+				pin2, userdata);
 }
 
 unsigned int ofono_sim_add_file_watch(struct ofono_sim_context *context,

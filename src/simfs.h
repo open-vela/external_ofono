@@ -57,7 +57,8 @@ void sim_fs_check_version(struct sim_fs *fs);
 int sim_fs_write(struct ofono_sim_context *context, int id,
 			ofono_sim_file_write_cb_t cb,
 			enum ofono_sim_file_structure structure, int record,
-			const unsigned char *data, int length, void *userdata);
+			const unsigned char *data, int length,
+			const char *pin2, void *userdata);
 
 char *sim_fs_get_cached_image(struct sim_fs *fs, int id);
 
