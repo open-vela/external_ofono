@@ -1418,6 +1418,7 @@ static const GDBusMethodTable modem_methods[] = {
 static const GDBusSignalTable modem_signals[] = {
 	{ GDBUS_SIGNAL("PropertyChanged",
 			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
+	{ GDBUS_SIGNAL("ModemRestart", NULL) },
 	{ }
 };
 
@@ -1488,6 +1489,20 @@ out:
 		if (modems_remaining == 0)
 			__ofono_exit();
 	}
+}
+
+void ofono_modem_restart(struct ofono_modem *modem)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	DBusMessage *signal;
+
+	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
+					"ModemRestart");
+
+	if (signal == NULL)
+		return;
+
+	g_dbus_send_message(conn, signal);
 }
 
 ofono_bool_t ofono_modem_get_powered(struct ofono_modem *modem)
