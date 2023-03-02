@@ -36,6 +36,7 @@
 #include "missing.h"
 
 #define DEFAULT_POWERED_TIMEOUT (20)
+#define DEFAULT_OEM_REQ_STRING_MAX_LEN 10
 #define SETTINGS_KEY "modem"
 #define SETTINGS_STORE "store"
 #define SETTINGS_GROUP "Settings"
@@ -1392,6 +1393,138 @@ static DBusMessage *modem_get_status(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void modem_invoke_oem_request_raw_cb(const struct ofono_error *error,
+				unsigned char *resp, int len, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessageIter iter, array;
+	DBusMessage *reply;
+	int i;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during modem invoke oem request raw");
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_TYPE_BYTE_AS_STRING, &array);
+
+	for (i = 0; i < len; i++)
+		dbus_message_iter_append_basic(&array, DBUS_TYPE_BYTE, &resp[i]);
+
+	dbus_message_iter_close_container(&iter, &array);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static DBusMessage *modem_invoke_oem_request_raw(DBusConnection *conn,
+				DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessageIter iter, array;
+	unsigned char *oem_req;
+	int req_len;
+
+	if (modem->driver->request_oem_raw == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &array);
+
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_fixed_array(&array, &oem_req, &req_len);
+
+	if (req_len == 0)
+		return __ofono_error_invalid_args(msg);
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->request_oem_raw(modem, oem_req, req_len,
+				modem_invoke_oem_request_raw_cb, modem);
+
+	return NULL;
+}
+
+static void modem_invoke_oem_request_strings_cb(const struct ofono_error *error,
+				char **resp, int len, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessageIter iter, array;
+	DBusMessage *reply;
+	int i;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error occurred during modem invoke oem request strings");
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_TYPE_STRING_AS_STRING, &array);
+
+	for (i = 0; i < len; i++)
+		dbus_message_iter_append_basic(&array, DBUS_TYPE_STRING, &resp[i]);
+
+	dbus_message_iter_close_container(&iter, &array);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static DBusMessage *modem_invoke_oem_request_strings(DBusConnection *conn,
+				DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessageIter iter, entry;
+	char *oem_req[DEFAULT_OEM_REQ_STRING_MAX_LEN];
+	int req_len;
+
+	if (modem->driver->request_oem_strings == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &entry);
+
+	req_len = 0;
+	while (dbus_message_iter_get_arg_type(&entry) == DBUS_TYPE_STRING) {
+		if (req_len == DEFAULT_OEM_REQ_STRING_MAX_LEN)
+			return __ofono_error_invalid_args(msg);
+
+		dbus_message_iter_get_basic(&entry, &oem_req[req_len++]);
+		dbus_message_iter_next(&entry);
+	}
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->request_oem_strings(modem, oem_req, req_len,
+				 modem_invoke_oem_request_strings_cb, modem);
+
+	return NULL;
+}
 
 static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
@@ -1412,6 +1545,14 @@ static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetModemStatus",
 			NULL, GDBUS_ARGS({ "status", "i" }),
 			modem_get_status) },
+	{ GDBUS_ASYNC_METHOD("OemRequestRaw",
+			GDBUS_ARGS({ "request", "ay" }),
+			GDBUS_ARGS({ "response", "ay" }),
+			modem_invoke_oem_request_raw) },
+	{ GDBUS_ASYNC_METHOD("OemRequestStrings",
+			GDBUS_ARGS({ "request", "as" }),
+			GDBUS_ARGS({ "response", "as" }),
+			modem_invoke_oem_request_strings) },
 	{ }
 };
 
@@ -1419,6 +1560,8 @@ static const GDBusSignalTable modem_signals[] = {
 	{ GDBUS_SIGNAL("PropertyChanged",
 			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
 	{ GDBUS_SIGNAL("ModemRestart", NULL) },
+	{ GDBUS_SIGNAL("OemHookIndication",
+			GDBUS_ARGS({ "response", "ay" })) },
 	{ }
 };
 
@@ -1511,6 +1654,32 @@ ofono_bool_t ofono_modem_get_powered(struct ofono_modem *modem)
 		return FALSE;
 
 	return modem->powered;
+}
+
+void ofono_oem_hook_raw(struct ofono_modem *modem, unsigned char *response, int len)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	DBusMessageIter iter, array;
+	DBusMessage *signal;
+	int i;
+
+	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
+					"OemHookIndication");
+
+	if (signal == NULL)
+		return;
+
+	dbus_message_iter_init_append(signal, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_TYPE_BYTE_AS_STRING, &array);
+
+	for (i = 0; i < len; i++)
+		dbus_message_iter_append_basic(&array, DBUS_TYPE_BYTE, &response[i]);
+
+	dbus_message_iter_close_container(&iter, &array);
+
+	g_dbus_send_message(conn, signal);
 }
 
 static gboolean trigger_interface_update(void *data)

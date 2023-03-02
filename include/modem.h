@@ -56,6 +56,12 @@ typedef void (*ofono_modem_enable_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_modem_status_query_cb_t)(const struct ofono_error *error,
 						int status, void *data);
 
+typedef void (*ofono_modem_oem_req_raw_cb_t)(const struct ofono_error *error,
+		unsigned char *resp, int len, void *data);
+
+typedef void (*ofono_modem_oem_req_str_cb_t)(const struct ofono_error *error,
+		char **resp, int len, void *data);
+
 struct ofono_modem_driver {
 	const char *name;
 	enum ofono_modem_type modem_type;
@@ -101,6 +107,14 @@ struct ofono_modem_driver {
 	void (*query_modem_status)(struct ofono_modem *modem,
 			ofono_modem_status_query_cb_t cb,
 			void *data);
+
+	/* Request oem raw */
+	void (*request_oem_raw)(struct ofono_modem *modem, unsigned char oem_req[],
+				int req_len, ofono_modem_oem_req_raw_cb_t cb, void *data);
+
+	/* Request oem strings */
+	void (*request_oem_strings)(struct ofono_modem *modem, char *oem_req[],
+				int req_len, ofono_modem_oem_req_str_cb_t cb, void *data);
 };
 
 void ofono_modem_add_interface(struct ofono_modem *modem,
@@ -148,6 +162,8 @@ ofono_bool_t ofono_modem_get_boolean(struct ofono_modem *modem,
 					const char *key);
 
 void ofono_modem_restart(struct ofono_modem *modem);
+
+void ofono_oem_hook_raw(struct ofono_modem *modem, unsigned char *response, int len);
 
 int ofono_modem_driver_register(const struct ofono_modem_driver *);
 void ofono_modem_driver_unregister(const struct ofono_modem_driver *);
