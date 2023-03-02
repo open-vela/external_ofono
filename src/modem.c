@@ -786,6 +786,83 @@ static void offline_cb(const struct ofono_error *error, void *data)
 	}
 }
 
+static void modem_activity_info_query_cb(const struct ofono_error *error,
+						int activity_info[], unsigned int length,
+						void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter args;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error during modem access activity info query");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_TYPE_INT32_AS_STRING, &args);
+
+	dbus_message_iter_append_fixed_array(&args,
+                                     DBUS_TYPE_INT32,
+                                     &activity_info,
+                                     length);
+
+	dbus_message_iter_close_container(&iter, &args);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static void modem_enable_or_disable_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error during modem access enable or disable");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static void modem_status_query_cb(const struct ofono_error *error,
+						int status, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error during modem access status query");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+	dbus_message_iter_init_append(reply, &iter);
+
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
 static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 {
 	struct ofono_modem *modem = user;
@@ -1250,6 +1327,72 @@ static DBusMessage *modem_set_property(DBusConnection *conn,
 	return __ofono_error_invalid_args(msg);
 }
 
+static DBusMessage *modem_get_activity_info(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_modem *modem = data;
+
+	if (modem->driver->query_activity_info == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->query_activity_info(modem, modem_activity_info_query_cb, modem);
+
+	return NULL;
+}
+
+static DBusMessage *modem_enable_or_disable(struct ofono_modem *modem, ofono_bool_t enable,
+					DBusConnection *conn, DBusMessage *msg)
+{
+	if (modem->driver->enable_modem == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->enable_modem(modem, enable, modem_enable_or_disable_cb, modem);
+
+	return NULL;
+}
+
+static DBusMessage *modem_enable(DBusConnection *conn, DBusMessage *msg,
+				void *data)
+{
+	struct ofono_modem *modem = data;
+
+	return modem_enable_or_disable(modem, TRUE, conn, msg);
+}
+
+static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
+				void *data)
+{
+	struct ofono_modem *modem = data;
+
+	return modem_enable_or_disable(modem, FALSE, conn, msg);
+}
+
+static DBusMessage *modem_get_status(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	struct ofono_modem *modem = data;
+
+	if (modem->driver->query_modem_status == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->query_modem_status(modem, modem_status_query_cb, modem);
+
+	return NULL;
+}
+
+
 static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1257,6 +1400,18 @@ static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_ASYNC_METHOD("SetProperty",
 			GDBUS_ARGS({ "property", "s" }, { "value", "v" }),
 			NULL, modem_set_property) },
+	{ GDBUS_ASYNC_METHOD("GetModemActivityInfo",
+			NULL, GDBUS_ARGS({ "activityinfo", "ai" }),
+			modem_get_activity_info) },
+	{ GDBUS_ASYNC_METHOD("EnableModem",
+			NULL, NULL,
+			modem_enable) },
+	{ GDBUS_ASYNC_METHOD("DisableModem",
+			NULL, NULL,
+			modem_disable) },
+	{ GDBUS_ASYNC_METHOD("GetModemStatus",
+			NULL, GDBUS_ARGS({ "status", "i" }),
+			modem_get_status) },
 	{ }
 };
 

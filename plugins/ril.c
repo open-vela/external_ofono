@@ -466,6 +466,134 @@ int ril_disable(struct ofono_modem *modem)
 	return -EINPROGRESS;
 }
 
+static void ril_query_modem_activity_info_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_activity_info_query_cb_t cb = cbd->cb;
+	struct parcel rilp;
+	int activity_info[OFONO_MODEM_ACTIVITY_INFO_ARRAY_LENGTH];
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("%s: RIL_REQUEST_GET_ACTIVITY_INFO reply failure: %s",
+				__func__,
+				ril_error_to_string(message->error));
+
+		if (cb != NULL) {
+			CALLBACK_WITH_FAILURE(cb, NULL, 0, user_data);
+			return;
+		}
+	}
+
+	if (cb == NULL) {
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, user_data);
+		return;
+	}
+
+	g_ril_init_parcel(message, &rilp);
+
+	for (int i = 0; i < OFONO_MODEM_ACTIVITY_INFO_ARRAY_LENGTH; i++) {
+		activity_info[i] = parcel_r_int32(&rilp);
+	}
+
+	CALLBACK_WITH_SUCCESS(cb, activity_info,
+			OFONO_MODEM_ACTIVITY_INFO_ARRAY_LENGTH,
+			user_data);
+}
+
+static void ril_query_modem_activity_info(struct ofono_modem *modem,
+		ofono_modem_activity_info_query_cb_t cb,
+		void *data)
+{
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_GET_ACTIVITY_INFO, NULL,
+			ril_query_modem_activity_info_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+}
+
+static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_enable_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("%s: RIL_REQUEST_ENABLE_MODEM reply failure: %s",
+				__func__,
+				ril_error_to_string(message->error));
+		CALLBACK_WITH_FAILURE(cb, cbd);
+		return;
+	}
+
+	CALLBACK_WITH_SUCCESS(cb, cbd);
+}
+
+static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
+		ofono_modem_enable_cb_t cb, void *data)
+{
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+	struct parcel rilp;
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, enable);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_ENABLE_MODEM, &rilp,
+			ril_enable_modem_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_status_query_cb_t cb = cbd->cb;
+	struct parcel rilp;
+	int status;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("%s: RIL_REQUEST_GET_MODEM_STATUS reply failure: %s",
+				__func__,
+				ril_error_to_string(message->error));
+
+		if (cb != NULL) {
+			CALLBACK_WITH_FAILURE(cb, -1, user_data);
+			return;
+		}
+	}
+
+	if (cb == NULL) {
+		CALLBACK_WITH_FAILURE(cb, -1, user_data);
+		return;
+	}
+
+	g_ril_init_parcel(message, &rilp);
+
+	status = parcel_r_int32(&rilp);
+
+	CALLBACK_WITH_SUCCESS(cb, status, user_data);
+}
+
+static void ril_query_modem_status(struct ofono_modem *modem,
+		ofono_modem_status_query_cb_t cb,
+		void *data)
+{
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_GET_MODEM_STATUS, NULL,
+			ril_query_modem_status_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, -1, data);
+}
+
 static struct ofono_modem_driver ril_driver = {
 	.name = "ril",
 	.probe = ril_probe,
@@ -476,6 +604,9 @@ static struct ofono_modem_driver ril_driver = {
 	.post_sim = ril_post_sim,
 	.post_online = ril_post_online,
 	.set_online = ril_set_online,
+	.query_activity_info = ril_query_modem_activity_info,
+	.enable_modem = ril_enable_modem,
+	.query_modem_status = ril_query_modem_status,
 };
 
 /*
