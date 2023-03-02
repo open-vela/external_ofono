@@ -147,6 +147,8 @@ int ofono_modem_set_boolean(struct ofono_modem *modem,
 ofono_bool_t ofono_modem_get_boolean(struct ofono_modem *modem,
 					const char *key);
 
+void ofono_modem_restart(struct ofono_modem *modem);
+
 int ofono_modem_driver_register(const struct ofono_modem_driver *);
 void ofono_modem_driver_unregister(const struct ofono_modem_driver *);
 
