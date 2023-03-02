@@ -366,6 +366,17 @@ static void ril_connected(struct ril_msg *message, gpointer user_data)
 	ofono_modem_set_powered(modem, TRUE);
 }
 
+static void ril_modem_restart(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_modem *modem = (struct ofono_modem *) user_data;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+
+	ofono_info("[%d,UNSOL]< %s", g_ril_get_slot(rd->ril),
+		g_ril_unsol_request_to_string(rd->ril, message->req));
+
+	ofono_modem_restart(modem);
+}
+
 static int create_gril(struct ofono_modem *modem)
 {
 	struct ril_data *rd = ofono_modem_get_data(modem);
@@ -404,6 +415,9 @@ static int create_gril(struct ofono_modem *modem)
 
 	g_ril_register(rd->ril, RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED,
 			ril_radio_state_changed, modem);
+
+	g_ril_register(rd->ril, RIL_UNSOL_MODEM_RESTART,
+			ril_modem_restart, modem);
 
 	return 0;
 }

@@ -66,6 +66,10 @@ Signals		PropertyChanged(string name, variant value)
 			This signal indicates a changed value of the given
 			property.
 
+		ModemRestart()
+
+			This signal indicates modem restart.
+
 Properties	boolean Powered [readwrite]
 
 			Boolean representing the power state of the modem
