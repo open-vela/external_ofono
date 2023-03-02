@@ -377,6 +377,31 @@ static void ril_modem_restart(struct ril_msg *message, gpointer user_data)
 	ofono_modem_restart(modem);
 }
 
+static void ril_oem_hook_raw(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_modem *modem = (struct ofono_modem *) user_data;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct parcel rilp;
+	unsigned char *response;
+	int len;
+
+	g_ril_init_parcel(message, &rilp);
+	if (rilp.malformed) {
+		ofono_error("%s: malformed parcel received", __func__);
+		return;
+	}
+
+	response = parcel_r_raw(&rilp, &len);
+	if (response == NULL) {
+		ofono_error("%s: no strings", __func__);
+		return;
+	}
+
+	g_ril_print_unsol(rd->ril, message);
+	ofono_oem_hook_raw(modem, response, len);
+	g_free(response);
+}
+
 static int create_gril(struct ofono_modem *modem)
 {
 	struct ril_data *rd = ofono_modem_get_data(modem);
@@ -418,6 +443,9 @@ static int create_gril(struct ofono_modem *modem)
 
 	g_ril_register(rd->ril, RIL_UNSOL_MODEM_RESTART,
 			ril_modem_restart, modem);
+
+	g_ril_register(rd->ril, RIL_UNSOL_OEM_HOOK_RAW,
+			ril_oem_hook_raw, modem);
 
 	return 0;
 }
@@ -608,6 +636,108 @@ static void ril_query_modem_status(struct ofono_modem *modem,
 	CALLBACK_WITH_FAILURE(cb, -1, data);
 }
 
+static void ril_oem_request_raw_cb(struct ril_msg *message,
+				gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_oem_req_raw_cb_t cb = cbd->cb;
+	struct ril_data *rd = cbd->user;
+	unsigned char *response;
+	struct parcel rilp;
+	int resp_len;
+
+	if (message->error != RIL_E_SUCCESS)
+		goto error;
+
+	g_ril_init_parcel(message, &rilp);
+
+	response = parcel_r_raw(&rilp, &resp_len);
+	if (response == NULL) {
+		ofono_error("%s: malformed parcel", __func__);
+		goto error;
+	}
+
+	g_ril_append_print_buf(rd->ril, "%d", resp_len);
+	g_ril_print_response(rd->ril, message);
+
+	CALLBACK_WITH_SUCCESS(cb, response, resp_len, cbd->data);
+	g_free(response);
+	return;
+
+error:
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
+}
+
+static void ril_request_oem_hook_raw(struct ofono_modem *modem, unsigned char oem_req[],
+				int req_len, ofono_modem_oem_req_raw_cb_t cb, void *data)
+{
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, rd);
+	struct parcel rilp;
+
+	parcel_init(&rilp);
+	parcel_w_raw(&rilp, oem_req, req_len);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_OEM_HOOK_RAW, &rilp,
+			ril_oem_request_raw_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+}
+
+static void ril_oem_request_strings_cb(struct ril_msg *message,
+					gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_oem_req_str_cb_t cb = cbd->cb;
+	struct ril_data *rd = cbd->user;
+	struct parcel rilp;
+	char **response;
+
+	if (message->error != RIL_E_SUCCESS)
+		goto error;
+
+	g_ril_init_parcel(message, &rilp);
+
+	response = parcel_r_strv(&rilp);
+	if (response == NULL) {
+		ofono_error("%s: parse error", __func__);
+		goto error;
+	}
+
+	g_ril_print_response(rd->ril, message);
+
+	CALLBACK_WITH_SUCCESS(cb, response, g_strv_length(response), cbd->data);
+	g_strfreev(response);
+	return;
+
+error:
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
+}
+
+static void ril_request_oem_hook_strings(struct ofono_modem *modem, char *oem_req[],
+				int req_len, ofono_modem_oem_req_str_cb_t cb, void *data)
+{
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, rd);
+	struct parcel rilp;
+	int i;
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, req_len);
+
+	for (i = 0; i < req_len; i++)
+		parcel_w_string(&rilp, oem_req[i]);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_OEM_HOOK_STRINGS, &rilp,
+			ril_oem_request_strings_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+}
+
 static struct ofono_modem_driver ril_driver = {
 	.name = "ril",
 	.probe = ril_probe,
@@ -621,6 +751,8 @@ static struct ofono_modem_driver ril_driver = {
 	.query_activity_info = ril_query_modem_activity_info,
 	.enable_modem = ril_enable_modem,
 	.query_modem_status = ril_query_modem_status,
+	.request_oem_raw = ril_request_oem_hook_raw,
+	.request_oem_strings = ril_request_oem_hook_strings,
 };
 
 /*

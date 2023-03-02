@@ -61,6 +61,24 @@ Methods		dict GetProperties()
 					 [service].Error.NotImplemented
 					 [service].Error.Failed
 
+		array{byte} OemRequestRaw(array{byte} request)
+
+			Returns RIL responses to raw oem request.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
+		array{string} OemRequestStrings(array{string} request)
+
+			Returns RIL responses to strings oem request.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string name, variant value)
 
 			This signal indicates a changed value of the given
@@ -69,6 +87,11 @@ Signals		PropertyChanged(string name, variant value)
 		ModemRestart()
 
 			This signal indicates modem restart.
+
+		OemHookIndication()
+
+			This signal is to indicate OEM applications that
+			an unsolicited OEM message was received.
 
 Properties	boolean Powered [readwrite]
 
