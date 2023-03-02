@@ -40,6 +40,8 @@ typedef int		ofono_bool_t;
 #define OFONO_MAX_MCC_LENGTH 3
 #define OFONO_MAX_MNC_LENGTH 3
 
+#define OFONO_MODEM_ACTIVITY_INFO_ARRAY_LENGTH 8
+
 typedef void (*ofono_destroy_func)(void *data);
 
 /* 27.007 Section 6.2 */
