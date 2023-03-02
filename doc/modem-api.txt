@@ -24,6 +24,43 @@ Methods		dict GetProperties()
 					 [service].Error.AccessDenied
 					 [service].Error.Failed
 
+		array{int} GetModemActivityInfo()
+
+			Returns modem activity information. The length of
+			the array is 8, index 0 stores SleepTime,
+			index 1 stores IdleTime, index 2-6 stores TxTime,
+			and index 7 stores RxTime. The specific meaning is
+			as follows.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.Failed
+
+		void EnableModem()
+
+			Set the modem enabled.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.Failed
+
+		void DisableModem()
+
+			Set the modem disabled.
+
+			Possible Errors: [service].Error.NotImplemented
+					 [service].Error.InProgress
+					 [service].Error.Failed
+
+		int GetModemStatus()
+
+			Get phone status (enabled - 1 / disabled - 0) directly
+			from modem.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string name, variant value)
 
 			This signal indicates a changed value of the given

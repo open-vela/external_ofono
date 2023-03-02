@@ -46,6 +46,16 @@ typedef void (*ofono_modem_online_cb_t)(const struct ofono_error *error,
 typedef ofono_bool_t (*ofono_modem_compare_cb_t)(struct ofono_modem *modem,
 							void *user_data);
 
+typedef void (*ofono_modem_activity_info_query_cb_t)(const struct ofono_error *error,
+						int activity_info[], unsigned int length,
+						void *data);
+
+typedef void (*ofono_modem_enable_cb_t)(const struct ofono_error *error,
+					void *data);
+
+typedef void (*ofono_modem_status_query_cb_t)(const struct ofono_error *error,
+						int status, void *data);
+
 struct ofono_modem_driver {
 	const char *name;
 	enum ofono_modem_type modem_type;
@@ -75,6 +85,22 @@ struct ofono_modem_driver {
 
 	/* Populate the atoms available online */
 	void (*post_online)(struct ofono_modem *modem);
+
+	/* Query modem activity info */
+	void (*query_activity_info)(struct ofono_modem *modem,
+			ofono_modem_activity_info_query_cb_t cb,
+			void *data);
+
+	/* Enable modem */
+	void (*enable_modem)(struct ofono_modem *modem,
+			ofono_bool_t enable,
+			ofono_modem_enable_cb_t cb,
+			void *data);
+
+	/* Query modem status */
+	void (*query_modem_status)(struct ofono_modem *modem,
+			ofono_modem_status_query_cb_t cb,
+			void *data);
 };
 
 void ofono_modem_add_interface(struct ofono_modem *modem,
