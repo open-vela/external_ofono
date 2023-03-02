@@ -28,7 +28,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <net/if.h>
+#ifdef __NuttX__
+#include <nuttx/net/ioctl.h>
+#include <nuttx/net/tun.h>
+#else
 #include <linux/if_tun.h>
+#endif
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 
