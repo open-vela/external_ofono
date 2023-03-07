@@ -923,6 +923,22 @@ static void ril_sim_status_changed(struct ril_msg *message, gpointer user_data)
 	send_get_sim_status(sim);
 }
 
+static void ril_uicc_enablement_changed(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_sim *sim = (struct ofono_sim *) user_data;
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct parcel rilp;
+	int enabled;
+
+	g_ril_print_unsol_no_args(sd->ril, message);
+
+	g_ril_init_parcel(message, &rilp);
+
+	enabled = parcel_r_int32(&rilp);
+
+	ofono_sim_uicc_enablement_changed(sim, enabled);
+}
+
 static void inf_pin_retries_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -1471,6 +1487,9 @@ static gboolean listen_and_get_sim_status(gpointer user)
 	g_ril_register(sd->ril, RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED,
 			(GRilNotifyFunc) ril_sim_status_changed, sim);
 
+	g_ril_register(sd->ril, RIL_UNSOL_UICC_APPLICATIONS_ENABLEMENT_CHANGED,
+			(GRilNotifyFunc) ril_uicc_enablement_changed, sim);
+
 	/* TODO: should we also register for RIL_UNSOL_SIM_REFRESH? */
 	return FALSE;
 }
@@ -1899,6 +1918,79 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	l_free(encoded_pdu_data);
 }
 
+static void ril_enable_uicc_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_sim_enable_uicc_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("%s: RIL_REQUEST_ENABLE_UICC_APPLICATIONS reply failure: %s",
+				__func__,
+				ril_error_to_string(message->error));
+		CALLBACK_WITH_FAILURE(cb, cbd);
+		return;
+	}
+
+	CALLBACK_WITH_SUCCESS(cb, cbd);
+}
+
+static void ril_enable_uicc(struct ofono_sim *sim, int enable,
+		ofono_sim_enable_uicc_cb_t cb, void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sd);
+	struct parcel rilp;
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, enable);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_ENABLE_UICC_APPLICATIONS, &rilp,
+			ril_enable_uicc_cb, cbd, g_free) > 0) {
+		return;
+	}
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_query_uicc_enablement_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_sim_uicc_enablement_query_cb_t cb = cbd->cb;
+	struct parcel rilp;
+	int enabled;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("%s: RIL_REQUEST_GET_UICC_APPLICATIONS_ENABLEMENT reply failure: %s",
+				__func__,
+				ril_error_to_string(message->error));
+
+		CALLBACK_WITH_FAILURE(cb, -1, user_data);
+		return;
+	}
+
+	g_ril_init_parcel(message, &rilp);
+
+	enabled = parcel_r_int32(&rilp);
+
+	CALLBACK_WITH_SUCCESS(cb, enabled, user_data);
+}
+
+static void ril_query_uicc_enablement(struct ofono_sim *sim,
+		ofono_sim_uicc_enablement_query_cb_t cb, void *data)
+{
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct cb_data *cbd = cb_data_new(cb, data, sd);
+
+	if (g_ril_send(sd->ril, RIL_REQUEST_GET_UICC_APPLICATIONS_ENABLEMENT, NULL,
+			ril_query_uicc_enablement_cb, cbd, g_free) > 0) {
+		return;
+	}
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, -1, data);
+}
+
 static const struct ofono_sim_driver driver = {
 	.name			= RILMODEM,
 	.probe			= ril_sim_probe,
@@ -1926,6 +2018,8 @@ static const struct ofono_sim_driver driver = {
 	.reset_pin2		= ril_pin2_send_puk2,
 	.lock_fdn		= ril_set_fdn_lock,
 	.basic_access		= ril_sim_basic_access,
+	.enable_uicc		= ril_enable_uicc,
+	.query_uicc_enablement	= ril_query_uicc_enablement,
 };
 
 void ril_sim_init(void)

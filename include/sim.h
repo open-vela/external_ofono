@@ -80,6 +80,12 @@ enum ofono_sim_state {
 	OFONO_SIM_STATE_RESETTING,
 };
 
+enum ofono_sim_uicc_app_state {
+	OFONO_SIM_UICC_APP_UNKNOWN = -1,
+	OFONO_SIM_UICC_APP_INACTIVE = 0,
+	OFONO_SIM_UICC_APP_ACTIVE = 1,
+};
+
 typedef void (*ofono_sim_file_info_cb_t)(const struct ofono_error *error,
 					int filelength,
 					enum ofono_sim_file_structure structure,
@@ -138,6 +144,14 @@ typedef void (*ofono_sim_basic_access_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_sim_set_active_card_slot_cb_t)(
 					const struct ofono_error *error,
 					void *data);
+
+typedef void (*ofono_sim_enable_uicc_cb_t)(
+					const struct ofono_error *error,
+					void *data);
+
+typedef void (*ofono_sim_uicc_enablement_query_cb_t)(
+					const struct ofono_error *error,
+					int enabled, void *data);
 
 struct ofono_sim_driver {
 	const char *name;
@@ -224,6 +238,10 @@ struct ofono_sim_driver {
 			const char *passwd, ofono_sim_lock_unlock_cb_t cb, void *data);
 	void (*basic_access)(struct ofono_sim *sim, const unsigned char *pdu,
 			unsigned int len, ofono_sim_basic_access_cb_t cb, void *data);
+	void (*enable_uicc)(struct ofono_sim *sim, int enable,
+			ofono_sim_enable_uicc_cb_t cb, void *data);
+	void (*query_uicc_enablement)(struct ofono_sim *sim,
+			ofono_sim_uicc_enablement_query_cb_t cb, void *data);
 };
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d);
@@ -322,6 +340,8 @@ void ofono_sim_remove_file_watch(struct ofono_sim_context *context,
 int ofono_sim_logical_access(struct ofono_sim *sim, int session_id,
 		unsigned char *pdu, unsigned int len,
 		ofono_sim_logical_access_cb_t cb, void *data);
+
+void ofono_sim_uicc_enablement_changed(struct ofono_sim *sim, int enabled);
 
 #ifdef __cplusplus
 }
