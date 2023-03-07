@@ -122,6 +122,7 @@ struct ofono_sim {
 	struct ofono_sim_context *context;
 	struct ofono_sim_context *early_context;
 	struct ofono_sim_context *isim_context;
+	enum ofono_sim_uicc_app_state uicc_enabled;
 
 	unsigned char *iidf_image;
 	unsigned int *iidf_watch_ids;
@@ -485,6 +486,11 @@ static DBusMessage *sim_get_properties(DBusConnection *conn,
 	ofono_dbus_dict_append(&dict, "ActiveCardSlot", DBUS_TYPE_UINT32,
 							&sim->active_card_slot);
 
+	if (sim->uicc_enabled != OFONO_SIM_UICC_APP_UNKNOWN) {
+		ofono_dbus_dict_append(&dict, "UiccActive", DBUS_TYPE_INT32,
+							&sim->uicc_enabled);
+	}
+
 	g_free(pin_retries_dict);
 	g_free(dbus_retries);
 
@@ -699,6 +705,90 @@ static void sim_set_slot_callback(const struct ofono_error *error, void *data)
 						&sim->active_card_slot);
 }
 
+static void sim_uicc_enablement_query_cb(const struct ofono_error *error,
+						int enabled, void *data)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	struct ofono_sim *sim = data;
+	const char *path = __ofono_atom_get_path(sim->atom);
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error during sim access uicc applications enablement query");
+
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+
+		return;
+	}
+
+	if (sim->uicc_enabled != enabled) {
+		sim->uicc_enabled = enabled;
+		ofono_dbus_signal_property_changed(conn, path,
+			OFONO_SIM_MANAGER_INTERFACE, "UiccActive",
+			DBUS_TYPE_INT32, &sim->uicc_enabled);
+	}
+}
+
+static void sim_enable_or_disable_uicc_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_sim *sim = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		DBG("Error during sim access enable or disable uicc applications");
+
+		reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(sim->pending);
+
+	__ofono_dbus_pending_reply(&sim->pending, reply);
+
+	sim->driver->query_uicc_enablement(sim,
+			sim_uicc_enablement_query_cb, sim);
+}
+
+static DBusMessage *set_property_uicc_enabled(struct ofono_sim *sim,
+					DBusMessage *msg,
+					DBusMessageIter *iter)
+{
+	const struct ofono_sim_driver *driver = sim->driver;
+	DBusMessageIter var;
+	int enabled;
+
+	dbus_message_iter_next(iter);
+
+	if (sim->driver->enable_uicc == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_VARIANT)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(iter, &var);
+
+	if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_INT32)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_basic(&var, &enabled);
+
+	if (sim->pending != NULL)
+		return __ofono_error_busy(msg);
+
+	if (sim->uicc_enabled == enabled)
+		return dbus_message_new_method_return(msg);
+
+	sim->pending = dbus_message_ref(msg);
+
+	driver->enable_uicc(sim, enabled,
+			sim_enable_or_disable_uicc_cb, sim);
+
+	return NULL;
+}
+
 static DBusMessage *sim_set_property(DBusConnection *conn, DBusMessage *msg,
 					void *data)
 {
@@ -797,6 +887,8 @@ error:
 							sim_set_slot_callback,
 							sim);
 		return NULL;
+	} else if (!strcmp(name, "UiccActive")) {
+		return set_property_uicc_enabled(sim, msg, &iter);
 	}
 
 	return __ofono_error_invalid_args(msg);
@@ -1687,6 +1779,19 @@ static const GDBusSignalTable sim_signals[] = {
 			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
 	{ }
 };
+
+void ofono_sim_uicc_enablement_changed(struct ofono_sim *sim, ofono_bool_t enabled)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(sim->atom);
+
+	if (sim->uicc_enabled != enabled) {
+		sim->uicc_enabled = enabled;
+		ofono_dbus_signal_property_changed(conn, path,
+			OFONO_SIM_MANAGER_INTERFACE, "UiccActive",
+			DBUS_TYPE_INT32, &sim->uicc_enabled);
+	}
+}
 
 static gboolean numbers_list_equal(GSList *a, GSList *b)
 {
@@ -3825,6 +3930,11 @@ void ofono_sim_register(struct ofono_sim *sim)
 	sim->hfp_watch = __ofono_modem_add_atom_watch(modem,
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					emulator_hfp_watch, sim, NULL);
+
+	if (sim->uicc_enabled == OFONO_SIM_UICC_APP_UNKNOWN) {
+		sim->driver->query_uicc_enablement(sim,
+			sim_uicc_enablement_query_cb, sim);
+	}
 
 	__ofono_atom_register(sim->atom, sim_unregister);
 }

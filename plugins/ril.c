@@ -520,13 +520,6 @@ static void ril_query_modem_activity_info_cb(struct ril_msg *message, gpointer u
 				__func__,
 				ril_error_to_string(message->error));
 
-		if (cb != NULL) {
-			CALLBACK_WITH_FAILURE(cb, NULL, 0, user_data);
-			return;
-		}
-	}
-
-	if (cb == NULL) {
 		CALLBACK_WITH_FAILURE(cb, NULL, 0, user_data);
 		return;
 	}
@@ -603,13 +596,6 @@ static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_dat
 				__func__,
 				ril_error_to_string(message->error));
 
-		if (cb != NULL) {
-			CALLBACK_WITH_FAILURE(cb, -1, user_data);
-			return;
-		}
-	}
-
-	if (cb == NULL) {
 		CALLBACK_WITH_FAILURE(cb, -1, user_data);
 		return;
 	}

@@ -89,8 +89,7 @@ static void ril_ims_registration_status(struct ofono_ims *ims,
 			ril_registration_status_cb, cbd, g_free) == 0) {
 		g_free(cbd);
 
-		if (cb != NULL)
-			CALLBACK_WITH_FAILURE(cb, -1, -1, data);
+		CALLBACK_WITH_FAILURE(cb, -1, -1, data);
 	}
 }
 
@@ -109,8 +108,7 @@ static void ril_ims_register_cb(struct ril_msg *message, gpointer user_data)
 		decode_ril_error(&error, "FAIL");
 	}
 
-	if (cb != NULL)
-		cb(&error, cbd->data);
+	cb(&error, cbd->data);
 }
 
 static void ims_registration_notify(struct ril_msg *message, gpointer user_data)
@@ -152,8 +150,7 @@ static void send_ims_register_status(struct ofono_ims *ims,
 			ril_ims_register_cb, cbd, g_free) == 0) {
 		g_free(cbd);
 
-		if (cb != NULL)
-			CALLBACK_WITH_FAILURE(cb, data);
+		CALLBACK_WITH_FAILURE(cb, data);
 	}
 }
 
