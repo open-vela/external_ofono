@@ -296,3 +296,12 @@ Properties	boolean Present [readonly]
 
 			This property will range from 1 (default) to
 			CardSlotCount (max) value.
+
+		int32 UiccActive [readwrite]
+
+			Indicates the uicc applications state of the current sim.
+
+			Possible values are
+			-1 - OFONO_SIM_UICC_APP_UNKNOWN
+			 0 - OFONO_SIM_UICC_APP_INACTIVE
+			 1 - OFONO_SIM_UICC_APP_ACTIVE
