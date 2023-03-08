@@ -41,6 +41,7 @@
 #include "missing.h"
 
 #define MAX_VOICE_CALLS 16
+#define MAX_IMS_CONFERENCE_CALLS 5
 
 #define VOICECALL_FLAG_SIM_ECC_READY 0x1
 #define VOICECALL_FLAG_STK_MODEM_CALLSETUP 0x2
@@ -2220,6 +2221,132 @@ static DBusMessage *manager_tone(DBusConnection *conn,
 	return NULL;
 }
 
+static int manager_conference(DBusMessage *msg,
+					char *dial_number[], void *data)
+{
+	struct ofono_voicecall *vc = data;
+	DBusMessageIter iter, entry;
+	int index;
+
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return -EINVAL;
+
+	dbus_message_iter_recurse(&iter, &entry);
+
+	index = 0;
+	while (dbus_message_iter_get_arg_type(&entry) == DBUS_TYPE_STRING) {
+		if (index < MAX_IMS_CONFERENCE_CALLS) {
+			dbus_message_iter_get_basic(&entry, &dial_number[index++]);
+			dbus_message_iter_next(&entry);
+		}
+	}
+	ofono_debug("manager_conference %d", index);
+
+	for (int i = 0; i < index; i++) {
+		ofono_debug("manager_conference %s", dial_number[i]);
+		if (!valid_long_phone_number_format(dial_number[i]))
+			return -EINVAL;
+
+		if (is_emergency_number(vc, dial_number[i]) == TRUE)
+			return -EPERM;
+	}
+
+	return index;
+}
+
+static DBusMessage *dial_conference(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	struct ofono_modem *modem;
+	char* dial_str[MAX_IMS_CONFERENCE_CALLS];
+	int num_size;
+
+	if (vc->pending || vc->dial_req || vc->pending_em)
+		return __ofono_error_busy(msg);
+
+	modem = __ofono_atom_get_modem(vc->atom);
+	if (ofono_modem_get_online(modem) == FALSE)
+		return __ofono_error_not_available(msg);
+
+	/* We can't have two dialing/alerting calls, reject outright */
+	if (voicecalls_num_connecting(vc) > 0 ||
+			g_slist_length(vc->call_list) >= MAX_VOICE_CALLS)
+		return __ofono_error_failed(msg);
+
+	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
+		return __ofono_error_busy(msg);
+
+	if (vc->driver->dial_conferece == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	num_size = manager_conference(msg, dial_str, data);
+
+	if (num_size > 0) {
+		vc->pending = dbus_message_ref(msg);
+		vc->driver->dial_conferece(vc, num_size, dial_str, generic_callback, vc);
+
+		return NULL;
+	}
+
+	switch (num_size) {
+	case -EINVAL:
+		return __ofono_error_invalid_format(msg);
+
+	case -ENETDOWN:
+		return __ofono_error_not_available(msg);
+
+	case -ENOTSUP:
+		return __ofono_error_not_implemented(msg);
+	}
+
+	return __ofono_error_failed(msg);
+}
+
+static DBusMessage *invite_participants(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	char* dial_str[MAX_IMS_CONFERENCE_CALLS];
+	int num_size;
+
+	if (vc->pending || vc->dial_req || vc->pending_em)
+		return __ofono_error_busy(msg);
+
+	if (voicecalls_have_waiting(vc))
+		return __ofono_error_failed(msg);
+
+	if (vc->multiparty_list == NULL) {
+		DBusMessage *reply = dbus_message_new_method_return(msg);
+		return reply;
+	}
+
+	if (vc->driver->invite_participants == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	num_size = manager_conference(msg, dial_str, data);
+
+	if (num_size > 0) {
+		vc->pending = dbus_message_ref(msg);
+		vc->driver->invite_participants(vc, num_size, dial_str, generic_callback, vc);
+
+		return NULL;
+	}
+
+	switch (num_size) {
+	case -EINVAL:
+		return __ofono_error_invalid_format(msg);
+
+	case -ENETDOWN:
+		return __ofono_error_not_available(msg);
+
+	case -ENOTSUP:
+		return __ofono_error_not_implemented(msg);
+	}
+
+	return __ofono_error_failed(msg);
+}
+
 static DBusMessage *manager_get_calls(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
@@ -2308,6 +2435,11 @@ static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_METHOD("GetCalls",
 		NULL, GDBUS_ARGS({ "calls_with_properties", "a(oa{sv})" }),
 		manager_get_calls) },
+	{ GDBUS_METHOD("DialConference", GDBUS_ARGS({ "number", "as" }), NULL,
+				dial_conference) },
+	{ GDBUS_METHOD("InviteParticipants", GDBUS_ARGS({ "number", "as" }),
+				NULL, invite_participants) },
+
 	{ }
 };
 

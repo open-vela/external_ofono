@@ -142,6 +142,19 @@ struct ofono_voicecall_driver {
 			ofono_voicecall_cb_t cb, void *data);
 	void (*send_tones)(struct ofono_voicecall *vc, const char *tones,
 			ofono_voicecall_cb_t cb, void *data);
+
+	/*
+	 * Initiates an IMS conference call
+	 */
+	void (*dial_conferece)(struct ofono_voicecall *vc, unsigned int count,
+			char *numbers[], ofono_voicecall_cb_t cb, void *data);
+
+	/*
+	 * Requests the conference server to invite an additional participants
+	 * to the conference.
+	 */
+	void (*invite_participants)(struct ofono_voicecall *vc, unsigned int count,
+			char *numbers[], ofono_voicecall_cb_t cb, void *data);
 };
 
 void ofono_voicecall_en_list_notify(struct ofono_voicecall *vc,
