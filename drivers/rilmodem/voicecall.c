@@ -424,6 +424,32 @@ out:
 	cb(&error, cbd->data);
 }
 
+static void rild_conference_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	struct ofono_voicecall *vc = cbd->user;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	ofono_voicecall_cb_t cb = cbd->cb;
+	struct ofono_error error;
+
+	if (message->error == RIL_E_SUCCESS) {
+		decode_ril_error(&error, "OK");
+	} else {
+		decode_ril_error(&error, "FAIL");
+		goto out;
+	}
+
+	g_ril_print_response_no_args(vd->ril, message);
+
+out:
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+			clcc_poll_cb, vc, NULL);
+
+	/* We have to callback after we schedule a poll if required */
+	if (cb)
+		cb(&error, cbd->data);
+}
+
 static void dial(struct ofono_voicecall *vc,
 			const struct ofono_phone_number *ph,
 			enum ofono_clir_option clir, ofono_voicecall_cb_t cb,
@@ -831,6 +857,49 @@ void ril_set_udub(struct ofono_voicecall *vc,
 			generic_cb, 0, NULL, cb, data);
 }
 
+void ril_conference_request(const guint rreq, struct ofono_voicecall *vc,
+				GRilResponseFunc func, unsigned int count,
+				char *numbers[], ofono_voicecall_cb_t cb, void *data)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct cb_data *cbd = cb_data_new(cb, data, vc);
+	struct parcel rilp;
+	char dst[256];
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, count);
+
+	memset(dst, 0, sizeof(dst));
+	for (int i = 0; i < count;) {
+		strcat(dst, numbers[i++]);
+
+		if (i < count)
+			strcat(dst, ";");
+	}
+	parcel_w_string(&rilp, dst);
+
+	if (g_ril_send(vd->ril, rreq, &rilp, func, cbd, g_free) == 0) {
+		g_free(cbd);
+		CALLBACK_WITH_FAILURE(cb, data);
+	}
+}
+
+void ril_dial_conferece(struct ofono_voicecall *vc, unsigned int count,
+				char *numbers[], ofono_voicecall_cb_t cb, void *data)
+{
+	ril_conference_request(RIL_REQUEST_DIAL_CONFERENCE, vc, rild_conference_cb,
+		count, numbers, cb, data);
+}
+
+void ril_invite_participants(struct ofono_voicecall *vc, unsigned int count,
+				char *numbers[], ofono_voicecall_cb_t cb, void *data)
+{
+	ril_conference_request(RIL_REQUEST_ADD_PARTICIPANT, vc, rild_conference_cb,
+		count, numbers, cb, data);
+}
+
+
+
 static gboolean ril_delayed_register(gpointer user_data)
 {
 	struct ofono_voicecall *vc = user_data;
@@ -922,6 +991,8 @@ static const struct ofono_voicecall_driver driver = {
 	.release_all_held	= ril_release_all_held,
 	.set_udub		= ril_set_udub,
 	.release_all_active	= ril_release_all_active,
+	.dial_conferece		= ril_dial_conferece,
+	.invite_participants	= ril_invite_participants,
 };
 
 void ril_voicecall_init(void)
