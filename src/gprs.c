@@ -1608,11 +1608,29 @@ static struct pri_context *pri_context_create(struct ofono_gprs *gprs,
 	}
 
 	context->gprs = gprs;
-	strcpy(context->name, name);
+
+	if (name)
+		strcpy(context->name, name);
+	else
+		context->name[0] = '\0';
+
 	context->type = type;
-	strcpy(context->context.apn, apn);
-	strcpy(context->context.username, username);
-	strcpy(context->context.password, password);
+
+	if (apn)
+		strcpy(context->context.apn, apn);
+	else
+		context->context.apn[0] = '\0';
+
+	if (username)
+		strcpy(context->context.username, username);
+	else
+		context->context.username[0] = '\0';
+
+	if (password)
+		strcpy(context->context.password, password);
+	else
+		context->context.password[0] = '\0';
+
 	context->context.proto = protocal;
 	context->context.auth_method = authtype;
 
