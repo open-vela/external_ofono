@@ -714,6 +714,7 @@ static void uicc_write_file_linear(struct ofono_sim *sim, int fileid, int record
 					int length, const unsigned char *value,
 					const unsigned char *path,
 					unsigned int path_len,
+					const char *pin2,
 					ofono_sim_write_cb_t cb, void *data)
 {
 	DBG("Not implemented");
