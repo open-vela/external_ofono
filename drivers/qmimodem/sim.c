@@ -418,6 +418,7 @@ static void qmi_write_linear(struct ofono_sim *sim,
 				const unsigned char *value,
 				const unsigned char *path,
 				unsigned int path_len,
+				const char *pin2,
 				ofono_sim_write_cb_t cb, void *user_data)
 {
 	write_generic(sim, QMI_UIM_WRITE_RECORD, fileid, record,

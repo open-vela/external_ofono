@@ -601,6 +601,7 @@ static void update_record(struct ofono_sim *sim, int fileid,
 				const unsigned char *value,
 				const unsigned char *path,
 				unsigned int path_len,
+				const char *pin2,
 				ofono_sim_write_cb_t cb, void *data)
 {
 	struct sim_data *sd = ofono_sim_get_data(sim);
@@ -628,7 +629,7 @@ static void update_record(struct ofono_sim *sim, int fileid,
 	parcel_w_int32(&rilp, access_mode);	/* P2 (access mode) */
 	parcel_w_int32(&rilp, length);	/* P3 (Lc) */
 	parcel_w_string(&rilp, hex_data);	/* data */
-	parcel_w_string(&rilp, NULL);		/* pin2; only for FDN/BDN */
+	parcel_w_string(&rilp, pin2);		/* pin2; only for FDN/BDN */
 	parcel_w_string(&rilp, sd->aid_str);	/* AID (Application ID) */
 
 	/* sessionId, specific to latest MTK modems (harmless for older ones) */
@@ -656,12 +657,13 @@ static void ril_sim_update_record(struct ofono_sim *sim, int fileid,
 					const unsigned char *value,
 					const unsigned char *path,
 					unsigned int path_len,
+					const char *pin2,
 					ofono_sim_write_cb_t cb, void *data)
 {
 	DBG("");
 
 	update_record(sim, fileid, 4, record, length, value,
-			path, path_len, cb, data);
+			path, path_len, pin2, cb, data);
 }
 
 static void ril_sim_update_cyclic(struct ofono_sim *sim, int fileid,
@@ -674,7 +676,7 @@ static void ril_sim_update_cyclic(struct ofono_sim *sim, int fileid,
 
 	/* Only mode valid for cyclic files is PREVIOUS */
 	update_record(sim, fileid, 3, 0, length, value,
-			path, path_len, cb, data);
+			path, path_len, NULL, cb, data);
 }
 
 static void ril_imsi_cb(struct ril_msg *message, gpointer user_data)

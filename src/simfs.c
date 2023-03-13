@@ -971,7 +971,7 @@ static gboolean sim_fs_op_next(gpointer user_data)
 		case OFONO_SIM_FILE_STRUCTURE_FIXED:
 			driver->write_file_linear(fs->sim, op->id, op->current,
 					op->length, op->buffer,
-					NULL, 0, sim_fs_op_write_cb, fs);
+					NULL, 0, NULL, sim_fs_op_write_cb, fs);
 			break;
 		case OFONO_SIM_FILE_STRUCTURE_CYCLIC:
 			driver->write_file_cyclic(fs->sim, op->id,
