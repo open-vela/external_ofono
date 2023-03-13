@@ -411,6 +411,7 @@ static void at_sim_update_record(struct ofono_sim *sim, int fileid,
 					const unsigned char *value,
 					const unsigned char *path,
 					unsigned int path_len,
+					const char *pin2,
 					ofono_sim_write_cb_t cb, void *data)
 {
 	at_sim_update_file(sim, 220, fileid, record, 4, length,

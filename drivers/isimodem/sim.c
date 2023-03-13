@@ -317,6 +317,7 @@ static void isi_write_file_linear(struct ofono_sim *sim, int fileid,
 					const unsigned char *value,
 					const unsigned char *path,
 					unsigned int path_len,
+					const char *pin2,
 					ofono_sim_write_cb_t cb, void *data)
 {
 	DBG("Fileid %04X not implemented", fileid);
