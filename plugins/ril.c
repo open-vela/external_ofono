@@ -520,7 +520,7 @@ static void ril_query_modem_activity_info_cb(struct ril_msg *message, gpointer u
 				__func__,
 				ril_error_to_string(message->error));
 
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, user_data);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
 		return;
 	}
 
@@ -532,7 +532,7 @@ static void ril_query_modem_activity_info_cb(struct ril_msg *message, gpointer u
 
 	CALLBACK_WITH_SUCCESS(cb, activity_info,
 			OFONO_MODEM_ACTIVITY_INFO_ARRAY_LENGTH,
-			user_data);
+			cbd->data);
 }
 
 static void ril_query_modem_activity_info(struct ofono_modem *modem,
@@ -547,7 +547,7 @@ static void ril_query_modem_activity_info(struct ofono_modem *modem,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
 }
 
 static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
@@ -559,11 +559,11 @@ static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
 		ofono_error("%s: RIL_REQUEST_ENABLE_MODEM reply failure: %s",
 				__func__,
 				ril_error_to_string(message->error));
-		CALLBACK_WITH_FAILURE(cb, cbd);
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
 		return;
 	}
 
-	CALLBACK_WITH_SUCCESS(cb, cbd);
+	CALLBACK_WITH_SUCCESS(cb, cbd->data);
 }
 
 static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
@@ -581,7 +581,7 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, data);
+	CALLBACK_WITH_FAILURE(cb, cbd->data);
 }
 
 static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_data)
@@ -596,7 +596,7 @@ static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_dat
 				__func__,
 				ril_error_to_string(message->error));
 
-		CALLBACK_WITH_FAILURE(cb, -1, user_data);
+		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 		return;
 	}
 
@@ -604,7 +604,7 @@ static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_dat
 
 	status = parcel_r_int32(&rilp);
 
-	CALLBACK_WITH_SUCCESS(cb, status, user_data);
+	CALLBACK_WITH_SUCCESS(cb, status, cbd->data);
 }
 
 static void ril_query_modem_status(struct ofono_modem *modem,
@@ -619,7 +619,7 @@ static void ril_query_modem_status(struct ofono_modem *modem,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, -1, data);
+	CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 }
 
 static void ril_oem_request_raw_cb(struct ril_msg *message,
