@@ -64,12 +64,6 @@ struct ofono_phonebook {
 	GTree *fdn_entries;	/* Container of fdn_entry structures */
 };
 
-struct fdn_entry {
-	int entry;
-	char *name;
-	char *number;
-};
-
 struct phonebook_number {
 	char *number;
 	int type;
@@ -733,7 +727,8 @@ static DBusMessage *update_fdn_entry(DBusConnection *conn, DBusMessage *msg,
 		return __ofono_error_invalid_format(msg);
 
 	phonebook->pending = dbus_message_ref(msg);
-	phonebook->driver->update_fdn_entry(phonebook,
+	phonebook->driver->update_fdn_entry(phonebook, fdn_idx,
+					new_name, new_number, pin2,
 					update_fdn_entry_cb, phonebook);
 
 	return NULL;
@@ -798,7 +793,7 @@ static DBusMessage *delete_fdn_entry(DBusConnection *conn, DBusMessage *msg,
 		return __ofono_error_invalid_format(msg);
 
 	phonebook->pending = dbus_message_ref(msg);
-	phonebook->driver->delete_fdn_entry(phonebook,
+	phonebook->driver->delete_fdn_entry(phonebook, fdn_idx, pin2,
 					delete_fdn_entry_cb, phonebook);
 
 	return NULL;

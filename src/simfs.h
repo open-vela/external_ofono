@@ -48,9 +48,16 @@ int sim_fs_read(struct ofono_sim_context *context, int id,
 		const unsigned char *path, unsigned int len,
 		ofono_sim_file_read_cb_t cb, void *data);
 
+int sim_fs_read_record(struct ofono_sim_context *context, int id,
+		enum ofono_sim_file_structure expected_type,
+		int record, int record_length,
+		const unsigned char *path, unsigned int len,
+		ofono_sim_file_read_cb_t cb, void *data);
+
 int sim_fs_read_info(struct ofono_sim_context *context, int id,
 		enum ofono_sim_file_structure expected_type,
-		sim_fs_read_info_cb_t cb, void *data);
+		const unsigned char *path, unsigned int pth_len,
+		ofono_sim_read_info_cb_t cb, void *data);
 
 void sim_fs_check_version(struct sim_fs *fs);
 
