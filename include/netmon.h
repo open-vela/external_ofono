@@ -80,9 +80,11 @@ struct ofono_netmon_driver {
 };
 
 enum ofono_netmon_cell_type {
-	OFONO_NETMON_CELL_TYPE_GSM,
-	OFONO_NETMON_CELL_TYPE_UMTS,
+	OFONO_NETMON_CELL_TYPE_GSM = 1,
+	OFONO_NETMON_CELL_TYPE_CDMA,
 	OFONO_NETMON_CELL_TYPE_LTE,
+	OFONO_NETMON_CELL_TYPE_UMTS,
+	OFONO_NETMON_CELL_TYPE_TDSCDMA,
 };
 
 enum ofono_netmon_info {

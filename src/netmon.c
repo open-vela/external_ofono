@@ -62,10 +62,14 @@ static const char *cell_type_to_tech_name(enum ofono_netmon_cell_type type)
 	switch (type) {
 	case OFONO_NETMON_CELL_TYPE_GSM:
 		return "gsm";
-	case OFONO_NETMON_CELL_TYPE_UMTS:
-		return "umts";
+	case OFONO_NETMON_CELL_TYPE_CDMA:
+		return "cdma";
 	case OFONO_NETMON_CELL_TYPE_LTE:
 		return "lte";
+	case OFONO_NETMON_CELL_TYPE_UMTS:
+		return "umts";
+	case OFONO_NETMON_CELL_TYPE_TDSCDMA:
+		return "tdscdma";
 	}
 
 	return NULL;
@@ -245,7 +249,8 @@ static void serving_cell_info_callback(const struct ofono_error *error,
 					&array);
 
 	for (i = 0; i < total; i++) {
-		if (list[i].registered)
+		if (list[i].registered
+			&& list[i].type <= OFONO_NETMON_CELL_TYPE_TDSCDMA)
 			append_cell_struct(&list[i], &array);
 	}
 
@@ -374,6 +379,39 @@ static DBusMessage *netmon_unregister_agent(DBusConnection *conn,
 	return dbus_message_new_method_return(msg);
 }
 
+static DBusMessage *netmon_periodic_update(DBusConnection *conn,
+				DBusMessage *msg, void *data)
+{
+	struct ofono_netmon *netmon = data;
+	const unsigned int enable = 1;
+	unsigned int period;
+
+	if (!netmon->driver->enable_periodic_update)
+		return __ofono_error_not_implemented(msg);
+
+	if (netmon->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_UINT32, &period,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (!period)
+		return __ofono_error_invalid_args(msg);
+
+	/* minimum period is 5 seconds, to avoid frequent updates*/
+	if (period < 5)
+		period = 5;
+
+	netmon->pending = dbus_message_ref(msg);
+
+	netmon->driver->enable_periodic_update(netmon, enable, period,
+					periodic_updates_enabled_cb, netmon);
+
+	return NULL;
+}
+
 
 void ofono_netmon_neighbouring_cell_notify(struct ofono_netmon *netmon,
 					int total,
@@ -456,6 +494,9 @@ static const GDBusMethodTable netmon_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetNeighbouringCellInformation",
 			NULL, GDBUS_ARGS({ "cellinfo", "a(a{sv})" }),
 			netmon_get_neighbouring_cell_info) },
+	{ GDBUS_ASYNC_METHOD("CellInfoUpdateRate",
+			GDBUS_ARGS({ "period", "u"}), NULL,
+			netmon_periodic_update) },
 	{ }
 };
 

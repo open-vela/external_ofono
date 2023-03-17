@@ -48,6 +48,10 @@ Methods		a(a{sv}) GetServingCellInformation()
 
 			Unregisters an agent.
 
+		void CellInfoUpdateRate(uint32 period)
+
+			Set cellinfo update frequency.
+
 Signals		PropertyChanged(string property, variant value)
 
 			This signal indicates a changed value of the given
