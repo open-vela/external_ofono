@@ -40,7 +40,7 @@
 #include <ofono/log.h>
 #include <ofono/modem.h>
 #include <ofono/phonebook.h>
-#include <sim.h>
+#include <ofono/sim.h>
 #include <simfs.h>
 #include <util.h>
 
@@ -276,7 +276,7 @@ end:
 	return NULL;
 }
 
-static struct phonebook_entry *handle_fdn(size_t len, const unsigned char *msg,
+static struct fdn_entry *handle_fdn(size_t len, const unsigned char *msg,
 					struct pb_ref_rec *ref, int fdn_idx)
 {
 	unsigned name_length = len - 14;
@@ -286,7 +286,7 @@ static struct phonebook_entry *handle_fdn(size_t len, const unsigned char *msg,
 	unsigned i, prefix;
 	char *number = NULL;
 	char *name = sim_string_to_utf8(msg, name_length);
-	struct phonebook_entry *new_entry;
+	struct fdn_entry *new_entry;
 
 	/* Length contains also TON & NPI */
 	number_length = msg[number_start];
@@ -736,7 +736,6 @@ static void decode_read_response(const struct record_to_read *rec_data,
 
 static gboolean free_fdn_entries(gpointer key, gpointer value, gpointer data)
 {
-	struct ofono_phonebook *pb = data;
 	struct fdn_entry *entry = value;
 
 	l_free(entry->name);
@@ -812,7 +811,7 @@ static void fdn_export_and_return(gboolean ok, struct cb_data *cbd)
 	l = pbd->pb_fdn_refs;
 	if (l != NULL) {
 		struct pb_ref_rec *ref = l->data;
-		struct pb_file_info *f_info = fdn_info(ref->pb_files);
+		const struct pb_file_info *f_info = fdn_info(ref->pb_files);
 
 		pbd->fdn_entries = ref->phonebook; /*ref->phonebook cannot be recycled here*/
 		ofono_phonebook_set_fdn_data(pb, pbd->fdn_entries);
@@ -863,7 +862,6 @@ static void read_record_cb(int ok, int total_length, int record,
 	g_free(rec);
 
 	if (ref->pending_records) {
-		struct record_to_read *rec;
 
 		ref->next_record = ref->pending_records;
 		rec = ref->next_record->data;
@@ -881,7 +879,6 @@ static void read_record_cb(int ok, int total_length, int record,
 		if (pbd->pb_ref_next == NULL) {
 			export_and_return(TRUE, cbd);
 		} else {
-			struct pb_ref_rec *ref;
 
 			DBG("Next EFpbr record");
 
@@ -998,7 +995,6 @@ static void read_fdn_record_cb(int ok, int total_length, int record,
 	g_free(rec);
 
 	if (ref->pending_records) {
-		struct record_to_read *rec;
 
 		ref->next_record = ref->pending_records;
 		rec = ref->next_record->data;
@@ -1022,7 +1018,6 @@ static void pb_fdn_cb(int ok, int total_length, int record,
 	struct ofono_phonebook *pb = cbd->user;
 	struct pb_data *pbd = ofono_phonebook_get_data(pb);
 	struct pb_ref_rec *ref = pbd->pb_fdn_ref_next->data;
-	GSList *l;
 
 	if (!ok) {
 		ofono_error("%s: error %d", __func__, ok);
@@ -1270,8 +1265,63 @@ static void ril_read_fdn_entries(struct ofono_phonebook *pb,
 			read_fdn_info_cb, cbd);
 }
 
-static void ril_insert_fdn_entry(struct ofono_phonebook *pb, char *name,
-				char *number, char *pin2, ofono_phonebook_update_cb_t cb, void *data)
+static void fdn_update_cb(int ok, int record, void *data)
+{
+	struct cb_data *cbd = data;
+	ofono_phonebook_update_cb_t cb = cbd->cb;
+
+	if (ok)
+		CALLBACK_WITH_SUCCESS(cb, record, cbd->data);
+	else {
+		ofono_info("Failed to update EFfdn");
+		CALLBACK_WITH_FAILURE(cb, record, cbd->data);
+	}
+
+	g_free(cbd);
+}
+
+static void ril_update_fdn_entry(struct ofono_phonebook *pb,
+				int record, const char *identifier,
+				const char *new_number, const char *pin2,
+				ofono_phonebook_update_cb_t cb, void *data)
+{
+	struct pb_data *pbd = ofono_phonebook_get_data(pb);
+	struct ofono_phone_number *number = NULL;
+	int rec_len, file_len, rec_count;
+	unsigned char effdn[255];
+	struct cb_data *cbd;
+
+	rec_len = pbd->fdn_record_length;
+	file_len = pbd->fdn_file_length;
+
+	if (rec_len <= 0 || file_len <= 0) {
+		ofono_error("%s: read fdn file info first ! \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	rec_count = file_len / rec_len;
+
+	if (record > rec_count) {
+		ofono_error("%s: the record to be deleted is invalid \n", __func__);
+		CALLBACK_WITH_FAILURE(cb, -1, data);
+		return;
+	}
+
+	cbd = cb_data_new(cb, data, pb);
+
+	string_to_phone_number(new_number, number);
+
+	sim_adn_build(effdn, rec_len, number, identifier);
+
+	ofono_sim_write(pbd->sim_context, SIM_EFFDN_FILEID,
+			fdn_update_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,
+			record, effdn, rec_len, pin2, cbd);
+}
+
+static void ril_insert_fdn_entry(struct ofono_phonebook *pb, const char *name,
+				const char *number, const char *pin2,
+				ofono_phonebook_update_cb_t cb, void *data)
 {
 	struct pb_data *pbd = ofono_phonebook_get_data(pb);
 	struct phonebook_entry *entry;
@@ -1306,8 +1356,9 @@ static void ril_insert_fdn_entry(struct ofono_phonebook *pb, char *name,
 	ril_update_fdn_entry(pb, i, name, number, pin2, cb, data);
 }
 
-static void ril_delete_fdn_entry(struct ofono_phonebook *pb, int record,
-				const char *pin2, ofono_phonebook_cb_t cb, void *data)
+static void ril_delete_fdn_entry(struct ofono_phonebook *pb,
+				int record, const char *pin2,
+				ofono_phonebook_update_cb_t cb, void *data)
 {
 	struct pb_data *pbd = ofono_phonebook_get_data(pb);
 	int rec_len, file_len, rec_count;
@@ -1335,58 +1386,6 @@ static void ril_delete_fdn_entry(struct ofono_phonebook *pb, int record,
 
 	//update with 0xff
 	memset(effdn, 0xff, rec_len);
-
-	ofono_sim_write(pbd->sim_context, SIM_EFFDN_FILEID,
-			fdn_update_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,
-			record, effdn, rec_len, pin2, cbd);
-}
-
-static void fdn_update_cb(int ok, int record, void *data)
-{
-	struct cb_data *cbd = data;
-
-	if (ok)
-		CALLBACK_WITH_SUCCESS(cbd->cb, record, cbd->data);
-	else {
-		ofono_info("Failed to update EFfdn");
-		CALLBACK_WITH_FAILURE(cbd->cb, record, cbd->data);
-	}
-
-	g_free(cbd);
-}
-
-static void ril_update_fdn_entry(struct ofono_phonebook *pb, int record,
-				const char *identifier, const char *new_number, const char *pin2,
-				ofono_phonebook_update_cb_t cb, void *data)
-{
-	struct pb_data *pbd = ofono_phonebook_get_data(pb);
-	struct ofono_phone_number *number;
-	int rec_len, file_len, rec_count;
-	unsigned char effdn[255];
-	struct cb_data *cbd;
-
-	rec_len = pbd->fdn_record_length;
-	file_len = pbd->fdn_file_length;
-
-	if (rec_len <= 0 || file_len <= 0) {
-		ofono_error("%s: read fdn file info first ! \n", __func__);
-		CALLBACK_WITH_FAILURE(cb, -1, data);
-		return;
-	}
-
-	rec_count = file_len / rec_len;
-
-	if (record > rec_count) {
-		ofono_error("%s: the record to be deleted is invalid \n", __func__);
-		CALLBACK_WITH_FAILURE(cb, -1, data);
-		return;
-	}
-
-	cbd = cb_data_new(cb, data, pb);
-
-	string_to_phone_number(new_number, number);
-
-	sim_adn_build(effdn, rec_len, number, identifier);
 
 	ofono_sim_write(pbd->sim_context, SIM_EFFDN_FILEID,
 			fdn_update_cb, OFONO_SIM_FILE_STRUCTURE_FIXED,

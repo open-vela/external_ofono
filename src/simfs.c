@@ -997,7 +997,8 @@ static gboolean sim_fs_op_next(gpointer user_data)
 
 int sim_fs_read_info(struct ofono_sim_context *context, int id,
 			enum ofono_sim_file_structure expected_type,
-			sim_fs_read_info_cb_t cb, void *data)
+			const unsigned char *path, unsigned int pth_len,
+			ofono_sim_read_info_cb_t cb, void *data)
 {
 	struct sim_fs *fs = context->fs;
 	struct sim_fs_op *op;
@@ -1025,6 +1026,8 @@ int sim_fs_read_info(struct ofono_sim_context *context, int id,
 	op->is_read = TRUE;
 	op->info_only = TRUE;
 	op->context = context;
+	memcpy(op->path, path, pth_len);
+	op->path_len = pth_len;
 
 	g_queue_push_tail(fs->op_q, op);
 
@@ -1080,6 +1083,59 @@ int sim_fs_read(struct ofono_sim_context *context, int id,
 	op->context = context;
 	if (path != NULL)
 		memcpy(op->path, path, path_len);
+	op->path_len = path_len;
+
+	g_queue_push_tail(fs->op_q, op);
+
+	if (g_queue_get_length(fs->op_q) == 1)
+		fs->op_source = g_idle_add(sim_fs_op_next, fs);
+
+	return 0;
+}
+
+int sim_fs_read_record(struct ofono_sim_context *context, int id,
+			enum ofono_sim_file_structure expected_type,
+			int record, int record_length,
+			const unsigned char *path, unsigned int path_len,
+			ofono_sim_file_read_cb_t cb, void *data)
+{
+	struct sim_fs *fs = context->fs;
+	struct sim_fs_op *op;
+
+	if (cb == NULL)
+		return -EINVAL;
+
+	if (fs->driver == NULL)
+		return -EINVAL;
+
+	if (record < 1)
+		return -EINVAL;
+
+	if ((expected_type == OFONO_SIM_FILE_STRUCTURE_FIXED &&
+			fs->driver->read_file_linear == NULL) ||
+			(expected_type == OFONO_SIM_FILE_STRUCTURE_CYCLIC &&
+				fs->driver->read_file_cyclic == NULL)) {
+		cb(0, 0, 0, NULL, 0, data);
+		return -ENOSYS;
+	}
+
+	if (fs->op_q == NULL)
+		fs->op_q = g_queue_new();
+
+	op = g_try_new0(struct sim_fs_op, 1);
+	if (op == NULL)
+		return -ENOMEM;
+
+	op->id = id;
+	op->structure = expected_type;
+	op->cb = cb;
+	op->userdata = data;
+	op->is_read = TRUE;
+	op->info_only = FALSE;
+	op->context = context;
+	op->record_length = record_length;
+	op->current = record;
+	memcpy(op->path, path, path_len);
 	op->path_len = path_len;
 
 	g_queue_push_tail(fs->op_q, op);
