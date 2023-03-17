@@ -30,6 +30,12 @@ extern "C" {
 
 struct ofono_phonebook;
 
+struct fdn_entry {
+	int entry;
+	char *name;
+	char *number;
+};
+
 typedef void (*ofono_phonebook_cb_t)(const struct ofono_error *error,
 					void *data);
 
@@ -52,8 +58,11 @@ struct ofono_phonebook_driver {
 				const char *new_number, const char *pin2,
 				ofono_phonebook_update_cb_t cb, void *data);
 	void (*update_fdn_entry)(struct ofono_phonebook *pb,
+				int record, const char *identifier,
+				const char *new_number, const char *pin2,
 				ofono_phonebook_update_cb_t cb, void *data);
 	void (*delete_fdn_entry)(struct ofono_phonebook *pb,
+				int record, const char *pin2,
 				ofono_phonebook_update_cb_t cb, void *data);
 };
 
@@ -78,6 +87,7 @@ void ofono_phonebook_remove(struct ofono_phonebook *pb);
 
 void ofono_phonebook_set_data(struct ofono_phonebook *pb, void *data);
 void *ofono_phonebook_get_data(struct ofono_phonebook *pb);
+void ofono_phonebook_set_fdn_data(struct ofono_phonebook *pb, void *data);
 
 #ifdef __cplusplus
 }
