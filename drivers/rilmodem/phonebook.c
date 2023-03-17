@@ -50,6 +50,7 @@
 
 #include "rilmodem.h"
 
+#undef UNUSED
 #define UNUSED	0xFF
 
 #define EXT1_CP_SUBADDRESS	1
