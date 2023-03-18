@@ -370,6 +370,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 		goto error;
 	}
 
+	g_ril_print_response_no_args(gcd->ril, message);
+
 	g_ril_init_parcel(message, &rilp);
 
 	parcel_r_int32(&rilp);				/* Version */
