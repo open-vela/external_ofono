@@ -766,17 +766,17 @@ static void pri_setproxy(const char *interface, const char *proxy)
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr(proxy);
-	memcpy(&rt.rt_dst, &addr, sizeof(rt.rt_dst));
+	memcpy(&rt.rt_dst, &addr, sizeof(addr));
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
-	memcpy(&rt.rt_gateway, &addr, sizeof(rt.rt_gateway));
+	memcpy(&rt.rt_gateway, &addr, sizeof(addr));
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
-	memcpy(&rt.rt_genmask, &addr, sizeof(rt.rt_genmask));
+	memcpy(&rt.rt_genmask, &addr, sizeof(addr));
 
 	if (ioctl(sk, SIOCADDRT, &rt) < 0)
 		ofono_error("Failed to add proxy host route");
