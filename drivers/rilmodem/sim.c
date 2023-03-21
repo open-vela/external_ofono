@@ -1292,7 +1292,7 @@ static void ril_set_fdn_lock(struct ofono_sim *sim,
 				ofono_sim_lock_unlock_cb_t cb, void *data)
 {
 	struct sim_data *sd = ofono_sim_get_data(sim);
-	struct cb_data *cbd = cb_data_new(cb, data, sd);
+	struct cb_data *cbd = cb_data_new(cb, data, sim);
 	struct parcel rilp;
 	char svcs_str[4];
 
