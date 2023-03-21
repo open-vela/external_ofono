@@ -3049,7 +3049,7 @@ gboolean status_report_assembly_report(struct status_report_assembly *assembly,
 	struct id_table_node *node;
 	gboolean delivered;
 	gboolean pending;
-	unsigned char *msgid;
+	unsigned char *msgid = NULL;
 	int i;
 
 	/* We ignore temporary or tempfinal status reports */
