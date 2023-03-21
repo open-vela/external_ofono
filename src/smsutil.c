@@ -2196,6 +2196,8 @@ unsigned char *sms_decode_datagram(GSList *sms_list, long *out_len)
 		sms = l->data;
 
 		ud = sms_extract_common(sms, NULL, NULL, &udl, NULL);
+		if (ud == NULL)
+			continue;
 
 		if (sms_udh_iter_init(sms, &iter))
 			taken = sms_udh_iter_get_udh_length(&iter) + 1;
@@ -2253,6 +2255,8 @@ char *sms_decode_text(GSList *sms_list)
 		sms = l->data;
 
 		ud = sms_extract_common(sms, NULL, &dcs, &udl, NULL);
+		if (ud == NULL)
+			continue;
 
 		if (!sms_mwi_dcs_decode(dcs, NULL, &charset, NULL, NULL) &&
 			!sms_dcs_decode(dcs, NULL, &charset, NULL, NULL))
