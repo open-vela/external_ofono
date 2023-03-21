@@ -86,6 +86,15 @@ struct radio_data {
 	unsigned int vendor;
 };
 
+static gboolean ril_delayed_register(gpointer user_data)
+{
+	struct ofono_radio_settings *rs = user_data;
+
+	ofono_radio_settings_register(rs);
+
+	return FALSE;
+}
+
 static void ril_set_rat_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -415,14 +424,10 @@ static void ril_set_band(struct ofono_radio_settings *rs,
 	CALLBACK_WITH_FAILURE(cb, data);
 }
 
-static void ril_delayed_register(const struct ofono_error *error,
+static void ril_set_fast_dormancy_cb(const struct ofono_error *error,
 							void *user_data)
 {
-	struct ofono_radio_settings *rs = user_data;
-
-	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
-		ofono_radio_settings_register(rs);
-	else
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		ofono_error("%s: cannot set default fast dormancy", __func__);
 }
 
@@ -437,7 +442,9 @@ static int ril_radio_settings_probe(struct ofono_radio_settings *rs,
 
 	ofono_radio_settings_set_data(rs, rsd);
 
-	ril_set_fast_dormancy(rs, FALSE, ril_delayed_register, rs);
+	ril_set_fast_dormancy(rs, FALSE, ril_set_fast_dormancy_cb, rs);
+
+	g_idle_add(ril_delayed_register, rs);
 
 	return 0;
 }
