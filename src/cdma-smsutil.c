@@ -476,7 +476,7 @@ static gboolean decode_subparams(struct simple_iter *iter, guint32 *bitmap,
 		entry = g_new0(struct subparam_handler_entry, 1);
 
 		entry->data = data;
-		entry->id = va_arg(args, enum cdma_sms_subparam_id);
+		entry->id = va_arg(args, int);
 		entry->flags = va_arg(args, int);
 
 		data = va_arg(args, void *);

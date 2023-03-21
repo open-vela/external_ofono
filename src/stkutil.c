@@ -2318,7 +2318,7 @@ static enum stk_command_parse_result parse_dataobj(
 		entry->flags = va_arg(args, int);
 		entry->data = va_arg(args, void *);
 
-		type = va_arg(args, enum stk_data_object_type);
+		type = va_arg(args, int);
 		entries = g_slist_prepend(entries, entry);
 	}
 
@@ -5377,7 +5377,7 @@ static bool build_dataobj(struct stk_tlv_builder *tlv,
 	va_start(args, builder_func);
 
 	while (builder_func) {
-		unsigned int flags = va_arg(args, enum stk_data_object_flag);
+		unsigned int flags = va_arg(args, int);
 		const void *data = va_arg(args, const void *);
 		bool cr = (flags & DATAOBJ_FLAG_CR) ? true : false;
 
