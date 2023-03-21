@@ -1027,7 +1027,7 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 	int apn_count;
 
 	if (apn_typestr == NULL || !gprs_context_type_allowed(apn_type)) {
-		ofono_error("requested apn type (%s) validation failed.", apn_typestr);
+		ofono_error("requested apn type (%d) validation failed.", apn_type);
 		return;
 	}
 
@@ -1096,7 +1096,7 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 	ofono_bool_t cleanup = FALSE;
 
 	if (apn_typestr == NULL) {
-		ofono_error("released apn type (%s) validation failed.", apn_typestr);
+		ofono_error("released apn type (%d) validation failed.", apn_type);
 		return;
 	}
 
