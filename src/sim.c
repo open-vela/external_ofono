@@ -3250,8 +3250,10 @@ static void sim_free_main_state(struct ofono_sim *sim)
 		sim->isim_context = NULL;
 	}
 
-	if (sim->impi)
+	if (sim->impi) {
 		g_free(sim->impi);
+		sim->impi = NULL;
+	}
 
 	if (sim->aid_list) {
 		g_slist_free_full(sim->aid_list,
