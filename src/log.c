@@ -248,8 +248,10 @@ static void signal_setup(sighandler_t handler)
 }
 #endif
 
+#ifdef OFONO_LOG_DEBUG_SYMBOL
 extern struct ofono_debug_desc __start___debug[];
 extern struct ofono_debug_desc __stop___debug[];
+#endif
 
 static gchar **enabled = NULL;
 
@@ -300,7 +302,9 @@ int __ofono_log_init(const char *program, const char *debug,
 	if (debug != NULL)
 		enabled = g_strsplit_set(debug, ":, ", 0);
 
+#ifdef OFONO_LOG_DEBUG_SYMBOL
 	__ofono_log_enable(__start___debug, __stop___debug);
+#endif
 
 #ifdef HAVE_OPENLOG
 	if (detach == FALSE)

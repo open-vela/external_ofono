@@ -57,6 +57,7 @@ struct ofono_debug_desc {
  * Simple macro around ofono_debug() which also include the function
  * name it is called in.
  */
+#ifdef OFONO_LOG_DEBUG_SYMBOL
 #define DBG(fmt, arg...) do { \
 	static struct ofono_debug_desc __ofono_debug_desc \
 	__attribute__((used, section("__debug"), aligned(8))) = { \
@@ -66,6 +67,11 @@ struct ofono_debug_desc {
 		ofono_debug("%s:%s() " fmt, \
 					__FILE__, __FUNCTION__ , ## arg); \
 } while (0)
+#else
+#define DBG(fmt, arg...) do { \
+        if (0) ofono_debug("%s:%s() " fmt, __FILE__, __FUNCTION__ , ## arg); \
+} while (0)
+#endif
 
 #ifdef __cplusplus
 }
