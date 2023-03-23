@@ -301,7 +301,17 @@ Properties	boolean Present [readonly]
 
 			Indicates the uicc applications state of the current sim.
 
-			Possible values are
-			-1 - OFONO_SIM_UICC_APP_UNKNOWN
-			 0 - OFONO_SIM_UICC_APP_INACTIVE
-			 1 - OFONO_SIM_UICC_APP_ACTIVE
+			The possible values are:
+				 -1 - OFONO_SIM_UICC_APP_UNKNOWN
+				  0 - OFONO_SIM_UICC_APP_INACTIVE
+				  1 - OFONO_SIM_UICC_APP_ACTIVE
+
+		uint32 SimState [readonly]
+
+			Returns a constant indicating the state of the SIM card.
+			The possible values are:
+				 0 - OFONO_SIM_STATE_NOT_PRESENT
+				 1 - OFONO_SIM_STATE_INSERTED
+				 2 - OFONO_SIM_STATE_LOCKED_OUT
+				 3 - OFONO_SIM_STATE_READY
+				 4 - OFONO_SIM_STATE_RESETTING

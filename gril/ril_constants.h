@@ -185,6 +185,7 @@
 #define RIL_CARDSTATE_ABSENT 0
 #define RIL_CARDSTATE_PRESENT 1
 #define RIL_CARDSTATE_ERROR 2
+#define RIL_CARDSTATE_RESTRICTED 3 /* card is present but not usable due to carrier restrictions.*/
 
 /* SIM - App states */
 #define RIL_APPSTATE_UNKNOWN 0

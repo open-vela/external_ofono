@@ -368,6 +368,18 @@ static void service_number_free(gpointer pointer)
 	l_free(num);
 }
 
+static void sim_state_update(struct ofono_sim *sim)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(sim->atom);
+	unsigned int state = (unsigned int) sim->state;
+
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_SIM_MANAGER_INTERFACE,
+					"SimState",
+					DBUS_TYPE_UINT32, &state);
+}
+
 static void call_state_watches(struct ofono_sim *sim)
 {
 	GSList *l;
@@ -379,6 +391,8 @@ static void call_state_watches(struct ofono_sim *sim)
 
 		notify(sim->state, item->notify_data);
 	}
+
+	sim_state_update(sim);
 }
 
 static DBusMessage *sim_get_properties(DBusConnection *conn,
@@ -395,6 +409,7 @@ static DBusMessage *sim_get_properties(DBusConnection *conn,
 	void **pin_retries_dict;
 	unsigned char *dbus_retries;
 	dbus_bool_t present = sim->state != OFONO_SIM_STATE_NOT_PRESENT;
+	unsigned int state = (unsigned int) sim->state;
 	dbus_bool_t fdn;
 	dbus_bool_t bdn;
 
@@ -409,6 +424,8 @@ static DBusMessage *sim_get_properties(DBusConnection *conn,
 					&dict);
 
 	ofono_dbus_dict_append(&dict, "Present", DBUS_TYPE_BOOLEAN, &present);
+
+	ofono_dbus_dict_append(&dict, "SimState", DBUS_TYPE_UINT32, &state);
 
 	if (!present)
 		goto done;
