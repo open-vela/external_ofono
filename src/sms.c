@@ -1227,6 +1227,7 @@ static void sim_sms_read_cb(int ok, int total_length, int record,
 
 	simple_tlv_iter_init(&tlv_iter, &data[1], total_length - 1);
 
+	sms_list = NULL;
 	while (simple_tlv_iter_next(&tlv_iter)) {
 		struct sms s;
 		if (simple_tlv_iter_get_tag(&tlv_iter) != 0xDD)
