@@ -943,6 +943,45 @@ static void ril_uicc_enablement_changed(struct ril_msg *message, gpointer user_d
 	ofono_sim_uicc_enablement_changed(sim, enabled);
 }
 
+static void ril_sim_refresh(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_sim *sim = (struct ofono_sim *) user_data;
+	struct sim_data *sd = ofono_sim_get_data(sim);
+	struct parcel rilp;
+	int sim_refresh_result;
+	int ef_id;
+	char *aid_str;
+
+	g_ril_init_parcel(message, &rilp);
+
+	sim_refresh_result = parcel_r_int32(&rilp);
+
+	/* is the EFID of the updated file if the result is */
+	/* SIM_FILE_UPDATE or 0 for any other result.       */
+	ef_id = parcel_r_int32(&rilp);
+
+	/* is AID(application ID) of the card application               */
+	/* See ETSI 102.221 8.1 and 101.220 4                           */
+	/*     For SIM_FILE_UPDATE result it can be set to AID of       */
+	/*         application in which updated EF resides or it can be */
+	/*         NULL if EF is outside of an application.             */
+	/*     For SIM_INIT result this field is set to AID of          */
+	/*         application that caused REFRESH                      */
+	/*     For SIM_RESET result it is NULL.                         */
+	aid_str = parcel_r_string(&rilp);
+
+	if (rilp.malformed) {
+		ofono_error("%s: malformed parcel received", __func__);
+		return;
+	}
+
+	g_ril_append_print_buf(sd->ril, "(sim refresh result : %d, ef id : %d, "
+					"aid : %s)", sim_refresh_result, ef_id, aid_str);
+
+	g_ril_print_unsol(sd->ril, message);
+}
+
+
 static void inf_pin_retries_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -1495,6 +1534,9 @@ static gboolean listen_and_get_sim_status(gpointer user)
 			(GRilNotifyFunc) ril_uicc_enablement_changed, sim);
 
 	/* TODO: should we also register for RIL_UNSOL_SIM_REFRESH? */
+	g_ril_register(sd->ril, RIL_UNSOL_SIM_REFRESH,
+			(GRilNotifyFunc) ril_sim_refresh, sim);
+
 	return FALSE;
 }
 
