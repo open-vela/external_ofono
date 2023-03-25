@@ -86,6 +86,15 @@ enum ofono_sim_uicc_app_state {
 	OFONO_SIM_UICC_APP_ACTIVE = 1,
 };
 
+enum ofono_sim_refresh_response {
+	/* Single file was updated */
+	OFONO_SIM_REFRESH_RESULT_FILE_UPDATE = 0,
+	/* The Icc has been initialized */
+	OFONO_SIM_REFRESH_RESULT_INIT = 1,
+	/* The Icc was reset */
+	OFONO_SIM_REFRESH_RESULT_RESET = 2,
+};
+
 typedef void (*ofono_sim_file_info_cb_t)(const struct ofono_error *error,
 					int filelength,
 					enum ofono_sim_file_structure structure,
