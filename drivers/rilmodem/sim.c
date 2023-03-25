@@ -948,13 +948,13 @@ static void ril_sim_refresh(struct ril_msg *message, gpointer user_data)
 	struct ofono_sim *sim = (struct ofono_sim *) user_data;
 	struct sim_data *sd = ofono_sim_get_data(sim);
 	struct parcel rilp;
-	int sim_refresh_result;
+	enum ofono_sim_refresh_response sim_refresh_result;
 	int ef_id;
 	char *aid_str;
 
 	g_ril_init_parcel(message, &rilp);
 
-	sim_refresh_result = parcel_r_int32(&rilp);
+	sim_refresh_result = (enum ofono_sim_refresh_response) parcel_r_int32(&rilp);
 
 	/* is the EFID of the updated file if the result is */
 	/* SIM_FILE_UPDATE or 0 for any other result.       */
@@ -979,6 +979,18 @@ static void ril_sim_refresh(struct ril_msg *message, gpointer user_data)
 					"aid : %s)", sim_refresh_result, ef_id, aid_str);
 
 	g_ril_print_unsol(sd->ril, message);
+
+	if (sim_refresh_result == OFONO_SIM_REFRESH_RESULT_RESET) {
+		// TODO: Reset the required apps when we know about the refresh
+		// so that anyone interested does not get stale state.
+	} else if (sim_refresh_result == OFONO_SIM_REFRESH_RESULT_INIT) {
+		// TODO: don't dispose CatService on SIM REFRESH of type INIT.
+	} else {
+		return;
+	}
+
+	// The card status could have changed. Get the latest state.
+	send_get_sim_status(sim);
 }
 
 
