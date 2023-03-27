@@ -110,6 +110,8 @@ struct ofono_sim {
 	enum ofono_sim_state state;
 	struct ofono_watchlist *state_watches;
 
+	struct ofono_watchlist *refresh_watches;
+
 	char *spn;
 	char *spn_dc;
 	struct ofono_watchlist *spn_watches;
@@ -393,6 +395,28 @@ static void call_state_watches(struct ofono_sim *sim)
 	}
 
 	sim_state_update(sim);
+}
+
+static void call_refresh_watches(struct ofono_sim *sim,
+			enum ofono_sim_refresh_response response,
+			int fileid, const char *aid_str)
+{
+	GSList *l;
+	ofono_sim_refresh_event_cb_t notify;
+
+	for (l = sim->refresh_watches->items; l; l = l->next) {
+		struct ofono_watchlist_item *item = l->data;
+		notify = item->notify;
+
+		notify(response, fileid, aid_str, item->notify_data);
+	}
+}
+
+void ofono_sim_refresh_notify(struct ofono_sim *sim,
+			enum ofono_sim_refresh_response response,
+			int fileid, const char *aid_str)
+{
+	call_refresh_watches(sim, response, fileid, aid_str);
 }
 
 static DBusMessage *sim_get_properties(DBusConnection *conn,
@@ -3470,6 +3494,34 @@ void ofono_sim_remove_state_watch(struct ofono_sim *sim, unsigned int id)
 	__ofono_watchlist_remove_item(sim->state_watches, id);
 }
 
+unsigned int ofono_sim_add_refresh_watch(struct ofono_sim *sim,
+				ofono_sim_refresh_event_cb_t notify,
+				void *data, ofono_destroy_func destroy)
+{
+	struct ofono_watchlist_item *item;
+
+	DBG("%p", sim);
+
+	if (sim == NULL)
+		return 0;
+
+	if (notify == NULL)
+		return 0;
+
+	item = g_new0(struct ofono_watchlist_item, 1);
+
+	item->notify = notify;
+	item->destroy = destroy;
+	item->notify_data = data;
+
+	return __ofono_watchlist_add_item(sim->refresh_watches, item);
+}
+
+void ofono_sim_remove_refresh_watch(struct ofono_sim *sim, unsigned int id)
+{
+	__ofono_watchlist_remove_item(sim->refresh_watches, id);
+}
+
 enum ofono_sim_state ofono_sim_get_state(struct ofono_sim *sim)
 {
 	if (sim == NULL)
@@ -3830,6 +3882,8 @@ static void sim_unregister(struct ofono_atom *atom)
 
 	__ofono_watchlist_free(sim->state_watches);
 	sim->state_watches = NULL;
+	__ofono_watchlist_free(sim->refresh_watches);
+	sim->refresh_watches = NULL;
 	__ofono_watchlist_free(sim->spn_watches);
 	sim->spn_watches = NULL;
 
@@ -3967,6 +4021,7 @@ void ofono_sim_register(struct ofono_sim *sim)
 
 	ofono_modem_add_interface(modem, OFONO_SIM_MANAGER_INTERFACE);
 	sim->state_watches = __ofono_watchlist_new(g_free);
+	sim->refresh_watches = __ofono_watchlist_new(g_free);
 	sim->spn_watches = __ofono_watchlist_new(g_free);
 	sim->simfs = sim_fs_new(sim, sim->driver);
 
