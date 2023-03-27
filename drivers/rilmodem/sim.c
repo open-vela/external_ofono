@@ -980,6 +980,8 @@ static void ril_sim_refresh(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_unsol(sd->ril, message);
 
+	ofono_sim_refresh_notify(sim, sim_refresh_result, ef_id, aid_str);
+
 	if (sim_refresh_result == OFONO_SIM_REFRESH_RESULT_RESET) {
 		// TODO: Reset the required apps when we know about the refresh
 		// so that anyone interested does not get stale state.
