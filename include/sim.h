@@ -116,6 +116,10 @@ typedef void (*ofono_sim_imsi_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_sim_state_event_cb_t)(enum ofono_sim_state new_state,
 					void *data);
 
+typedef void (*ofono_sim_refresh_event_cb_t)(
+		enum ofono_sim_refresh_response response,
+		int fileid, const char *aid_str, void *data);
+
 typedef void (*ofono_sim_file_read_cb_t)(int ok, int total_length, int record,
 					const unsigned char *data,
 					int record_length, void *userdata);
@@ -315,6 +319,10 @@ void ofono_sim_inserted_notify(struct ofono_sim *sim, ofono_bool_t inserted);
  * used to notify oFono core when the SIM / firmware is truly ready
  */
 void ofono_sim_initialized_notify(struct ofono_sim *sim);
+
+void ofono_sim_refresh_notify(struct ofono_sim *sim,
+		enum ofono_sim_refresh_response response,
+		int fileid, const char *aid_str);
 
 struct ofono_sim_context *ofono_sim_context_create(struct ofono_sim *sim);
 
