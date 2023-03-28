@@ -407,10 +407,10 @@ static int create_gril(struct ofono_modem *modem)
 {
 	struct ril_data *rd = ofono_modem_get_data(modem);
 	int slot_id = ofono_modem_get_integer(modem, "Slot");
-
+#ifndef CONFIG_ARCH_SIM
 	ofono_info("Using %s as socket for slot %d.",
 					RILD_CMD_SOCKET[slot_id], slot_id);
-
+#endif
 	/* RIL expects user radio to connect to the socket */
 	rd->ril = g_ril_new_with_ucred(RILD_CMD_SOCKET[slot_id],
 						OFONO_RIL_VENDOR_AOSP,
@@ -425,7 +425,9 @@ static int create_gril(struct ofono_modem *modem)
 	 */
 
 	if (rd->ril == NULL) {
+#ifndef CONFIG_ARCH_SIM
 		ofono_error("g_ril_new() failed to create modem!");
+#endif
 		return -EIO;
 	}
 	g_ril_set_slot(rd->ril, slot_id);
@@ -455,14 +457,16 @@ static gboolean connect_rild(gpointer user_data)
 {
 	struct ofono_modem *modem = (struct ofono_modem *) user_data;
 	struct ril_data *rd = ofono_modem_get_data(modem);
-
+#ifndef CONFIG_ARCH_SIM
 	ofono_info("Trying to reconnect to rild...");
-
+#endif
 	if (rd->rild_connect_retries++ < RILD_MAX_CONNECT_RETRIES) {
 		if (create_gril(modem) < 0)
 			return TRUE;
 	} else {
+#ifndef CONFIG_ARCH_SIM
 		ofono_error("Failed to connect to rild.");
+#endif
 		return TRUE;
 	}
 
