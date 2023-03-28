@@ -830,6 +830,7 @@ static struct ril_s *create_ril(const char *sock_path, unsigned int uid,
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
 
+#ifndef CONFIG_ARCH_SIM
 	/* Drop root user last, otherwise we won't be able to change egid */
 	if (gid != 0 && setegid(gid) < 0)
 		ofono_error("%s: setegid(%d) failed: %s (%d)",
@@ -838,6 +839,7 @@ static struct ril_s *create_ril(const char *sock_path, unsigned int uid,
 	if (uid != 0 && seteuid(uid) < 0)
 		ofono_error("%s: seteuid(%d) failed: %s (%d)",
 				__func__, uid, strerror(errno), errno);
+#endif
 
 	r = connect(sk, (struct sockaddr *) &addr, sizeof(addr));
 
@@ -851,8 +853,10 @@ static struct ril_s *create_ril(const char *sock_path, unsigned int uid,
 				__func__, strerror(errno), errno);
 
 	if (r < 0) {
+#ifndef CONFIG_ARCH_SIM
 		ofono_error("create_ril: can't connect to RILD: %s (%d)\n",
 				strerror(errno), errno);
+#endif
 		goto error;
 	}
 
