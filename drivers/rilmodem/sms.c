@@ -98,6 +98,7 @@ static void ril_csca_query_cb(struct ril_msg *message, gpointer user_data)
 	struct parcel rilp;
 	char *temp_buf;
 	char *number;
+	char *p_save;
 
 	if (message->error != RIL_E_SUCCESS)
 		goto error;
@@ -109,7 +110,7 @@ static void ril_csca_query_cb(struct ril_msg *message, gpointer user_data)
 		goto error;
 
 	/* RIL gives address in quotes */
-	number = strtok(temp_buf, "\"");
+	number = strtok_r(temp_buf, "\"", &p_save);
 	if (number == NULL || *number == '\0') {
 		g_free(temp_buf);
 		goto error;
