@@ -363,8 +363,10 @@ static void ril_gprs_set_data_profile(struct ofono_gprs *gprs,
 	struct parcel rilp;
 	int i;
 
-	if (contexts == NULL)
+	if (contexts == NULL) {
+		g_free(cbd);
 		return;
+	}
 
 	parcel_init(&rilp);
 	parcel_w_int32(&rilp, length);
