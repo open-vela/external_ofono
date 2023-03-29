@@ -548,7 +548,7 @@ static void ril_query_modem_activity_info(struct ofono_modem *modem,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
 }
 
 static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
@@ -582,7 +582,7 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, data);
 }
 
 static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_data)
@@ -620,7 +620,7 @@ static void ril_query_modem_status(struct ofono_modem *modem,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, -1, data);
 }
 
 static void ril_oem_request_raw_cb(struct ril_msg *message,
