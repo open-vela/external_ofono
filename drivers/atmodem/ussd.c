@@ -104,7 +104,7 @@ static void cusd_parse(GAtResult *result, struct ofono_ussd *ussd)
 	GAtResultIter iter;
 	int status;
 	const char *content;
-	int dcs;
+	int dcs = 0;
 	enum sms_charset charset;
 	unsigned char msg[160];
 	const unsigned char *msg_ptr = NULL;
