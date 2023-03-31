@@ -185,7 +185,7 @@ static const char *gprs_context_default_name(enum ofono_gprs_context_type type)
 {
 	switch (type) {
 	case OFONO_GPRS_CONTEXT_TYPE_ANY:
-		return NULL;
+		return "any";
 	case OFONO_GPRS_CONTEXT_TYPE_INTERNET:
 		return "Internet";
 	case OFONO_GPRS_CONTEXT_TYPE_HIPRI:
@@ -212,7 +212,7 @@ static const char *gprs_context_type_to_string(
 {
 	switch (type) {
 	case OFONO_GPRS_CONTEXT_TYPE_ANY:
-		return NULL;
+		return "";
 	case OFONO_GPRS_CONTEXT_TYPE_INTERNET:
 		return "internet";
 	case OFONO_GPRS_CONTEXT_TYPE_HIPRI:
