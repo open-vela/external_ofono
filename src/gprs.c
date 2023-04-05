@@ -386,6 +386,20 @@ static struct pri_context *gprs_context_by_type(struct ofono_gprs *gprs, int typ
 	return NULL;
 }
 
+static struct pri_context *gprs_active_context_by_type(struct ofono_gprs *gprs, int type)
+{
+	GSList *l;
+
+	for (l = gprs->contexts; l; l = l->next) {
+		struct pri_context *ctx = l->data;
+
+		if (type == ctx->type && ctx->active == TRUE)
+			return ctx;
+	}
+
+	return NULL;
+}
+
 static void context_settings_free(struct context_settings *settings)
 {
 	if (settings->ipv4) {
@@ -1017,6 +1031,7 @@ static void pri_deactivate_callback(const struct ofono_error *error, void *data)
 	}
 
 	ctx->status = CONTEXT_STATUS_DEACTIVATED;
+	gprs_try_setup_data_call(ctx->gprs, ctx->type);
 }
 
 static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
@@ -1077,15 +1092,18 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 	}
 
 	if (assign_context(ctx, 0) == FALSE) {
-		ofono_error("gprs context assignment failed for apn type (%s).", apn_typestr);
+		ofono_error("failed to assign gc for apn type (%s) - %s.", apn_typestr, __func__);
 		return;
 	}
 	gc = ctx->context_driver;
 
-	if (ctx->ref_count > 0) {
-		gc->driver->activate_primary(gc, &ctx->context, pri_activate_callback, ctx);
-		ctx->status = CONTEXT_STATUS_ACTIVATING;
+	if (ctx->ref_count <= 0) {
+		release_context(ctx);
+		return;
 	}
+
+	gc->driver->activate_primary(gc, &ctx->context, pri_activate_callback, ctx);
+	ctx->status = CONTEXT_STATUS_ACTIVATING;
 }
 
 static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
@@ -1100,15 +1118,15 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 		return;
 	}
 
-	ctx = gprs_context_by_type(gprs, apn_type);
+	ctx = gprs_active_context_by_type(gprs, apn_type);
 	if (ctx == NULL) {
-		ofono_error("no available apn context");
+		ofono_warn("no active apn context (%s)", apn_typestr);
 		return;
 	}
 
 	gc = ctx->context_driver;
 	if (gc == NULL) {
-		ofono_error("gprs context assignment failed for apn type (%s).", apn_typestr);
+		ofono_error("failed to assign gc for apn type (%s) - %s.", apn_typestr, __func__);
 		return;
 	}
 
@@ -1697,6 +1715,8 @@ static struct pri_context *pri_context_create(struct ofono_gprs *gprs,
 	if (type == OFONO_GPRS_CONTEXT_TYPE_INTERNET)
 		context->ref_count = 1;
 
+	context->active = FALSE;
+
 	return context;
 }
 
@@ -2247,6 +2267,9 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 		else
 			gprs_try_deactive_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
 	} else if (!strcmp(property, "PreferredApn")) {
+		struct pri_context *new_internet_ctx = NULL;
+		struct pri_context *active_internet_ctx = NULL;
+
 		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
 			return __ofono_error_invalid_args(msg);
 
@@ -2263,8 +2286,19 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 				g_free(gprs->preferred_apn);
 			gprs->preferred_apn = g_strdup(value_str);
 
-			gprs_try_deactive_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
-			gprs_try_setup_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+			new_internet_ctx = gprs_context_by_path(gprs, gprs->preferred_apn);
+			if (new_internet_ctx != NULL) {
+				new_internet_ctx->ref_count = 1;
+			}
+
+			active_internet_ctx = gprs_active_context_by_type(
+				gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+			if (active_internet_ctx != NULL) {
+				active_internet_ctx->ref_count = 0;
+				gprs_try_deactive_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+			} else {
+				gprs_try_setup_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+			}
 		}
 	} else if (!strcmp(property, "DataAllowed")) {
 		if (gprs->driver->set_data_allow == NULL)
@@ -2372,6 +2406,16 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 {
 	unsigned int id;
 	struct pri_context *context;
+	GSList *l;
+
+	for (l = gprs->contexts; l; l = l->next) {
+		struct pri_context *ctx = l->data;
+
+		if (type == ctx->type && g_strcmp0(apn, ctx->context.apn) == 0) {
+			ofono_error("duplicated apn is already existing!");
+			return NULL;
+		}
+	}
 
 	if (gprs->last_context_id)
 		id = l_uintset_find_unused(gprs->used_pids,
@@ -2568,6 +2612,8 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 	char *path;
 	const char *atompath;
 	dbus_bool_t value;
+	struct pri_context *next_ctx = NULL;
+	enum ofono_gprs_context_type next_type;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("Removing context failed with error: %s",
@@ -2578,6 +2624,7 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 		return;
 	}
 
+	next_type = ctx->type;
 	pri_reset_context_settings(ctx);
 	release_context(ctx);
 
@@ -2596,6 +2643,12 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 
 	context_dbus_unregister(ctx);
 	gprs->contexts = g_slist_remove(gprs->contexts, ctx);
+
+	next_ctx = gprs_context_by_type(gprs, next_type);
+	if (next_ctx != NULL) {
+		next_ctx->ref_count = 1;
+		gprs_try_setup_data_call(gprs, next_type);
+	}
 
 	__ofono_dbus_pending_reply(&gprs->pending,
 				dbus_message_new_method_return(gprs->pending));
@@ -2657,6 +2710,15 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 	g_dbus_emit_signal(conn, atompath, OFONO_CONNECTION_MANAGER_INTERFACE,
 				"ContextRemoved", DBUS_TYPE_OBJECT_PATH, &path,
 				DBUS_TYPE_INVALID);
+
+	if (gprs->preferred_apn != NULL && g_strcmp0(path, gprs->preferred_apn) == 0) {
+		g_free(gprs->preferred_apn);
+		gprs->preferred_apn = g_strdup("");
+
+		ofono_dbus_signal_property_changed(conn, atompath,
+				OFONO_CONNECTION_MANAGER_INTERFACE,
+				"PreferredApn", DBUS_TYPE_STRING, &gprs->preferred_apn);
+	}
 
 	return NULL;
 }
