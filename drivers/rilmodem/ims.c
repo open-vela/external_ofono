@@ -244,7 +244,7 @@ static void ril_ims_remove(struct ofono_ims *ims)
 }
 
 static const struct ofono_ims_driver driver = {
-	.name			= "RILMODEM",
+	.name			= RILMODEM,
 	.probe			= ril_ims_probe,
 	.remove			= ril_ims_remove,
 	.ims_register		= ril_ims_register,
