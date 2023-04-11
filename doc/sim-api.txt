@@ -79,7 +79,7 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidArguments
 					 [service].Error.Failed
 
-		int32 OpenLogicalChannel(string aid)
+		int32 OpenLogicalChannel(array{byte} aid)
 
 			Open a new logical channel and select the given application.
                         The session id of the logical channel will be returned.
@@ -99,7 +99,7 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidArguments
 					 [service].Error.Failed
 
-		string TransmitApduLogicalChannel(int32 sessionid, string pdu, uint32 len)
+		string TransmitApduLogicalChannel(int32 sessionid, array{byte} pdu)
 
 			Transmit an APDU to the ICC card over a previously
 			opened logical channel.
@@ -149,7 +149,7 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 
-		string TransmitApduBasicChannel(string pdu, uint32 len)
+		string TransmitApduBasicChannel(array{byte} pdu)
 
 			Transmit an APDU to the ICC card over the basic channel.
 

@@ -1605,7 +1605,9 @@ static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
 	struct ofono_sim *sim = data;
-	const unsigned char *aid;
+	DBusMessageIter iter, array;
+	unsigned char *aid;
+	int length;
 
 	if (sim->pending)
 		return __ofono_error_busy(msg);
@@ -1613,8 +1615,20 @@ static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
 	if (sim->driver->open_channel == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &aid,
-					DBUS_TYPE_INVALID) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &array);
+
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_fixed_array(&array, &aid, &length);
+
+	if (length == 0 || length > 16)
 		return __ofono_error_invalid_args(msg);
 
 	sim->pending = dbus_message_ref(msg);
@@ -1669,7 +1683,8 @@ static void logical_access_cb(const struct ofono_error *error,
 {
 	struct ofono_sim *sim = data;
 	DBusMessage *reply;
-	DBusMessageIter iter;
+	DBusMessageIter iter, array;
+	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("Error occurred during logical access");
@@ -1681,7 +1696,13 @@ static void logical_access_cb(const struct ofono_error *error,
 	reply = dbus_message_new_method_return(sim->pending);
 	dbus_message_iter_init_append(reply, &iter);
 
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &resp);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_TYPE_BYTE_AS_STRING, &array);
+
+	for (i = 0; i < len; i++)
+		dbus_message_iter_append_basic(&array, DBUS_TYPE_BYTE, &resp[i]);
+
+	dbus_message_iter_close_container(&iter, &array);
 
 	__ofono_dbus_pending_reply(&sim->pending, reply);
 }
@@ -1690,9 +1711,10 @@ static DBusMessage *sim_logical_access(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
 	struct ofono_sim *sim = data;
+	DBusMessageIter iter, array;
 	int session_id;
 	const unsigned char *pdu;
-	unsigned int len;
+	int pdu_len;
 
 	if (sim->pending)
 		return __ofono_error_busy(msg);
@@ -1700,15 +1722,29 @@ static DBusMessage *sim_logical_access(DBusConnection *conn,
 	if (sim->driver->logical_access == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &session_id,
-					DBUS_TYPE_STRING, &pdu,
-					DBUS_TYPE_UINT32, &len,
-					DBUS_TYPE_INVALID) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_basic(&iter, &session_id);
+	dbus_message_iter_next(&iter);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &array);
+
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_fixed_array(&array, &pdu, &pdu_len);
+
+	if (pdu_len <= 0)
 		return __ofono_error_invalid_args(msg);
 
 	sim->pending = dbus_message_ref(msg);
 
-	sim->driver->logical_access(sim, session_id, pdu, len, logical_access_cb, sim);
+	sim->driver->logical_access(sim, session_id, pdu, (unsigned int)pdu_len,
+					logical_access_cb, sim);
 
 	return NULL;
 }
@@ -1718,7 +1754,8 @@ static void sim_basic_access_cb(const struct ofono_error *error,
 {
 	struct ofono_sim *sim = data;
 	DBusMessage *reply;
-	DBusMessageIter iter;
+	DBusMessageIter iter, array;
+	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("Error occurred during basic access");
@@ -1730,7 +1767,13 @@ static void sim_basic_access_cb(const struct ofono_error *error,
 	reply = dbus_message_new_method_return(sim->pending);
 	dbus_message_iter_init_append(reply, &iter);
 
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &resp);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					DBUS_TYPE_BYTE_AS_STRING, &array);
+
+	for (i = 0; i < len; i++)
+		dbus_message_iter_append_basic(&array, DBUS_TYPE_BYTE, &resp[i]);
+
+	dbus_message_iter_close_container(&iter, &array);
 
 	__ofono_dbus_pending_reply(&sim->pending, reply);
 }
@@ -1739,8 +1782,9 @@ static DBusMessage *sim_basic_access(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
 	struct ofono_sim *sim = data;
+	DBusMessageIter iter, array;
 	const unsigned char *pdu;
-	unsigned int len;
+	int pdu_len;
 
 	if (sim->pending)
 		return __ofono_error_busy(msg);
@@ -1748,14 +1792,26 @@ static DBusMessage *sim_basic_access(DBusConnection *conn,
 	if (sim->driver->basic_access == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &pdu,
-					DBUS_TYPE_UINT32, &len,
-					DBUS_TYPE_INVALID) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_recurse(&iter, &array);
+
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE)
+		return __ofono_error_invalid_args(msg);
+
+	dbus_message_iter_get_fixed_array(&array, &pdu, &pdu_len);
+
+	if (pdu_len <= 0)
 		return __ofono_error_invalid_args(msg);
 
 	sim->pending = dbus_message_ref(msg);
 
-	sim->driver->basic_access(sim, pdu, len, sim_basic_access_cb, sim);
+	sim->driver->basic_access(sim, pdu, (unsigned int)pdu_len,
+					sim_basic_access_cb, sim);
 
 	return NULL;
 }
@@ -1792,14 +1848,14 @@ static const GDBusMethodTable sim_methods[] = {
 			NULL, GDBUS_ARGS({ "result", "b" }),
 			sim_query_fdn) },
 	{ GDBUS_ASYNC_METHOD("OpenLogicalChannel",
-			GDBUS_ARGS({ "aid", "s" }),
+			GDBUS_ARGS({ "aid", "ay" }),
 			GDBUS_ARGS({ "sessionid", "i" }),
 			sim_open_logical_channel) },
 	{ GDBUS_ASYNC_METHOD("CloseLogicalChannel",
 			GDBUS_ARGS({ "sessionid", "i" }), NULL,
 			sim_close_logical_channel) },
 	{ GDBUS_ASYNC_METHOD("TransmitApduLogicalChannel",
-			GDBUS_ARGS({ "sessionid", "i" }, {"pdu", "s"}, {"len", "u"}),
+			GDBUS_ARGS({ "sessionid", "i" }, {"pdu", "ay"}),
 			GDBUS_ARGS({ "response", "s" }),
 			sim_logical_access) },
 	{ GDBUS_ASYNC_METHOD("EnableFdn",
@@ -1809,7 +1865,7 @@ static const GDBusMethodTable sim_methods[] = {
 			GDBUS_ARGS({ "password", "s" }), NULL,
 			sim_disable_fdn) },
 	{ GDBUS_ASYNC_METHOD("TransmitApduBasicChannel",
-			GDBUS_ARGS({"pdu", "s"}, {"len", "u"}),
+			GDBUS_ARGS({"pdu", "ay"}),
 			GDBUS_ARGS({ "response", "s" }),
 			sim_basic_access) },
 	{ }
