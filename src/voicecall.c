@@ -1241,6 +1241,41 @@ static void voicecalls_emit_call_added(struct ofono_voicecall *vc,
 	notify_phone_status_changed(vc);
 }
 
+static void voicecalls_emit_call_changed(struct ofono_voicecall *vc,
+					struct voicecall *v)
+{
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	DBusMessageIter dict;
+	const char *path;
+
+	notify_emulator_call_status(vc);
+
+	path = __ofono_atom_get_path(vc->atom);
+
+	signal = dbus_message_new_signal(path,
+					OFONO_VOICECALL_MANAGER_INTERFACE,
+					"CallChanged");
+
+	if (signal == NULL)
+		return;
+
+	dbus_message_iter_init_append(signal, &iter);
+
+	path = voicecall_build_path(vc, v->call);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_OBJECT_PATH, &path);
+
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					OFONO_PROPERTIES_ARRAY_SIGNATURE,
+					&dict);
+	append_voicecall_properties(v, &dict);
+	dbus_message_iter_close_container(&iter, &dict);
+
+	g_dbus_send_message(ofono_dbus_get_connection(), signal);
+
+	notify_phone_status_changed(vc);
+}
+
 static void voicecalls_release_queue(struct ofono_voicecall *vc, GSList *calls,
 					ofono_voicecall_cb_t cb,
 					ofono_bool_t skip_held)
@@ -1496,8 +1531,10 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 
 	__ofono_dbus_pending_reply(&vc->pending, reply);
 
-	if (need_to_emit)
+	if (need_to_emit) {
 		voicecalls_emit_call_added(vc, v);
+		voicecalls_emit_call_changed(vc, v);
+	}
 }
 
 static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
@@ -1614,6 +1651,7 @@ static void manager_dial_hfp_callback(const struct ofono_error *error,
 	__ofono_dbus_pending_reply(&vc->pending, reply);
 
 	voicecalls_emit_call_added(vc, v);
+	voicecalls_emit_call_changed(vc, v);
 	return;
 
 error:
@@ -2455,6 +2493,8 @@ static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("CallAdded",
 		GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("CallRemoved", GDBUS_ARGS({ "path", "o"})) },
+	{ GDBUS_SIGNAL("CallChanged",
+		GDBUS_ARGS({ "path", "o" }, { "properties", "a{sv}" })) },
 	{ GDBUS_SIGNAL("PhoneStatusChanged", GDBUS_ARGS({ "status", "i" })) },
 	{ GDBUS_SIGNAL("RingBackTone", GDBUS_ARGS({ "status", "i" })) },
 	{ }
@@ -2526,6 +2566,7 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	}
 
 	voicecalls_emit_call_removed(vc, call);
+	voicecalls_emit_call_changed(vc, call);
 
 	voicecall_dbus_unregister(vc, call);
 
@@ -2559,6 +2600,8 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 		voicecall_set_call_calledid(l->data, &call->called_number);
 		voicecall_set_call_name(l->data, call->name,
 						call->cnap_validity);
+
+		voicecalls_emit_call_changed(vc, l->data);
 
 		return;
 	}
@@ -2622,6 +2665,7 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 	vc->call_list = g_slist_insert_sorted(vc->call_list, v, call_compare);
 
 	voicecalls_emit_call_added(vc, v);
+	voicecalls_emit_call_changed(vc, v);
 
 	return;
 
@@ -3675,8 +3719,10 @@ static void emulator_dial_callback(const struct ofono_error *error, void *data)
 
 	vc->pending_em = NULL;
 
-	if (need_to_emit)
+	if (need_to_emit) {
 		voicecalls_emit_call_added(vc, v);
+		voicecalls_emit_call_changed(vc, v);
+	}
 }
 
 static void emulator_dial(struct ofono_emulator *em, struct ofono_voicecall *vc,
@@ -3966,8 +4012,10 @@ static void dial_request_cb(const struct ofono_error *error, void *data)
 	if (v->call->status == CALL_STATUS_ACTIVE)
 		dial_request_finish(vc);
 
-	if (need_to_emit)
+	if (need_to_emit) {
 		voicecalls_emit_call_added(vc, v);
+		voicecalls_emit_call_changed(vc, v);
+	}
 }
 
 static void dial_request(struct ofono_voicecall *vc)
