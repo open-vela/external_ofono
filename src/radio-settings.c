@@ -110,6 +110,10 @@ static gboolean radio_access_mode_from_string(const char *str,
 	} else if (g_str_equal(str, "lte,gsm")) {
 		*mode = OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_GSM;
 		return TRUE;
+	} else if (g_str_equal(str, "lte,umts,gsm")) {
+		*mode = OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS|
+			OFONO_RADIO_ACCESS_MODE_GSM;
+		return TRUE;
 	}
 
 	return FALSE;
