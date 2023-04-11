@@ -241,6 +241,16 @@ Signals		CallAdded(object path, dict properties)
 			expected to monitor changes in Modem.Interfaces
 			property.
 
+		CallChanged(object path, dict properties)
+
+			Signal that is sent when a new call is changed.  It
+			contains the object path of the new voice call and
+			also its properties.
+
+			Applications get the whole properties via this
+			signal and don't need to call GetProperties on
+			the voice call object.
+
 		PropertyChanged(string property, variant value)
 
 			Signal is emitted whenever a property has changed.
