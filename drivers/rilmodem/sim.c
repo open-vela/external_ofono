@@ -1743,11 +1743,12 @@ static void ril_sim_open_channel(struct ofono_sim *sim, const unsigned char *aid
 	struct sim_data *sd = ofono_sim_get_data(sim);
 	struct cb_data *cbd = cb_data_new(cb, data, sd);
 	struct parcel rilp;
-	char aid_str[32];
+	char aid_str[33];
 
 	encode_hex_own_buf(aid, 16, 0, aid_str);
 	parcel_init(&rilp);
 	parcel_w_string(&rilp, aid_str);
+	parcel_w_int32(&rilp, -1 /* P2 parameter */); // No P2 value is provided
 
 	g_ril_append_print_buf(sd->ril, "(%s)", aid_str);
 
