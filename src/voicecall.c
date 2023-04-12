@@ -1402,7 +1402,11 @@ static struct voicecall *synthesize_outgoing_call(struct ofono_voicecall *vc,
 	v->detect_time = time(NULL);
 
 	DBG("Registering new call: %d", call->id);
-	voicecall_dbus_register(v);
+	if (!voicecall_dbus_register(v)) {
+		g_free(call);
+		ofono_error("Unable to register voice call");
+		return NULL;
+	}
 
 	vc->call_list = g_slist_insert_sorted(vc->call_list, v, call_compare);
 
@@ -2610,6 +2614,7 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 	v->detect_time = time(NULL);
 
 	if (!voicecall_dbus_register(v)) {
+		v = NULL;
 		ofono_error("Unable to register voice call");
 		goto error;
 	}
