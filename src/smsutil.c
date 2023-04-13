@@ -4346,7 +4346,7 @@ static void cbs_assembly_expire(struct cbs_assembly *assembly,
 			assembly->assembly_list = l->next;
 
 		g_slist_free_full(node->pages, g_free);
-		g_free(node->pages);
+		g_free(node);
 		tmp = l;
 		l = l->next;
 		g_slist_free_1(tmp);
