@@ -2836,7 +2836,7 @@ skip_efpl:
 	 *   preference in the EFPL at the MF level
 	 * Otherwise in order of preference according to TS 51.011
 	 */
-	if (efli_format) {
+	if (sim->efli && efli_format) {
 		if (sim->efli_length >= 2 && sim->efli[0] == 0xff &&
 				sim->efli[1] == 0xff)
 			sim->language_prefs = concat_lang_prefs(NULL, efpl);
