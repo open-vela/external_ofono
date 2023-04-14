@@ -2583,11 +2583,23 @@ static DBusMessage *gprs_add_context(DBusConnection *conn,
 	if (gprs_context_string_to_type(typestr, &type) == FALSE)
 		return __ofono_error_invalid_format(msg);
 
+	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
+	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
+	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
 	if (name == NULL)
 		name = gprs_context_default_name(type);
 
 	if (name == NULL)
 		name = typestr;
+
+	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH)
+		return __ofono_error_invalid_format(msg);
 
 	context = add_context(gprs, name, type, apn, username, password, protocal, authtype);
 	if (context == NULL)
@@ -2900,7 +2912,9 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 
 	context->context.auth_method = ap->auth_method;
 
-	strcpy(context->context.apn, ap->apn);
+	if (ap->apn != NULL)
+		strcpy(context->context.apn, ap->apn);
+
 	context->context.proto = ap->proto;
 
 	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
