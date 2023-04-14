@@ -1186,11 +1186,7 @@ static void set_nitz_time(struct ofono_netreg *netreg,
 	const char *path = __ofono_atom_get_path(netreg->atom);
 	char buf[128];
 	const char *nitz_str = buf;
-
-	int error_code = snprintf(buf, sizeof(buf), "%d,%d,%d,%d,%d,%d,%d,%d",
-		info->sec, info->min, info->hour,
-		info->mday, info->mon, info->year,
-		info->dst, info->utcoff);
+	int error_code;
 
 	if (netreg->nitz_time == NULL && info == NULL)
 		return;
@@ -1198,12 +1194,22 @@ static void set_nitz_time(struct ofono_netreg *netreg,
 	if (netreg->nitz_time)
 		g_free(netreg->nitz_time);
 
-	if (error_code < 0 || info == NULL) {
+	if (info) {
+		error_code = snprintf(buf, sizeof(buf), "%d,%d,%d,%d,%d,%d,%d,%d",
+			info->sec, info->min, info->hour,
+			info->mday, info->mon, info->year,
+			info->dst, info->utcoff);
+		if (error_code < 0) {
+			DBG("Error during set nitz time");
+			netreg->nitz_time = NULL;
+			return;
+		} else {
+			netreg->nitz_time = g_strdup(buf);
+		}
+	} else {
 		DBG("Error during set nitz time");
 		netreg->nitz_time = NULL;
 		return;
-	} else {
-		netreg->nitz_time = g_strdup(buf);
 	}
 
 	ofono_dbus_signal_property_changed(conn, path,
