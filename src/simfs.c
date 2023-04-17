@@ -333,7 +333,9 @@ static gboolean cache_block(struct sim_fs *fs, int block, int block_len,
 	bit = block % 8;
 
 	/* lseek to correct byte (skip file info) */
-	lseek(fs->fd, offset + SIM_FILE_INFO_SIZE, SEEK_SET);
+	if (lseek(fs->fd, offset + SIM_FILE_INFO_SIZE,
+				SEEK_SET) == (off_t) -1)
+		return FALSE;
 
 	b = fs->bitmap[offset];
 	b |= 1 << bit;
