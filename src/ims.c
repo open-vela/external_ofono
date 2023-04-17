@@ -95,7 +95,7 @@ static void ims_set_sms_capable(struct ofono_ims *ims, ofono_bool_t status)
 	dbus_bool_t old_value = ims->ext_info & SMS_CAPABLE_FLAG ? TRUE :
 								FALSE;
 
-	if (old_value == new_value)
+	if (ims->ext_info >= 0 && old_value == new_value)
 		return;
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -113,7 +113,7 @@ static void ims_set_voice_capable(struct ofono_ims *ims, ofono_bool_t status)
 	dbus_bool_t old_value = ims->ext_info & VOICE_CAPABLE_FLAG ? TRUE :
 								FALSE;
 
-	if (old_value == new_value)
+	if (ims->ext_info >= 0 && old_value == new_value)
 		return;
 
 	ofono_dbus_signal_property_changed(conn, path,
