@@ -1280,6 +1280,9 @@ gboolean __ofono_netreg_remove_status_watch(struct ofono_netreg *netreg,
 {
 	DBG("%p", netreg);
 
+	if (netreg == NULL)
+		return FALSE;
+
 	return __ofono_watchlist_remove_item(netreg->status_watches, id);
 }
 
