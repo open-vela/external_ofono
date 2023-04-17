@@ -388,7 +388,8 @@ static DBusMessage *usim_gsm_authenticate(DBusConnection *conn,
 	if (sa->pending)
 		return __ofono_error_busy(msg);
 
-	dbus_message_iter_init(msg, &iter);
+	if (!dbus_message_iter_init(msg, &iter))
+		return __ofono_error_invalid_args(msg);
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
 		return __ofono_error_invalid_format(msg);
