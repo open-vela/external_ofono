@@ -53,21 +53,25 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 	struct ofono_error error;
 	int reg_info;
 	int ext_info;
+	int num;
 	struct parcel rilp;
 
 	if(cb == NULL)
 		return;
-
-	if (message->error != RIL_E_SUCCESS)
-		goto error;
 
 	g_ril_init_parcel(message, &rilp);
 
 	if (rilp.size < sizeof(int32_t))
 		goto error;
 
-	reg_info = parcel_r_int32(&rilp);
-	ext_info = parcel_r_int32(&rilp);
+	num = parcel_r_int32(&rilp);
+	if(num > 0) {
+		reg_info = parcel_r_int32(&rilp);
+		ext_info = parcel_r_int32(&rilp);
+		decode_ril_error(&error, "OK");
+	}else {
+		decode_ril_error(&error, "FAIL");
+	}
 
 	DBG("ril_registration_status_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
 	cb(&error, reg_info, ext_info, cbd->data);
@@ -111,29 +115,52 @@ static void ril_ims_register_cb(struct ril_msg *message, gpointer user_data)
 	cb(&error, cbd->data);
 }
 
-static void ims_registration_notify(struct ril_msg *message, gpointer user_data)
-{
+static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
+
 	struct ofono_ims *ims = user_data;
-	struct ril_ims_data *rid = ofono_ims_get_data(ims);
 	int reg_info;
 	int ext_info;
+	int num;
 	struct parcel rilp;
 
-	g_ril_print_unsol_no_args(rid->ril, message);
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("ims_state_change_cb error");
+		return;
+	}
 
 	g_ril_init_parcel(message, &rilp);
-
-	if (message->error != RIL_E_SUCCESS)
-		return;
 
 	if (rilp.size < sizeof(int32_t))
 		return;
 
-	reg_info = parcel_r_int32(&rilp);
-	ext_info = parcel_r_int32(&rilp);
+	num = parcel_r_int32(&rilp);
+	if(num > 0) {
+		reg_info = parcel_r_int32(&rilp);
+		ext_info = parcel_r_int32(&rilp);
+	}
 
-	DBG("reg_info:%d, ext_info:%d", reg_info, ext_info);
+	DBG("ims_state_change_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
 	ofono_ims_status_notify(ims, reg_info, ext_info);
+}
+
+static void get_ims_registration_state(struct ofono_ims *ims) {
+
+	struct ril_ims_data *rid = ofono_ims_get_data(ims);
+
+	if(g_ril_send(rid->ril, RIL_REQUEST_IMS_REGISTRATION_STATE, NULL,
+			ims_state_change_cb, ims , NULL) == 0) {
+		ofono_error("send RIL_REQUEST_IMS_REGISTRATION_STATE error");
+	}
+}
+
+static void ims_registration_notify(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_ims *ims = user_data;
+	struct ril_ims_data *rid = ofono_ims_get_data(ims);
+
+	g_ril_print_unsol_no_args(rid->ril, message);
+
+	get_ims_registration_state(ims);
 }
 
 static void send_ims_register_status(struct ofono_ims *ims,
@@ -144,6 +171,7 @@ static void send_ims_register_status(struct ofono_ims *ims,
 	struct parcel rilp;
 
 	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 1);
 	parcel_w_int32(&rilp, state);
 
 	if (g_ril_send(rid->ril, RIL_REQUEST_IMS_REG_STATE_CHANGE, &rilp,
@@ -177,6 +205,7 @@ static void ril_ims_set_capable(struct ofono_ims *ims, int cap,
 	struct parcel rilp;
 
 	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 1);
 	parcel_w_int32(&rilp, cap);
 
 	if (g_ril_send(rid->ril, RIL_REQUEST_IMS_SET_SERVICE_STATUS, &rilp,
