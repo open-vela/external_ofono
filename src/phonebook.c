@@ -594,11 +594,15 @@ static void insert_fdn_entry_cb(const struct ofono_error *error, int record, voi
 	}
 
 	//update phonebook->fdn_entries
-	dbus_message_get_args(phonebook->pending, NULL,
+	if (dbus_message_get_args(phonebook->pending, NULL,
 			DBUS_TYPE_STRING, &new_name,
 			DBUS_TYPE_STRING, &new_number,
 			DBUS_TYPE_STRING, &pin2,
-			DBUS_TYPE_INVALID);
+			DBUS_TYPE_INVALID) == FALSE) {
+		reply = __ofono_error_invalid_format(phonebook->pending);
+		__ofono_dbus_pending_reply(&phonebook->pending, reply);
+		return;
+	}
 
 	new_entry = l_new(struct fdn_entry, 1);
 	new_entry->name = l_strdup(new_name);
@@ -669,12 +673,16 @@ static void update_fdn_entry_cb(const struct ofono_error *error, int record, voi
 	}
 
 	// update phonebook->fdn_entries
-	dbus_message_get_args(phonebook->pending, NULL,
+	if (dbus_message_get_args(phonebook->pending, NULL,
 			DBUS_TYPE_STRING, &new_name,
 			DBUS_TYPE_STRING, &new_number,
 			DBUS_TYPE_STRING, &pin2,
 			DBUS_TYPE_INT32, &fdn_idx,
-			DBUS_TYPE_INVALID);
+			DBUS_TYPE_INVALID) == FALSE) {
+		reply = __ofono_error_invalid_format(phonebook->pending);
+		__ofono_dbus_pending_reply(&phonebook->pending, reply);
+		return;
+	}
 
 	entry = g_tree_lookup(phonebook->fdn_entries, GINT_TO_POINTER(fdn_idx));
 	if (entry) {
