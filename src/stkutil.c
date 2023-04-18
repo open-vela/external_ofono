@@ -1046,7 +1046,8 @@ static bool parse_dataobj_datetime_timezone(
 		return false;
 
 	data = comprehension_tlv_iter_get_data(iter);
-	sms_decode_scts(data, 7, &offset, scts);
+	if (!sms_decode_scts(data, 7, &offset, scts))
+		return false;
 
 	return true;
 }
