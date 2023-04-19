@@ -183,3 +183,6 @@ Properties	string LineIdentification [readonly]
 
 			Contains the indication whether the voice call is
 			joined in a multiparty call by the remote party or not.
+
+		int32 DisconnectReason [readonly, optional]
+			Contains disconnected reason when the voice call is disconnected.

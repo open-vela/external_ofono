@@ -471,6 +471,9 @@ static void append_voicecall_properties(struct voicecall *v,
 	ofono_dbus_dict_append(dict, "Emergency",
 					DBUS_TYPE_BOOLEAN, &emergency_call);
 
+	ofono_dbus_dict_append(dict, "DisconnectReason",
+					DBUS_TYPE_INT32, &call->disconnet_reason);
+
 }
 
 static DBusMessage *voicecall_get_properties(DBusConnection *conn,
@@ -2547,8 +2550,10 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 
 	vc->release_list = g_slist_remove(vc->release_list, call);
 
-	if (reason != OFONO_DISCONNECT_REASON_UNKNOWN)
+	if (reason != OFONO_DISCONNECT_REASON_UNKNOWN) {
+		call->call->disconnet_reason = reason;
 		voicecall_emit_disconnect_reason(call, reason);
+	}
 
 	number = phone_number_to_string(&call->call->phone_number);
 	if (is_emergency_number(vc, number) == TRUE)

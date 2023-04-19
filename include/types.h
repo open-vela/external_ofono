@@ -105,6 +105,7 @@ struct ofono_call {
 	char name[OFONO_MAX_CALLER_NAME_LENGTH + 1];
 	int clip_validity;
 	int cnap_validity;
+	enum ofono_disconnect_reason disconnet_reason;
 };
 
 struct ofono_network_time {
