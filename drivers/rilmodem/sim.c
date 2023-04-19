@@ -1709,6 +1709,7 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	struct sim_data *sd = cbd->user;
 	struct parcel rilp;
 	int session_id = -1;
+	int numparams;
 
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("Reply failure: %s",
@@ -1717,6 +1718,16 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	g_ril_init_parcel(message, &rilp);
+	numparams = parcel_r_int32(&rilp);
+
+	if (numparams != 1) {
+		ofono_error("%s: invalid OPEN CHANNEL reply: "
+				"number of params is %d; should be 1.",
+				__func__,
+				numparams);
+		goto error;
+	}
+
 	session_id = parcel_r_int32(&rilp);
 
 	if (rilp.malformed) {
@@ -1764,34 +1775,15 @@ static void ril_sim_close_channel_cb(struct ril_msg *message, gpointer user_data
 	struct cb_data *cbd = user_data;
 	ofono_sim_close_channel_cb_t cb = cbd->cb;
 	struct sim_data *sd = cbd->user;
-	struct parcel rilp;
-	int session_id = -1;
 
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("Reply failure: %s",
 				ril_error_to_string(message->error));
-		goto error;
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+	} else {
+		g_ril_print_response_no_args(sd->ril, message);
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
 	}
-
-	g_ril_init_parcel(message, &rilp);
-	session_id = parcel_r_int32(&rilp);
-
-	if (rilp.malformed) {
-		ofono_error("%s: malformed parcel received", __func__);
-		goto error;
-	}
-
-	g_ril_append_print_buf(sd->ril, "{%d}", session_id);
-	g_ril_print_response(sd->ril, message);
-
-	if (session_id == -1)
-		goto error;
-
-	CALLBACK_WITH_SUCCESS(cb, cbd->data);
-	return;
-
-error:
-	CALLBACK_WITH_FAILURE(cb, cbd->data);
 }
 
 static void ril_sim_close_channel(struct ofono_sim *sim, int session_id,
