@@ -219,6 +219,75 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 
+		void manager_deflect(object path, string number)
+
+			Deflects the incoming or waiting call to number given
+			in the argument.  This method is only valid if the
+			call is in "incoming" or "waiting" state and the
+			Call Deflection supplementary service is subscribed to.
+
+			This functionality is generally implemented by using
+			the +CHLD=4 * NUMBER command.
+
+			This method should not be confused with the Transfer()
+			method.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		void manager_hangup(object path)
+
+			Hangs up the voice call.
+
+			For an incoming call, the call is hung up using ATH or
+			equivalent.  For a waiting call, the remote party is
+			notified by using the User Determined User Busy (UDUB)
+			condition.  This is generally implemented using CHLD=0.
+
+			Please note that the GSM specification does not allow
+			the release of a held call when a waiting call exists.
+			This is because 27.007 allows CHLD=1X to operate only
+			on active calls.  Hence a held call cannot be hung up
+			without affecting the state of the incoming call (e.g.
+			using other CHLD alternatives). Most manufacturers
+			provide vendor extensions that do allow the state of
+			the held call to be modified using CHLD=1X or
+			equivalent.  It should be noted that Bluetooth HFP
+			specifies the classic 27.007 behavior and does not
+			allow CHLD=1X to modify the state of held calls.
+
+			Based on the discussion above, it should also be noted
+			that releasing a particular party of a held multiparty
+			call might not be possible on some implementations.
+			It is recommended for the applications to structure
+			their UI accordingly.
+
+			NOTE: Releasing active calls does not produce
+			side-effects.  That is the state of held or waiting
+			calls is not affected.  As an exception, in the case
+			where a single active call and a waiting call are
+			present, releasing the active call will result in the
+			waiting call transitioning to the 'incoming' state.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.Failed
+					 [service].Error.NotImplemented
+
+		void manager_answer(object path)
+
+			Answers the incoming call.  Only valid if the state
+			of the call is "incoming."
+
+			This functionality is generally implemented by ATA
+			AT command.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.Failed
+					 [service].Error.NotImplemented
+
 Signals		CallAdded(object path, dict properties)
 
 			Signal that is sent when a new call is added.  It

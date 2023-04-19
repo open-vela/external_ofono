@@ -726,6 +726,23 @@ static void voicecall_emit_disconnect_reason(struct voicecall *call,
 				DBUS_TYPE_INVALID);
 }
 
+static struct voicecall *voicecall_by_path(struct ofono_voicecall *vc, const char *path)
+{
+	GSList *l;
+	struct voicecall *v;
+	const char *call_path;
+
+	for (l = vc->call_list; l; l = l->next) {
+		v = l->data;
+		call_path = voicecall_build_path(vc, v->call);
+
+		if (g_strcmp0(call_path, path) == 0)
+			return v;
+	}
+
+	return NULL;
+}
+
 static void voicecall_emit_multiparty(struct voicecall *call, gboolean mpty)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -2444,6 +2461,189 @@ static DBusMessage *manager_get_calls(DBusConnection *conn,
 	return reply;
 }
 
+static DBusMessage *manager_deflect(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	struct voicecall *call;
+	struct ofono_phone_number ph;
+	const char *number;
+	const char *path;
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_STRING, &number,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	call = voicecall_by_path(vc, path);
+	if (call == NULL)
+		return __ofono_error_invalid_args(msg);
+
+	if (call->call->status != CALL_STATUS_INCOMING &&
+			call->call->status != CALL_STATUS_WAITING)
+		return __ofono_error_failed(msg);
+
+	if (vc->driver->deflect == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (vc->pending || vc->dial_req || vc->pending_em)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &number,
+					DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (!valid_phone_number_format(number))
+		return __ofono_error_invalid_format(msg);
+
+	vc->pending = dbus_message_ref(msg);
+
+	string_to_phone_number(number, &ph);
+
+	vc->driver->deflect(vc, &ph, generic_callback, vc);
+
+	return NULL;
+}
+
+static DBusMessage *manager_hangup(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	struct voicecall *call;
+	gboolean single_call = vc->call_list->next == 0;
+	const char *path;
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	call = voicecall_by_path(vc, path);
+	if (call == NULL)
+		return __ofono_error_invalid_args(msg);
+
+	if (vc->pending || vc->pending_em)
+		return __ofono_error_busy(msg);
+
+	if (vc->dial_req && vc->dial_req->call != call)
+		return __ofono_error_busy(msg);
+
+	switch (call->call->status) {
+	case CALL_STATUS_DISCONNECTED:
+		return __ofono_error_failed(msg);
+
+	case CALL_STATUS_INCOMING:
+		if (vc->driver->hangup_all == NULL &&
+				vc->driver->hangup_active == NULL)
+			return __ofono_error_not_implemented(msg);
+
+		vc->pending = dbus_message_ref(msg);
+
+		if (vc->driver->hangup_all)
+			vc->driver->hangup_all(vc, generic_callback, vc);
+		else
+			vc->driver->hangup_active(vc, generic_callback, vc);
+
+		return NULL;
+
+	case CALL_STATUS_WAITING:
+		if (vc->driver->set_udub == NULL)
+			return __ofono_error_not_implemented(msg);
+
+		vc->pending = dbus_message_ref(msg);
+		vc->driver->set_udub(vc, generic_callback, vc);
+
+		return NULL;
+
+	case CALL_STATUS_HELD:
+		if (vc->driver->release_all_held &&
+				voicecalls_num_held(vc) == 1 &&
+				voicecalls_have_waiting(vc) == FALSE) {
+			vc->pending = dbus_message_ref(msg);
+			vc->driver->release_all_held(vc, generic_callback, vc);
+
+			return NULL;
+		}
+
+		break;
+
+	case CALL_STATUS_DIALING:
+	case CALL_STATUS_ALERTING:
+		if (vc->driver->hangup_active != NULL) {
+			vc->pending = dbus_message_ref(msg);
+			vc->driver->hangup_active(vc, generic_callback, vc);
+
+			return NULL;
+		}
+
+		/*
+		 * We check if we have a single alerting, dialing or activeo
+		 * call and try to hang it up with hangup_all or hangup_active
+		 */
+
+		/* fall through */
+	case CALL_STATUS_ACTIVE:
+		if (single_call == TRUE && vc->driver->hangup_all != NULL) {
+			vc->pending = dbus_message_ref(msg);
+			vc->driver->hangup_all(vc, generic_callback, vc);
+
+			return NULL;
+		}
+
+		if (voicecalls_num_active(vc) == 1 &&
+				vc->driver->hangup_active != NULL) {
+			vc->pending = dbus_message_ref(msg);
+			vc->driver->hangup_active(vc, generic_callback, vc);
+
+			return NULL;
+		}
+
+		break;
+	}
+
+	if (vc->driver->release_specific == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	vc->pending = dbus_message_ref(msg);
+	vc->driver->release_specific(vc, call->call->id,
+					generic_callback, vc);
+
+	return NULL;
+}
+
+static DBusMessage *manager_answer(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	struct voicecall *call;
+	const char *path;
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	call = voicecall_by_path(vc, path);
+	if (call == NULL)
+		return __ofono_error_invalid_args(msg);
+
+	if (call->call->status != CALL_STATUS_INCOMING)
+		return __ofono_error_failed(msg);
+
+	if (vc->driver->answer == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (vc->pending || vc->dial_req || vc->pending_em)
+		return __ofono_error_busy(msg);
+
+	vc->pending = dbus_message_ref(msg);
+
+	vc->driver->answer(vc, generic_callback, vc);
+
+	return NULL;
+}
+
 static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -2484,7 +2684,10 @@ static const GDBusMethodTable manager_methods[] = {
 				dial_conference) },
 	{ GDBUS_METHOD("InviteParticipants", GDBUS_ARGS({ "number", "as" }),
 				NULL, invite_participants) },
-
+	{ GDBUS_ASYNC_METHOD("Deflect", GDBUS_ARGS({ "path", "o" }, { "number", "s" }), NULL,
+							manager_deflect) },
+	{ GDBUS_ASYNC_METHOD("Hangup", GDBUS_ARGS({ "path", "o" }), NULL, manager_hangup) },
+	{ GDBUS_ASYNC_METHOD("Answer", GDBUS_ARGS({ "path", "o" }), NULL, manager_answer) },
 	{ }
 };
 
