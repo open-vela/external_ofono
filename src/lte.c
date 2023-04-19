@@ -68,7 +68,7 @@ static void lte_load_settings(struct ofono_lte *lte)
 	char *username;
 	char *password;
 	char **groups;
-	ofono_bool_t ia_apn_exiting;
+	ofono_bool_t ia_apn_exiting = FALSE;
 
 	if (lte->imsi == NULL)
 		return;
@@ -86,7 +86,7 @@ static void lte_load_settings(struct ofono_lte *lte)
 	for (int i = 0; groups[i]; i++) {
 		type_str = g_key_file_get_string(lte->settings, groups[i], "Type", NULL);
 
-		if (strcasecmp(type_str, "ia") == 0) {
+		if (type_str && strcasecmp(type_str, "ia") == 0) {
 			apn = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
 						LTE_APN, NULL);
 			proto_str = g_key_file_get_string(lte->settings, SETTINGS_GROUP,
