@@ -711,7 +711,7 @@ static void mw_set_indicator(struct ofono_message_waiting *mw, int profile,
 
 		mw->messages[type].message_count = messages;
 
-		if (mw_message_waiting_property_name[type])
+		if (mw_message_count_property_name[type])
 			ofono_dbus_signal_property_changed(conn, path,
 					OFONO_MESSAGE_WAITING_INTERFACE,
 					mw_message_count_property_name[type],
