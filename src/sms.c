@@ -1084,7 +1084,7 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	struct ofono_sms *sms = data;
 	const char *to;
 	const unsigned char *text;
-	unsigned char port;
+	unsigned int port;
 	GSList *msg_list;
 	unsigned int flags;
 	gboolean use_16bit_ref = FALSE;
@@ -1092,7 +1092,7 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	struct ofono_uuid uuid;
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
-					DBUS_TYPE_BYTE, &port,
+					DBUS_TYPE_UINT32, &port,
 					DBUS_TYPE_STRING, &text,
 					DBUS_TYPE_INVALID))
 		return __ofono_error_invalid_args(msg);
@@ -1100,10 +1100,10 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	if (valid_phone_number_format(to) == FALSE)
 		return __ofono_error_invalid_format(msg);
 
-	if (port < 0 || port > 65535)
+	if (port > 65535)
 		return __ofono_error_invalid_format(msg);
 
-	msg_list = sms_datagram_prepare(to, text, sizeof(text), sms->ref,
+	msg_list = sms_datagram_prepare(to, text, strlen((char*)text), sms->ref,
 						use_16bit_ref, 0, port, true,
 						sms->use_delivery_reports);
 
@@ -1471,7 +1471,7 @@ static const GDBusMethodTable sms_manager_methods[] = {
 			GDBUS_ARGS({ "path", "o" }),
 			sms_send_message) },
 	{ GDBUS_ASYNC_METHOD("SendDataMessage",
-			GDBUS_ARGS({ "to", "s" }, { "port", "y" }, { "text", "s" } ),
+			GDBUS_ARGS({ "to", "s" }, { "port", "u" }, { "text", "s" } ),
 			GDBUS_ARGS({ "path", "o" }),
 			sms_send_data_message) },
 	{ GDBUS_METHOD("GetMessages",
