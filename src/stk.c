@@ -2725,6 +2725,9 @@ static gboolean handle_command_launch_browser(const struct stk_command *cmd,
 	char *alpha_id;
 	int err;
 
+	if (stk->current_agent == NULL)
+		return FALSE;
+
 	alpha_id = dbus_apply_text_attributes(lb->alpha_id ? lb->alpha_id : "",
 							&lb->text_attr);
 	if (alpha_id == NULL) {
