@@ -148,24 +148,18 @@ static const char *modem_type_to_string(enum ofono_modem_type type)
 
 static void modem_load_settings(struct ofono_modem *modem)
 {
-	GError *error;
 	modem->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
 	if (modem->settings == NULL) {
 		return;
 	}
 
-	error = NULL;
-	modem->online = g_key_file_get_boolean(modem->settings,
-						SETTINGS_GROUP,
-						"Online",
-						&error);
-	if (error) {
-		g_error_free(error);
-		modem->online = FALSE;
-		g_key_file_set_boolean(modem->settings, SETTINGS_GROUP,
-							"Online",
-							modem->online);
-		storage_sync(SETTINGS_KEY, SETTINGS_STORE, modem->settings);
+	if (g_key_file_has_group(modem->settings, SETTINGS_GROUP)
+		&& g_key_file_has_key(modem->settings, SETTINGS_GROUP,
+				"Online", NULL)) {
+		modem->online = g_key_file_get_boolean(modem->settings, SETTINGS_GROUP,
+							"Online", NULL);
+	} else {
+		modem->online = TRUE;
 	}
 }
 
