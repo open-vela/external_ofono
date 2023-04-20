@@ -3907,11 +3907,10 @@ static void emulator_dial_callback(const struct ofono_error *error, void *data)
 	struct ofono_voicecall *vc = data;
 	gboolean need_to_emit;
 	struct voicecall *v;
-	const char *number;
-	GError *err = NULL;
+	char *number = NULL;
 
 	number = g_key_file_get_string(vc->settings, SETTINGS_GROUP,
-					"Number", &err);
+					"Number", NULL);
 
 	v = dial_handle_result(vc, error, number, &need_to_emit);
 
@@ -3931,6 +3930,8 @@ static void emulator_dial_callback(const struct ofono_error *error, void *data)
 		voicecalls_emit_call_added(vc, v);
 		voicecalls_emit_call_changed(vc, v);
 	}
+
+	g_free(number);
 }
 
 static void emulator_dial(struct ofono_emulator *em, struct ofono_voicecall *vc,
@@ -4032,9 +4033,8 @@ static void emulator_bldn_cb(struct ofono_emulator *em,
 			struct ofono_emulator_request *req, void *userdata)
 {
 	struct ofono_voicecall *vc = userdata;
-	const char *number;
+	char *number = NULL;
 	struct ofono_error result;
-	GError *error = NULL;
 
 	switch (ofono_emulator_request_get_type(req)) {
 	case OFONO_EMULATOR_REQUEST_TYPE_COMMAND_ONLY:
@@ -4042,7 +4042,7 @@ static void emulator_bldn_cb(struct ofono_emulator *em,
 			goto fail;
 
 		number = g_key_file_get_string(vc->settings, SETTINGS_GROUP,
-						"Number", &error);
+						"Number", NULL);
 		if (number == NULL || number[0] == '\0')
 			goto fail;
 
@@ -4055,6 +4055,8 @@ fail:
 		result.type = OFONO_ERROR_TYPE_FAILURE;
 		ofono_emulator_send_final(em, &result);
 	};
+
+	g_free(number);
 }
 
 static void emulator_hfp_watch(struct ofono_atom *atom,
