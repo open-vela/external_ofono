@@ -57,7 +57,7 @@ struct ring_buffer *ring_buffer_new(unsigned int size)
 
 	buffer->buffer = g_slice_alloc(real_size);
 	if (buffer->buffer == NULL) {
-		g_free(buffer);
+		g_slice_free(struct ring_buffer, buffer);
 		return NULL;
 	}
 
