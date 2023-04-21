@@ -258,12 +258,15 @@ static struct at_command *at_command_create(guint gid, const char *cmd,
 	}
 
 	c = g_try_new0(struct at_command, 1);
-	if (c == NULL)
+	if (c == NULL) {
+		g_strfreev(prefixes);
 		return 0;
+	}
 
 	len = strlen(cmd);
 	c->cmd = g_try_new(char, len + 2);
 	if (c->cmd == NULL) {
+		g_strfreev(prefixes);
 		g_free(c);
 		return 0;
 	}
