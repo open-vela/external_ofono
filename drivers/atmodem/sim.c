@@ -2068,6 +2068,7 @@ static void at_set_active_card_slot(struct ofono_sim *sim, unsigned int index,
 		error.error = 4;
 
 		cb(&error, data);
+		g_free(cbd);
 		return;
 	}
 
