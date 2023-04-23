@@ -305,7 +305,7 @@ static void ril_netmon_periodic_update(struct ofono_netmon *netmon,
 		return;
 
 	g_free(cbd);
-	CALLBACK_WITH_FAILURE(cb, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, data);
 }
 
 static void ril_netmon_neighbouring_cell_update(struct ofono_netmon *netmon,
