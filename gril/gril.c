@@ -917,8 +917,10 @@ static struct ril_notify *ril_notify_create(struct ril_s *ril,
 		return 0;
 
 	key = g_try_new0(int, 1);
-	if (key == NULL)
+	if (key == NULL) {
+		g_free(notify);
 		return 0;
+	}
 
 	*key = req;
 
