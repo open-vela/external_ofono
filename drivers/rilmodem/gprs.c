@@ -269,6 +269,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 	if (cb)
 		CALLBACK_WITH_SUCCESS(cb, status, cbd->data);
 
+	g_strfreev(strv);
 	return;
 
 error_free:

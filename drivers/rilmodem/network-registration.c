@@ -387,8 +387,8 @@ static void ril_registration_status(struct ofono_netreg *netreg,
 
 	if (g_ril_send(nd->ril, RIL_REQUEST_VOICE_REGISTRATION_STATE, NULL,
 			ril_creg_cb, cbd, g_free) == 0) {
+		CALLBACK_WITH_FAILURE(((ofono_netreg_status_cb_t)cbd->cb), -1, -1, -1, -1, -1, data);
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, -1, -1, -1, -1, -1, data);
 	}
 }
 
