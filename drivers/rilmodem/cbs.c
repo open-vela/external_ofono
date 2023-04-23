@@ -131,6 +131,7 @@ static void ril_cbs_received(struct ril_msg *message, gpointer user_data)
 
 	if (!pdu || pdulen != 88) {
 		ofono_error("%s: it isn't a gsm cell broadcast msg", __func__);
+		g_free(pdu);
 		return;
 	}
 

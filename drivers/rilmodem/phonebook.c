@@ -1468,6 +1468,7 @@ static void pb_reference_data_cb(int ok, int total_length, int record,
 		return;
 	}
 
+	pbd->pb_refs = g_slist_append(pbd->pb_refs, ref_rec);
 	ref_rec->phonebook = g_tree_new(comp_int);
 
 	while (ptr < sdata + record_length && finished == FALSE) {
@@ -1516,8 +1517,6 @@ static void pb_reference_data_cb(int ok, int total_length, int record,
 			break;
 		}
 	}
-
-	pbd->pb_refs = g_slist_append(pbd->pb_refs, ref_rec);
 
 	if (record*record_length >= total_length) {
 		struct pb_ref_rec *ref;
@@ -1589,12 +1588,16 @@ static int ril_phonebook_probe(struct ofono_phonebook *pb,
 		return -ENOMEM;
 
 	pd->sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-	if (pd->sim == NULL)
+	if (pd->sim == NULL) {
+		g_free(pd);
 		return -ENOENT;
+	}
 
 	pd->sim_context = ofono_sim_context_create(pd->sim);
-	if (pd->sim_context == NULL)
+	if (pd->sim_context == NULL) {
+		g_free(pd);
 		return -ENOENT;
+	}
 
 	ofono_phonebook_set_data(pb, pd);
 
