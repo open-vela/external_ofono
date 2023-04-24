@@ -1814,6 +1814,7 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 	int sw1, sw2;
 	char *hex_response;
 	unsigned char *response = NULL;
+	unsigned char *response_append = NULL;
 	size_t len;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -1828,17 +1829,28 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 	if (hex_response == NULL)
 		goto error;
 
+	len = 0;
 	response = l_util_from_hexstring(hex_response, &len);
 	g_free(hex_response);
 	hex_response = NULL;
 
-	if (response == NULL || len == 0) {
-		ofono_error("Null SIM IO response from RILD");
+	// Append the returned status code to the end of the response payload.
+	response_append = l_new(unsigned char, len + 2);
+	if (response_append == NULL)
 		goto error;
-	}
 
-	CALLBACK_WITH_SUCCESS(cb, response, len, cbd->data);
+	if (response == NULL || len == 0) {
+		ofono_info("Null SIM IO response from RILD");
+	} else {
+		memcpy(response_append, response, len);
+	}
+	response_append[len] = (unsigned char) sw1;
+	response_append[len + 1] = (unsigned char) sw2;
+
+
+	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, cbd->data);
 	l_free(response);
+	l_free(response_append);
 	return;
 
 error:
@@ -1898,6 +1910,7 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 	int sw1, sw2;
 	char *hex_response;
 	unsigned char *response = NULL;
+	unsigned char *response_append = NULL;
 	size_t len;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -1912,17 +1925,29 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 	if (hex_response == NULL)
 		goto error;
 
+	len = 0;
 	response = l_util_from_hexstring(hex_response, &len);
 	g_free(hex_response);
 	hex_response = NULL;
 
-	if (response == NULL || len == 0) {
-		ofono_error("Null SIM IO response from RILD");
+	// Append the returned status code to the end of the response payload.
+	response_append = l_new(unsigned char, len + 2);
+	if (response_append == NULL)
 		goto error;
-	}
 
-	CALLBACK_WITH_SUCCESS(cb, response, len, cbd->data);
+	if (response == NULL || len == 0) {
+		ofono_info("Null SIM IO response from RILD");
+	} else {
+		memcpy(response_append, response, len);
+	}
+	response_append[len] = (unsigned char) sw1;
+	response_append[len + 1] = (unsigned char) sw2;
+
+
+	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, cbd->data);
 	l_free(response);
+	l_free(response_append);
+
 	return;
 
 error:
@@ -1955,7 +1980,7 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 
 	parcel_init(&rilp);
 	/* "sessionid" should be ignored for +CSIM command. */
-	parcel_w_int32(&rilp, -1 /* invalid session id */);
+	parcel_w_int32(&rilp, 0); // session id
 	parcel_w_int32(&rilp, cla);
 	parcel_w_int32(&rilp, ins);
 	parcel_w_int32(&rilp, p1);
