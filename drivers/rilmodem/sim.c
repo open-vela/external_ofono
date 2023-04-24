@@ -1761,7 +1761,7 @@ static void ril_sim_open_channel(struct ofono_sim *sim, const unsigned char *aid
 	parcel_w_string(&rilp, aid_str);
 	parcel_w_int32(&rilp, -1 /* P2 parameter */); // No P2 value is provided
 
-	g_ril_append_print_buf(sd->ril, "(%s)", aid_str);
+	g_ril_append_print_buf(sd->ril, "(%s, %d)", aid_str, -1);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_OPEN_CHANNEL, &rilp,
 			ril_sim_open_channel_cb, cbd, g_free) == 0) {
@@ -1879,7 +1879,8 @@ static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
 	parcel_w_int32(&rilp, p3);
 	parcel_w_string(&rilp, encoded_pdu_data);
 
-	g_ril_append_print_buf(sd->ril, "(%d,%d,%d, %d,%d,%d,%s)", session_id, cla, ins, p1, p2, p3, encoded_pdu_data);
+	g_ril_append_print_buf(sd->ril, "(%d, %d, %d, %d, %d, %d, %s)",
+			session_id, cla, ins, p1, p2, p3, encoded_pdu_data);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL, &rilp,
 			ril_sim_logical_access_cb, cbd, g_free) == 0) {
@@ -1953,6 +1954,8 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 		encoded_pdu_data = l_util_hexstring(pdu, len - 5);
 
 	parcel_init(&rilp);
+	/* "sessionid" should be ignored for +CSIM command. */
+	parcel_w_int32(&rilp, -1 /* invalid session id */);
 	parcel_w_int32(&rilp, cla);
 	parcel_w_int32(&rilp, ins);
 	parcel_w_int32(&rilp, p1);
@@ -1960,8 +1963,8 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	parcel_w_int32(&rilp, p3);
 	parcel_w_string(&rilp, encoded_pdu_data);
 
-	g_ril_append_print_buf(sd->ril, "(%d, %d, %d, %d, %d, %s)",
-			cla, ins, p1, p2, p3, encoded_pdu_data);
+	g_ril_append_print_buf(sd->ril, "(%d, %d, %d, %d, %d, %d, %s)",
+			-1, cla, ins, p1, p2, p3, encoded_pdu_data);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC, &rilp,
 			ril_sim_basic_access_cb, cbd, g_free) == 0) {
