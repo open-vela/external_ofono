@@ -470,14 +470,13 @@ static void dial(struct ofono_voicecall *vc,
 		ril_request = RIL_REQUEST_EMERGENCY_DIAL;
 	} else {
 		ril_request = RIL_REQUEST_DIAL;
-
-		/* CLIR mode */
-		parcel_w_int32(&rilp, clir);
-		/* USS, empty string */
-		/* TODO: Deal with USS properly */
-		parcel_w_int32(&rilp, 0);
-		parcel_w_int32(&rilp, 0);
 	}
+	/* CLIR mode */
+	parcel_w_int32(&rilp, clir);
+	/* USS, empty string */
+	/* TODO: Deal with USS properly */
+	parcel_w_int32(&rilp, 0);
+	parcel_w_int32(&rilp, 0);
 
 	g_ril_append_print_buf(vd->ril, "(%s,%d,0,0)",
 				phone_number_to_string(ph),
