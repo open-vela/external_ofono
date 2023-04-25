@@ -779,7 +779,7 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 	if (gsm_umts_app_index >= num_apps)
 		return;
 
-	DBG("[%d,%04d]< %s: card_state=%d,universal_pin_state=%d,"
+	ofono_info("[%d,%04d]< %s: card_state=%d,universal_pin_state=%d,"
 			"gsm_umts_index=%d,cdma_index=%d,ims_index=%d,"
 			"num_apps=%d",
 			g_ril_get_slot(sd->ril),
@@ -893,9 +893,11 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 	g_free(sd->aid_str);
 	sd->aid_str = parcel_r_string(&rilp);	/* AID */
 
-	DBG("[%d,%04d]< app_type: %d, passwd_state: %d, aid_str (AID): %s",
+	ofono_info("[%d,%04d]< app_type: %d, app_state: %d, perso_substate: %d,"
+		"passwd_state: %d, aid_str (AID): %s",
 		g_ril_get_slot(sd->ril), message->serial_no,
-		sd->app_type, sd->passwd_state, sd->aid_str);
+		sd->app_type, app_state, perso_substate,
+		sd->passwd_state, sd->aid_str);
 
 	/*
 	 * Note: There doesn't seem to be any other way to force the core SIM
