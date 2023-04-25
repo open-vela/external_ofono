@@ -413,7 +413,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 		goto error_free;
 	}
 
-	DBG("[status=%d,retry=%d,cid=%d,active=%d,type=%s,ifname=%s,"
+	ofono_debug("[status=%d,retry=%d,cid=%d,active=%d,type=%s,ifname=%s,"
 		"address=%s,dns=%s,gateways=%s,pcscf_addrs=%s,mtu=%d]",
 		status, retry, cid, active, type,
 		ifname, raw_addrs, raw_dns, raw_gws, pcscf_addrs, mtu);
@@ -505,10 +505,15 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 		g_strfreev(ip_addrs);
 	}
 
-	if (protocol == OFONO_GPRS_PROTO_IP) {
-		ofono_gprs_context_set_ipv4_pcscf(gc, pcscf_addrs);
-	} else if (protocol == OFONO_GPRS_PROTO_IPV6) {
-		ofono_gprs_context_set_ipv6_pcscf(gc, pcscf_addrs);
+	/* Parse IMS pcscf addresses */
+	if (pcscf_addrs) {
+		int ip_type = ril_util_address_to_gprs_proto(pcscf_addrs);
+
+		if (ip_type == OFONO_GPRS_PROTO_IP) {
+			ofono_gprs_context_set_ipv4_pcscf(gc, pcscf_addrs);
+		} else if (ip_type == OFONO_GPRS_PROTO_IPV6) {
+			ofono_gprs_context_set_ipv6_pcscf(gc, pcscf_addrs);
+		}
 	}
 
 	ofono_gprs_context_set_mtu(gc, mtu);
