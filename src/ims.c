@@ -252,8 +252,12 @@ static void set_capability_cb(const struct ofono_error *error, void *data)
 	}
 
 	reply = dbus_message_new_method_return(ims->pending);
-
 	__ofono_dbus_pending_reply(&ims->pending, reply);
+
+	if (ims->driver->registration_status == NULL)
+		return;
+
+	ims->driver->registration_status(ims, registration_status_cb, ims);
 }
 
 static DBusMessage *ofono_ims_set_capability(DBusConnection *conn,
