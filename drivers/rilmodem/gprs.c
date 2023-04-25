@@ -527,6 +527,8 @@ static void get_active_data_calls_cb(struct ril_msg *message,
 		goto end;
 	}
 
+	g_ril_print_response_no_args(gd->ril, message);
+
 	g_ril_init_parcel(message, &rilp);
 
 	/* Version */
@@ -548,6 +550,8 @@ static void get_active_data_calls_cb(struct ril_msg *message,
 		parcel_skip_string(&rilp);		/* addresses */
 		parcel_skip_string(&rilp);		/* dns */
 		parcel_skip_string(&rilp);		/* gateways */
+		parcel_skip_string(&rilp);		/* pcscf */
+		parcel_r_int32(&rilp);			/* mtu */
 
 		/* malformed check */
 		if (rilp.malformed) {
@@ -555,7 +559,7 @@ static void get_active_data_calls_cb(struct ril_msg *message,
 			goto end;
 		}
 
-		DBG("Standing data call with cid %d", cid);
+		ofono_debug("Standing data call with cid %d", cid);
 
 		if (drop_data_call(gprs, cid) == 0)
 			++(gd->pending_deact_req);

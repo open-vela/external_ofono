@@ -104,6 +104,8 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 	if (gcd->state == STATE_IDLE)
 		return;
 
+	g_ril_print_unsol_no_args(gcd->ril, message);
+
 	g_ril_init_parcel(message, &rilp);
 
 	/* Version */
@@ -120,6 +122,8 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 		parcel_skip_string(&rilp);		/* addresses */
 		parcel_skip_string(&rilp);		/* dns */
 		parcel_skip_string(&rilp);		/* gateways */
+		parcel_skip_string(&rilp);		/* pcscf */
+		parcel_r_int32(&rilp);			/* mtu */
 
 		/* malformed check */
 		if (rilp.malformed) {
@@ -133,7 +137,7 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 		if (active != 0)
 			return;
 
-		DBG("call !active; notify disconnect: %d", cid);
+		ofono_debug("call !active; notify disconnect: %d", cid);
 
 		ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
 		set_context_disconnected(gcd);
