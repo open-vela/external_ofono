@@ -1711,6 +1711,7 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	struct sim_data *sd = cbd->user;
 	struct parcel rilp;
 	int session_id = -1;
+	int select_response;
 	int numparams;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -1722,22 +1723,23 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_init_parcel(message, &rilp);
 	numparams = parcel_r_int32(&rilp);
 
-	if (numparams != 1) {
+	if (numparams != 2) {
 		ofono_error("%s: invalid OPEN CHANNEL reply: "
-				"number of params is %d; should be 1.",
+				"number of params is %d; should be 2.",
 				__func__,
 				numparams);
 		goto error;
 	}
 
 	session_id = parcel_r_int32(&rilp);
+	select_response = parcel_r_int32(&rilp);
 
 	if (rilp.malformed) {
 		ofono_error("%s: malformed parcel received", __func__);
 		goto error;
 	}
 
-	g_ril_append_print_buf(sd->ril, "{%d}", session_id);
+	g_ril_append_print_buf(sd->ril, "{%d, %d}", session_id, select_response);
 	g_ril_print_response(sd->ril, message);
 
 	if (session_id == -1)
@@ -1828,13 +1830,12 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 	if (parse_sim_io(sd->ril, message, &sw1, &sw2, &hex_response) == FALSE)
 		goto error;
 
-	if (hex_response == NULL)
-		goto error;
-
 	len = 0;
-	response = l_util_from_hexstring(hex_response, &len);
-	g_free(hex_response);
-	hex_response = NULL;
+	if (hex_response != NULL) {
+		response = l_util_from_hexstring(hex_response, &len);
+		g_free(hex_response);
+		hex_response = NULL;
+	}
 
 	// Append the returned status code to the end of the response payload.
 	response_append = l_new(unsigned char, len + 2);
@@ -1842,7 +1843,7 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 		goto error;
 
 	if (response == NULL || len == 0) {
-		ofono_info("Null SIM IO response from RILD");
+		ofono_info("Null SIM IO response payload from RILD");
 	} else {
 		memcpy(response_append, response, len);
 	}
@@ -1924,13 +1925,12 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 	if (parse_sim_io(sd->ril, message, &sw1, &sw2, &hex_response) == FALSE)
 		goto error;
 
-	if (hex_response == NULL)
-		goto error;
-
 	len = 0;
-	response = l_util_from_hexstring(hex_response, &len);
-	g_free(hex_response);
-	hex_response = NULL;
+	if (hex_response != NULL) {
+		response = l_util_from_hexstring(hex_response, &len);
+		g_free(hex_response);
+		hex_response = NULL;
+	}
 
 	// Append the returned status code to the end of the response payload.
 	response_append = l_new(unsigned char, len + 2);
@@ -1938,7 +1938,7 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 		goto error;
 
 	if (response == NULL || len == 0) {
-		ofono_info("Null SIM IO response from RILD");
+		ofono_info("Null SIM IO response payload from RILD");
 	} else {
 		memcpy(response_append, response, len);
 	}
@@ -1991,7 +1991,7 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	parcel_w_string(&rilp, encoded_pdu_data);
 
 	g_ril_append_print_buf(sd->ril, "(%d, %d, %d, %d, %d, %d, %s)",
-			-1, cla, ins, p1, p2, p3, encoded_pdu_data);
+			0, cla, ins, p1, p2, p3, encoded_pdu_data);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC, &rilp,
 			ril_sim_basic_access_cb, cbd, g_free) == 0) {
