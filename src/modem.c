@@ -2763,3 +2763,9 @@ void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 out:
 	modem->emergency--;
 }
+
+void ofono_modem_process_radio_state(struct ofono_modem *modem,
+				const char *radio_state)
+{
+	set_online(modem, g_str_equal(radio_state, "ON"));
+}

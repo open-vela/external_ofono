@@ -150,6 +150,9 @@ static void ril_radio_state_changed(struct ril_msg *message, gpointer user_data)
 
 			break;
 		}
+
+		ofono_modem_process_radio_state(modem,
+			ril_radio_state_to_string(radio_state));
 	}
 }
 
@@ -596,6 +599,7 @@ static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_dat
 	struct cb_data *cbd = user_data;
 	ofono_modem_status_query_cb_t cb = cbd->cb;
 	struct parcel rilp;
+	int numparams;
 	int status;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -609,9 +613,17 @@ static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_dat
 
 	g_ril_init_parcel(message, &rilp);
 
+	numparams = parcel_r_int32(&rilp);
+	if (numparams != 1)
+		goto error;
+
 	status = parcel_r_int32(&rilp);
 
 	CALLBACK_WITH_SUCCESS(cb, status, cbd->data);
+	return;
+
+error:
+	CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 }
 
 static void ril_query_modem_status(struct ofono_modem *modem,
