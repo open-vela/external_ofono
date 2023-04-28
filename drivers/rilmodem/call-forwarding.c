@@ -146,6 +146,8 @@ static void ril_set_forward_cb(struct ril_msg *message, gpointer user_data)
 		ofono_error("%s: failed; rild error: %s", __func__,
 					ril_error_to_string(message->error));
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
+
+		return;
 	}
 
 	g_ril_print_response_no_args(fd->ril, message);
