@@ -115,6 +115,27 @@ static struct sim_ef_info ef_db[] = {
 {	0x7FFF, 0x0000, ROOTMF, DF, 0, 0,		0,	0	}
 };
 
+/* Notice:
+ * When inserting an element, please insert it according to
+ * the dictionary order of mcc and mnc.
+ */
+static struct sim_spn_override_info spn_override_db[] = {
+{	"454", "07", "China Unicom" },
+{	"460", "00", "China Mobile" },
+{	"460", "01", "China Unicom" },
+{	"460", "02", "China Mobile" },
+{	"460", "03", "China Telecom" },
+{	"460", "04", "China Mobile" },
+{	"460", "05", "China Telecom" },
+{	"460", "06", "China Unicom" },
+{	"460", "07", "China Mobile" },
+{	"460", "08", "China Mobile" },
+{	"460", "09", "China Unicom" },
+{	"460", "11", "China Telecom" },
+{	"460", "13", "China Broadnet" },
+{	"460", "15", "China Broadnet" }
+};
+
 void simple_tlv_iter_init(struct simple_tlv_iter *iter,
 				const unsigned char *pdu, unsigned int len)
 {
@@ -1827,4 +1848,37 @@ gboolean sim_parse_gsm_authenticate(const unsigned char *buffer, int len,
 
 gsm_end:
 	return FALSE;
+}
+
+static int spn_override_compare(const void *a, const void *b)
+{
+    struct sim_spn_override_info *spn1 = (struct sim_spn_override_info *) a;
+    struct sim_spn_override_info *spn2 = (struct sim_spn_override_info *) b;
+
+    int cmp = strcmp(spn1->mcc, spn2->mcc);
+    if (cmp) {
+        return cmp;
+    }
+
+    return strcmp(spn1->mnc, spn2->mnc);
+}
+
+char *sim_spn_override_lookup(const char *mcc, const char *mnc)
+{
+	struct sim_spn_override_info key;
+	struct sim_spn_override_info *result;
+
+	/* Three digit country code */
+	strncpy(key.mcc, mcc, OFONO_MAX_MCC_LENGTH);
+	key.mcc[OFONO_MAX_MCC_LENGTH] = '\0';
+
+	/* Usually a 2 but sometimes 3 digit network code */
+	strncpy(key.mnc, mnc, OFONO_MAX_MNC_LENGTH);
+	key.mnc[OFONO_MAX_MNC_LENGTH] = '\0';
+
+	unsigned int nelem = sizeof(spn_override_db) / sizeof(struct sim_spn_override_info);
+
+	result = bsearch(&key, spn_override_db, nelem, sizeof(struct sim_spn_override_info), spn_override_compare);
+
+	return result != NULL ? result->spn_override : NULL;
 }

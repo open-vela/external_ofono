@@ -306,6 +306,12 @@ struct sim_eons_operator_info {
 	char *info;
 };
 
+struct sim_spn_override_info {
+	char mcc[OFONO_MAX_MCC_LENGTH + 1];
+	char mnc[OFONO_MAX_MNC_LENGTH + 1];
+	char *spn_override;
+};
+
 struct sim_ef_info {
 	unsigned short id;
 	unsigned short parent2g;
@@ -542,3 +548,5 @@ gboolean sim_parse_umts_authenticate(const unsigned char *buffer, int len,
 
 gboolean sim_parse_gsm_authenticate(const unsigned char *buffer, int len,
 		const unsigned char **sres, const unsigned char **kc);
+
+char *sim_spn_override_lookup(const char *mcc, const char *mnc);

@@ -3609,6 +3609,7 @@ static void sim_spn_set(struct ofono_sim *sim, const void *data, int length,
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(sim->atom);
+	char *spn_override = NULL;
 
 	l_free(sim->spn);
 	sim->spn = NULL;
@@ -3650,7 +3651,16 @@ static void sim_spn_set(struct ofono_sim *sim, const void *data, int length,
 	if (dc)
 		sim->spn_dc = l_memdup(dc, 1);
 
+	ofono_info("spn read successfully : %s, dc : %s", sim->spn, sim->spn_dc);
+
 notify:
+	spn_override = sim_spn_override_lookup(sim->mcc, sim->mnc);
+	ofono_info("spn override : %s, mcc : %s, mnc : %s", spn_override, sim->mcc, sim->mnc);
+	if (spn_override) {
+		l_free(sim->spn);
+		sim->spn = l_strdup(spn_override);
+	}
+
 	if (sim->spn)
 		ofono_dbus_signal_property_changed(conn, path,
 						OFONO_SIM_MANAGER_INTERFACE,
