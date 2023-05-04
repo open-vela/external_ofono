@@ -1341,15 +1341,21 @@ unsigned int sim_ef_db_get_path_2g(unsigned short id, unsigned char out_path[])
 	int i = 0;
 	int j;
 
+	if (id == 0)
+		return 0;
+
 	info = bsearch(GUINT_TO_POINTER((unsigned int) id), ef_db, nelem,
 				sizeof(struct sim_ef_info), find_ef_by_id);
-	if (info == NULL || info->parent2g == 0)
+	if (info == NULL)
 		return 0;
 
 	path[i++] = info->parent2g & 0xff;
 	path[i++] = info->parent2g >> 8;
 
 	while (info->parent2g != ROOTMF) {
+		if (info->parent2g == 0)
+			return 0;
+
 		info = bsearch(GUINT_TO_POINTER((unsigned int) info->parent2g),
 				ef_db, nelem, sizeof(struct sim_ef_info),
 				find_ef_by_id);
@@ -1374,15 +1380,21 @@ unsigned int sim_ef_db_get_path_3g(unsigned short id, unsigned char out_path[])
 	int i = 0;
 	int j;
 
+	if (id == 0)
+		return 0;
+
 	info = bsearch(GUINT_TO_POINTER((unsigned int) id), ef_db, nelem,
 				sizeof(struct sim_ef_info), find_ef_by_id);
-	if (info == NULL || info->parent3g == 0)
+	if (info == NULL)
 		return 0;
 
 	path[i++] = info->parent3g & 0xff;
 	path[i++] = info->parent3g >> 8;
 
 	while (info->parent3g != ROOTMF) {
+		if (info->parent3g == 0)
+			return 0;
+
 		info = bsearch(GUINT_TO_POINTER((unsigned int) info->parent3g),
 				ef_db, nelem, sizeof(struct sim_ef_info),
 				find_ef_by_id);
