@@ -229,10 +229,10 @@ static void ril_file_info_cb(struct ril_msg *message, gpointer user_data)
 						&flen, &rlen, &str,
 						access, &file_status);
 
-	l_free(response);
-
 	if (!ok)
 		goto error;
+
+	l_free(response);
 
 	CALLBACK_WITH_SUCCESS(cb, flen, str, rlen,
 					access, file_status, cbd->data);
