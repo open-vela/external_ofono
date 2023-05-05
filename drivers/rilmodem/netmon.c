@@ -135,7 +135,9 @@ static int process_cellinfo_list(struct ril_msg *message,
 		else
 			strcpy(list[i].mcc, "");
 
-		if (mnc >= 0 && mnc <= 999)
+		if (mnc >= 0 && mnc <= 99)
+			snprintf(list[i].mnc, sizeof(list[i].mnc), "%02d", mnc);
+		else if (mnc > 99 && mnc <= 999)
 			snprintf(list[i].mnc, sizeof(list[i].mnc), "%03d", mnc);
 		else
 			strcpy(list[i].mnc, "");
