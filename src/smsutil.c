@@ -3399,18 +3399,18 @@ void sms_tx_backup_free(const char *imsi, unsigned long id,
 		goto nodir_exit;
 
 	/* skip '..' and '.' entries */
-	while (len-- > 2) {
-		struct dirent *dir = entries[len];
-		char *file = g_strdup_printf("%s/%s", path, dir->d_name);
+	while (len--) {
+		if (len > 1) {
+			struct dirent *dir = entries[len];
+			char *file = g_strdup_printf("%s/%s", path, dir->d_name);
 
-		unlink(file);
-		g_free(file);
+			unlink(file);
+			g_free(file);
+		}
 
 		g_free(entries[len]);
 	}
 
-	g_free(entries[1]);
-	g_free(entries[0]);
 	g_free(entries);
 
 	rmdir(path);
