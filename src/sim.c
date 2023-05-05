@@ -3648,10 +3648,12 @@ static void sim_spn_set(struct ofono_sim *sim, const void *data, int length,
 		goto notify;
 	}
 
-	if (dc)
+	if (dc) {
 		sim->spn_dc = l_memdup(dc, 1);
+		ofono_info("spn read successfully dc : %d", *dc);
+	}
 
-	ofono_info("spn read successfully : %s, dc : %s", sim->spn, sim->spn_dc);
+	ofono_info("spn read successfully spn : %s", sim->spn);
 
 notify:
 	spn_override = sim_spn_override_lookup(sim->mcc, sim->mnc);
