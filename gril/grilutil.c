@@ -449,6 +449,8 @@ const char *ril_request_id_to_string(int req)
 		return "RIL_REQUEST_ADD_PARTICIPANT";
 	case RIL_REQUEST_DIAL_CONFERENCE:
 		return "RIL_REQUEST_CONFERENCE_DIAL";
+	case RIL_REQUEST_SET_EMERGENCY_NUMBER:
+		return "RIL_REQUEST_SET_EMERGENCY_NUMBER";
 	default:
 		return "<INVALID>";
 	}

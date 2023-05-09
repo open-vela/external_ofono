@@ -108,6 +108,14 @@ struct ofono_call {
 	enum ofono_disconnect_reason disconnet_reason;
 };
 
+struct ofono_ecc_info {
+	char *number;
+	unsigned int  category;
+	unsigned int condition;
+	char mcc[OFONO_MAX_MCC_LENGTH + 1];
+	char mnc[OFONO_MAX_MNC_LENGTH + 1];
+};
+
 struct ofono_network_time {
 	int sec;	/* Seconds [0..59], -1 if unavailable */
 	int min;	/* Minutes [0..59], -1 if unavailable */
