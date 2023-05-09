@@ -45,6 +45,8 @@
 
 #define VOICECALL_FLAG_SIM_ECC_READY 0x1
 #define VOICECALL_FLAG_STK_MODEM_CALLSETUP 0x2
+#define VOICECALL_FLAG_CUST_ECC_READY 0x4
+
 
 #define SETTINGS_STORE "voicecall"
 #define SETTINGS_GROUP "Settings"
@@ -59,6 +61,7 @@ struct ofono_voicecall {
 	GSList *sim_en_list; /* Emergency numbers already read from SIM */
 	GSList *new_sim_en_list; /* Emergency numbers being read from SIM */
 	char **nw_en_list; /* Emergency numbers from modem/network */
+	GSList *cust_ecc_list; /*Emergency numbers from customer country/operator */
 	DBusMessage *pending;
 	uint32_t flags;
 	struct ofono_sim *sim;
@@ -118,6 +121,16 @@ struct emulator_status {
 	int status;
 };
 
+static struct ofono_ecc_info cust_ecc_list[] = {
+{	"110", 0, 2, "460", "FFF" },
+{	"119", 0, 2, "460", "FFF" },
+{	"120", 0, 2, "460", "FFF" },
+{	"118", 0, 2, "460", "FFF" },
+{	"999", 0, 2, "460", "FFF" },
+{	"000", 0, 1, "460", "FFF" },
+{	"08", 0, 1, "460", "FFF" },
+};
+
 static const char *default_en_list[] = { "911", "112", NULL };
 static const char *default_en_list_no_sim[] = { "119", "118", "999", "110",
 						"08", "000", NULL };
@@ -129,6 +142,18 @@ static void hangup_all_active(const struct ofono_error *error, void *data);
 static void multirelease_callback(const struct ofono_error *err, void *data);
 static gboolean tone_request_run(gpointer user_data);
 static void notify_phone_status_changed(struct ofono_voicecall *vc);
+
+static gint ecc_compare_by_number(gconstpointer a, gconstpointer b)
+{
+	const struct ofono_ecc_info *ea = a;
+	const struct ofono_ecc_info *eb = b;
+
+	if (strcmp(ea->number, eb->number) == 0) {
+		return 0;
+	}
+
+	return -1;
+}
 
 static gint call_compare_by_id(gconstpointer a, gconstpointer b)
 {
@@ -3033,6 +3058,17 @@ static void set_new_ecc(struct ofono_voicecall *vc)
 	vc->en_list = g_hash_table_new_full(g_str_hash, g_str_equal,
 							g_free, NULL);
 
+	/*Emergency numbers from customer country/operator */
+	if (vc->flags & VOICECALL_FLAG_CUST_ECC_READY) {
+		GSList *el;
+		struct ofono_ecc_info *ecc;
+
+		for(el = vc->cust_ecc_list; el; el = el->next) {
+			ecc = el->data;
+			g_hash_table_insert(vc->en_list, g_strdup(ecc->number), NULL);
+		}
+	}
+
 	/* Emergency numbers from modem/network */
 	if (vc->nw_en_list)
 		add_to_en_list(vc, vc->nw_en_list);
@@ -3072,6 +3108,15 @@ static void free_sim_ecc_numbers(struct ofono_voicecall *vc, gboolean old_only)
 		g_slist_free_full(vc->sim_en_list, g_free);
 		vc->sim_en_list = NULL;
 	}
+}
+
+static void free_cust_ecc_numbers(struct ofono_voicecall *vc)
+{
+	if (vc->cust_ecc_list) {
+		g_slist_free(vc->cust_ecc_list);
+		vc->cust_ecc_list = NULL;
+	}
+	vc->flags &= ~VOICECALL_FLAG_CUST_ECC_READY;
 }
 
 static void ecc_g2_read_cb(int ok, int total_length, int record,
@@ -3156,6 +3201,68 @@ void ofono_voicecall_en_list_notify(struct ofono_voicecall *vc,
 
 	vc->nw_en_list = g_strdupv(nw_en_list);
 	set_new_ecc(vc);
+}
+
+static void set_cust_ecc_callback(const struct ofono_error *error, void *data)
+{
+	struct ofono_voicecall *vc = data;
+
+	if (error->type == OFONO_ERROR_TYPE_FAILURE) {
+		ofono_error("command failed with error: %s",
+				telephony_error_to_str(error));
+	} else if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
+		vc->flags |= VOICECALL_FLAG_CUST_ECC_READY;
+		set_new_ecc(vc);
+	}
+}
+
+static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
+{
+	struct ofono_ecc_info *ecc;
+	unsigned int ecc_db_len;
+	GSList *current_ecc_list = NULL;
+	GSList *l;
+	const char *mcc;
+	const char *mnc;
+
+	mcc = ofono_sim_get_mcc(vc->sim);
+	mnc = ofono_sim_get_mnc(vc->sim);
+	if (mcc == NULL || mnc == NULL) {
+		return;
+	}
+
+	ecc_db_len = sizeof(cust_ecc_list) / sizeof(struct ofono_ecc_info);
+
+	for (int i = 0; i < ecc_db_len; i++) {
+		if (strcmp(cust_ecc_list[i].mcc, mcc) == 0 &&
+				(strcmp(cust_ecc_list[i].mnc, mnc) == 0 ||
+				strcmp(cust_ecc_list[i].mnc, "FFF") == 0)) {
+
+			l = g_slist_find_custom(current_ecc_list, cust_ecc_list+i,
+								ecc_compare_by_number);
+			if (l) {
+				ecc = l->data;
+
+				//same ecc number, use special mnc value replace common mnc
+				if (strcmp(cust_ecc_list[i].mnc, mnc) == 0) {
+					current_ecc_list= g_slist_remove(current_ecc_list, ecc);
+					current_ecc_list = g_slist_prepend(current_ecc_list,
+										cust_ecc_list+i);
+				}
+			} else {
+				current_ecc_list = g_slist_prepend(current_ecc_list,
+									cust_ecc_list+i);
+			}
+		}
+	}
+
+	if (g_slist_length(current_ecc_list) > 0) {
+		vc->cust_ecc_list = current_ecc_list;
+
+		if (vc->driver->set_cust_ecc != NULL) {
+			vc->driver->set_cust_ecc(vc, current_ecc_list, set_cust_ecc_callback, vc);
+		}
+	}
 }
 
 int ofono_voicecall_driver_register(const struct ofono_voicecall_driver *d)
@@ -3293,6 +3400,7 @@ static void voicecall_unregister(struct ofono_atom *atom)
 	vc->sim = NULL;
 
 	free_sim_ecc_numbers(vc, FALSE);
+	free_cust_ecc_numbers(vc);
 
 	if (vc->nw_en_list) {
 		g_strfreev(vc->nw_en_list);
@@ -3418,6 +3526,7 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 			vc->sim_context = NULL;
 		}
 
+		free_cust_ecc_numbers(vc);
 		free_sim_ecc_numbers(vc, FALSE);
 		set_new_ecc(vc);
 
@@ -3425,6 +3534,7 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 		break;
 	case OFONO_SIM_STATE_READY:
 		voicecall_load_settings(vc);
+		voicecall_load_cust_ecc(vc);
 		break;
 	case OFONO_SIM_STATE_LOCKED_OUT:
 		voicecall_close_settings(vc);

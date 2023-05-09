@@ -418,6 +418,10 @@
 #define RIL_UNSOL_EMERGENCY_NUMBER_LIST 1102
 #define RIL_UNSOL_UICC_APPLICATIONS_ENABLEMENT_CHANGED 1103
 
+/* The following requests are for unisoc RIL */
+#define RIL_REQUEST_UNISOC_RIL_BASE 2000;
+#define RIL_REQUEST_SET_EMERGENCY_NUMBER 2001
+
 /* Suplementary services Service class*/
 #define SERVICE_CLASS_NONE 0
 

@@ -155,6 +155,10 @@ struct ofono_voicecall_driver {
 	 */
 	void (*invite_participants)(struct ofono_voicecall *vc, unsigned int count,
 			char *numbers[], ofono_voicecall_cb_t cb, void *data);
+
+	/* set custom ecc list to modem */
+	void (*set_cust_ecc)(struct ofono_voicecall *vc,
+			GSList *l, ofono_voicecall_cb_t cb, void *data);
 };
 
 void ofono_voicecall_en_list_notify(struct ofono_voicecall *vc,
