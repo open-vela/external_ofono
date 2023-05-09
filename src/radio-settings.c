@@ -63,24 +63,21 @@ struct ofono_radio_settings {
 static const char *radio_access_mode_to_string(unsigned int m)
 {
 	switch (m) {
-	case OFONO_RADIO_ACCESS_MODE_ANY:
-		return "any";
 	case OFONO_RADIO_ACCESS_MODE_GSM:
 		return "gsm";
-	case OFONO_RADIO_ACCESS_MODE_UMTS:
+	case OFONO_RADIO_ACCESS_MODE_WCDMA_ONLY:
 		return "umts";
-	case OFONO_RADIO_ACCESS_MODE_LTE:
+	case OFONO_RADIO_ACCESS_MODE_LTE_ONLY:
 		return "lte";
 	}
 
-	if (m == (OFONO_RADIO_ACCESS_MODE_UMTS|OFONO_RADIO_ACCESS_MODE_GSM))
+	if (m == OFONO_RADIO_ACCESS_MODE_UMTS)
 		return "umts,gsm";
 
-	if (m == (OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS))
+	if (m == OFONO_RADIO_ACCESS_MODE_LTE_WCDMA)
 		return "lte,umts";
 
-	if (m == (OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS|
-			OFONO_RADIO_ACCESS_MODE_GSM))
+	if (m == OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA)
 		return "lte,umts,gsm";
 
 	return NULL;
@@ -90,27 +87,23 @@ static gboolean radio_access_mode_from_string(const char *str,
 					unsigned int *mode)
 
 {
-	if (g_str_equal(str, "any")) {
-		*mode = OFONO_RADIO_ACCESS_MODE_ANY;
-		return TRUE;
-	} else if (g_str_equal(str, "gsm")) {
+	if (g_str_equal(str, "gsm")) {
 		*mode = OFONO_RADIO_ACCESS_MODE_GSM;
 		return TRUE;
 	} else if (g_str_equal(str, "umts")) {
-		*mode = OFONO_RADIO_ACCESS_MODE_UMTS;
+		*mode = OFONO_RADIO_ACCESS_MODE_WCDMA_ONLY;
 		return TRUE;
 	} else if (g_str_equal(str, "lte")) {
-		*mode = OFONO_RADIO_ACCESS_MODE_LTE;
+		*mode = OFONO_RADIO_ACCESS_MODE_LTE_ONLY;
 		return TRUE;
 	} else if (g_str_equal(str, "umts,gsm")) {
-		*mode = OFONO_RADIO_ACCESS_MODE_UMTS|OFONO_RADIO_ACCESS_MODE_GSM;
+		*mode = OFONO_RADIO_ACCESS_MODE_UMTS;
 		return TRUE;
 	} else if (g_str_equal(str, "lte,umts")) {
-		*mode = OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS;
+		*mode = OFONO_RADIO_ACCESS_MODE_LTE_WCDMA;
 		return TRUE;
 	} else if (g_str_equal(str, "lte,umts,gsm")) {
-		*mode = OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS|
-			OFONO_RADIO_ACCESS_MODE_GSM;
+		*mode = OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA;
 		return TRUE;
 	}
 
