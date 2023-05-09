@@ -779,13 +779,13 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 	if (gsm_umts_app_index >= num_apps)
 		return;
 
-	ofono_info("[%d,%04d]< %s: card_state=%d,universal_pin_state=%d,"
-			"gsm_umts_index=%d,cdma_index=%d,ims_index=%d,"
-			"num_apps=%d",
+	ofono_info("[%d,%04d]< %s: %s,%s,gsm_umts_index=%d,"
+			"cdma_index=%d,ims_index=%d,num_apps=%d",
 			g_ril_get_slot(sd->ril),
 			message->serial_no,
 			"RIL_REQUEST_GET_SIM_STATUS",
-			card_state, universal_pin_state,
+			ril_card_state_to_string(card_state),
+			ril_pin_state_to_string(universal_pin_state),
 			gsm_umts_app_index, cdma_app_index, ims_app_index,
 			num_apps);
 
@@ -893,10 +893,12 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 	g_free(sd->aid_str);
 	sd->aid_str = parcel_r_string(&rilp);	/* AID */
 
-	ofono_info("[%d,%04d]< app_type: %d, app_state: %d, perso_substate: %d,"
-		"passwd_state: %d, aid_str (AID): %s",
+	ofono_info("[%d,%04d]< %s: %s,%s,perso_substate=%d,"
+		"passwd_state=%d,aid_str (AID)=%s",
 		g_ril_get_slot(sd->ril), message->serial_no,
-		sd->app_type, app_state, perso_substate,
+		"RIL_REQUEST_GET_SIM_STATUS",
+		ril_app_type_to_string(sd->app_type),
+		ril_app_state_to_string(app_state), perso_substate,
 		sd->passwd_state, sd->aid_str);
 
 	/*

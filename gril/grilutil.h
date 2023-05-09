@@ -34,6 +34,10 @@ extern "C" {
 int ril_protocol_string_to_ofono_protocol(gchar *protocol_str);
 const char *ril_error_to_string(int error);
 const char *ril_radio_state_to_string(int radio_state);
+const char *ril_card_state_to_string(int card_state);
+const char *ril_pin_state_to_string(int pin_state);
+const char *ril_app_type_to_string(int app_type);
+const char *ril_app_state_to_string(int app_state);
 const char *ril_request_id_to_string(int req);
 const char *ril_unsol_request_to_string(int request);
 const char *ril_pdp_fail_to_string(int status);
