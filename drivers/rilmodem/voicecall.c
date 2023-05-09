@@ -447,6 +447,28 @@ out:
 		cb(&error, cbd->data);
 }
 
+static void rild_set_cust_ecc_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	struct ofono_voicecall *vc = cbd->user;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	ofono_voicecall_cb_t cb = cbd->cb;
+	struct ofono_error error;
+
+	if (message->error == RIL_E_SUCCESS) {
+		decode_ril_error(&error, "OK");
+	} else {
+		decode_ril_error(&error, "FAIL");
+		goto out;
+	}
+
+	g_ril_print_response_no_args(vd->ril, message);
+
+out:
+	if (cb)
+		cb(&error, cbd->data);
+}
+
 static void dial(struct ofono_voicecall *vc,
 			const struct ofono_phone_number *ph,
 			enum ofono_clir_option clir, ofono_voicecall_cb_t cb,
@@ -894,7 +916,32 @@ void ril_invite_participants(struct ofono_voicecall *vc, unsigned int count,
 		count, numbers, cb, data);
 }
 
+void ril_set_emergency_number(struct ofono_voicecall *vc, 
+				GSList *l, ofono_voicecall_cb_t cb, void *data)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct cb_data *cbd = cb_data_new(cb, data, vc);
+	struct ofono_ecc_info *ecc;
+	struct parcel rilp;
+	GSList *temp;
 
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, g_slist_length(l));
+
+	for (temp = l; temp; temp = temp->next) {
+		ecc = temp->data;
+
+		parcel_w_string(&rilp, ecc->number);
+		parcel_w_int32(&rilp, ecc->category);
+		parcel_w_int32(&rilp, ecc->condition);
+	}
+
+	if (g_ril_send(vd->ril, RIL_REQUEST_SET_EMERGENCY_NUMBER, &rilp, 
+			rild_set_cust_ecc_cb, cbd, g_free) == 0) {
+		g_free(cbd);
+		CALLBACK_WITH_FAILURE(cb, data);
+	}
+}
 
 static gboolean ril_delayed_register(gpointer user_data)
 {
@@ -989,6 +1036,7 @@ static const struct ofono_voicecall_driver driver = {
 	.release_all_active	= ril_release_all_active,
 	.dial_conferece		= ril_dial_conferece,
 	.invite_participants	= ril_invite_participants,
+	.set_cust_ecc		= ril_set_emergency_number,
 };
 
 void ril_voicecall_init(void)
