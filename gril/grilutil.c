@@ -117,6 +117,79 @@ const char *ril_radio_state_to_string(int radio_state)
 	}
 }
 
+const char *ril_card_state_to_string(int card_state)
+{
+	switch (card_state) {
+	case RIL_CARDSTATE_ABSENT:
+		return "CARDSTATE_ABSENT";
+	case RIL_CARDSTATE_PRESENT:
+		return "CARDSTATE_PRESENT";
+	case RIL_CARDSTATE_ERROR:
+		return "CARDSTATE_ERROR";
+	case RIL_CARDSTATE_RESTRICTED:
+		return "CARDSTATE_RESTRICTED";
+	default:
+		return "CARDSTATE_UNKNOWN";
+	}
+}
+
+const char *ril_pin_state_to_string(int pin_state)
+{
+	switch (pin_state) {
+	case RIL_PINSTATE_ENABLED_NOT_VERIFIED:
+		return "PINSTATE_ENABLED_NOT_VERIFIED";
+	case RIL_PINSTATE_ENABLED_VERIFIED:
+		return "PINSTATE_ENABLED_VERIFIED";
+	case RIL_PINSTATE_DISABLED:
+		return "PINSTATE_DISABLED";
+	case RIL_PINSTATE_ENABLED_BLOCKED:
+		return "PINSTATE_ENABLED_BLOCKED";
+	case RIL_PINSTATE_ENABLED_PERM_BLOCKED:
+		return "PINSTATE_ENABLED_PERM_BLOCKED";
+	case RIL_PINSTATE_UNKNOWN:
+	default:
+		return "PINSTATE_UNKNOWN";
+	}
+}
+
+const char *ril_app_type_to_string(int app_type)
+{
+	switch (app_type) {
+	case RIL_APPTYPE_SIM:
+		return "APPTYPE_SIM";
+	case RIL_APPTYPE_USIM:
+		return "APPTYPE_USIM";
+	case RIL_APPTYPE_RUIM:
+		return "APPTYPE_RUIM";
+	case RIL_APPTYPE_CSIM:
+		return "APPTYPE_CSIM";
+	case RIL_APPTYPE_ISIM:
+		return "APPTYPE_ISIM";
+	case RIL_APPTYPE_UNKNOWN:
+	default:
+		return "APPTYPE_UNKNOWN";
+	}
+}
+
+const char *ril_app_state_to_string(int app_state)
+{
+	switch (app_state) {
+	case RIL_APPSTATE_DETECTED:
+		return "APPSTATE_DETECTED";
+	case RIL_APPSTATE_PIN:
+		return "APPSTATE_PIN";
+	case RIL_APPSTATE_PUK:
+		return "APPSTATE_PUK";
+	case RIL_APPSTATE_SUBSCRIPTION_PERSO:
+		return "APPSTATE_SUBSCRIPTION_PERSO";
+	case RIL_APPSTATE_READY:
+		return "APPSTATE_READY";
+	case RIL_APPSTATE_UNKNOWN:
+	default:
+		return "APPSTATE_UNKNOWN";
+	}
+}
+
 const char *ril_request_id_to_string(int req)
 {
 	switch (req) {
