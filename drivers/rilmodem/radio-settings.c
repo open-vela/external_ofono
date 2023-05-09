@@ -121,26 +121,22 @@ static void ril_set_rat_mode(struct ofono_radio_settings *rs, unsigned int mode,
 	int pref = PREF_NET_TYPE_LTE_GSM_WCDMA;
 
 	switch (mode) {
-	case OFONO_RADIO_ACCESS_MODE_ANY:
-		pref = PREF_NET_TYPE_LTE_GSM_WCDMA;
-		break;
 	case OFONO_RADIO_ACCESS_MODE_GSM:
 		pref = PREF_NET_TYPE_GSM_ONLY;
 		break;
-	case OFONO_RADIO_ACCESS_MODE_UMTS:
+	case OFONO_RADIO_ACCESS_MODE_WCDMA_ONLY:
 		pref = PREF_NET_TYPE_WCDMA;
 		break;
-	case OFONO_RADIO_ACCESS_MODE_LTE:
+	case OFONO_RADIO_ACCESS_MODE_LTE_ONLY:
 		pref = PREF_NET_TYPE_LTE_ONLY;
 		break;
-	case OFONO_RADIO_ACCESS_MODE_UMTS|OFONO_RADIO_ACCESS_MODE_GSM:
+	case OFONO_RADIO_ACCESS_MODE_UMTS:
 		pref = PREF_NET_TYPE_GSM_WCDMA;
 		break;
-	case OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS:
+	case OFONO_RADIO_ACCESS_MODE_LTE_WCDMA:
 		pref = PREF_NET_TYPE_LTE_WCDMA;
 		break;
-	case OFONO_RADIO_ACCESS_MODE_LTE|OFONO_RADIO_ACCESS_MODE_UMTS|
-		OFONO_RADIO_ACCESS_MODE_GSM:
+	case OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA:
 		pref = PREF_NET_TYPE_LTE_GSM_WCDMA;
 		break;
 	}
@@ -203,7 +199,7 @@ static void ril_rat_mode_cb(struct ril_msg *message, gpointer user_data)
 		}
 	}
 
-	if (net_type < 0 || net_type > PREF_NET_TYPE_LTE_ONLY) {
+	if (net_type < 0 || net_type > OFONO_RADIO_ACCESS_MODE_LTE_WCDMA) {
 		ofono_error("%s: unknown network type", __func__);
 		goto error;
 	}
@@ -216,6 +212,8 @@ static void ril_rat_mode_cb(struct ril_msg *message, gpointer user_data)
 	 */
 	switch (net_type) {
 	case PREF_NET_TYPE_WCDMA:
+		mode = OFONO_RADIO_ACCESS_MODE_WCDMA_ONLY;
+		break;
 	case PREF_NET_TYPE_GSM_WCDMA:
 	case PREF_NET_TYPE_GSM_WCDMA_AUTO:
 		mode = OFONO_RADIO_ACCESS_MODE_UMTS;
@@ -224,9 +222,13 @@ static void ril_rat_mode_cb(struct ril_msg *message, gpointer user_data)
 		mode = OFONO_RADIO_ACCESS_MODE_GSM;
 		break;
 	case PREF_NET_TYPE_LTE_ONLY:
+		mode = OFONO_RADIO_ACCESS_MODE_LTE_ONLY;
+		break;
 	case PREF_NET_TYPE_LTE_WCDMA:
+		mode = OFONO_RADIO_ACCESS_MODE_LTE_WCDMA;
+		break;
 	case PREF_NET_TYPE_LTE_GSM_WCDMA:
-		mode = OFONO_RADIO_ACCESS_MODE_LTE;
+		mode = OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA;
 		break;
 	default:
 		ofono_error("%s: Unexpected preferred network type (%d)",
