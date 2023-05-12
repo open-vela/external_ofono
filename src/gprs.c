@@ -4136,8 +4136,12 @@ static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 		contexts[i++] = ctx->context;
 	}
 
-	driver->set_data_profile(gprs, contexts, i, gprs_set_data_profile_callback, gprs);
+	if (driver->set_data_profile != NULL)
+		driver->set_data_profile(gprs, contexts, i, gprs_set_data_profile_callback, gprs);
 	g_free(contexts);
+
+	if (gprs->driver->attached_status != NULL)
+		gprs->driver->attached_status(gprs, registration_status_cb, gprs);
 }
 
 static void spn_read_cb(const char *spn, const char *dc, void *data)

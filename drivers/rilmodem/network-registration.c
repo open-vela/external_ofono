@@ -789,7 +789,7 @@ static gboolean ril_delayed_register(gpointer user_data)
 	ofono_netreg_register(netreg);
 
 	/* Register for network state changes */
-	g_ril_register(nd->ril, RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED,
+	g_ril_register(nd->ril, RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED,
 			ril_network_state_change, netreg);
 
 	/* Register for network time update reports */
