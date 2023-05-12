@@ -177,6 +177,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 		if (end == strv[3] || *end != '\0')
 			tech = -1;
 
+		ofono_debug("DATA_REGISTRATION_STATE with raw tech %d", tech);
 		if (g_ril_vendor(gd->ril) == OFONO_RIL_VENDOR_MTK) {
 			switch (tech) {
 			case MTK_RADIO_TECH_HSDPAP:
@@ -263,6 +264,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	modem = ofono_gprs_get_modem(gprs);
+	ofono_debug("DATA_REGISTRATION_STATE with tech %d", tech);
 	ofono_modem_set_integer(modem, "RilDataRadioTechnology", tech);
 	ofono_gprs_bearer_notify(gprs, ril_tech_to_bearer_tech(tech));
 
@@ -463,9 +465,6 @@ static void query_max_cids(struct ofono_gprs *gprs)
 {
 	struct ril_gprs_data *gd = ofono_gprs_get_data(gprs);
 
-	g_ril_register(gd->ril, RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED,
-					ril_gprs_state_change, gprs);
-
 	/*
 	 * MTK modem does not return max_cids, string, so hard-code it
 	 * here
@@ -614,6 +613,9 @@ static int ril_gprs_probe(struct ofono_gprs *gprs, unsigned int vendor,
 	ofono_gprs_set_data(gprs, gd);
 
 	get_active_data_calls(gprs);
+
+	g_ril_register(gd->ril, RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED,
+					ril_gprs_state_change, gprs);
 
 	g_ril_register(gd->ril, RIL_UNSOL_RESTRICTED_STATE_CHANGED,
 			ril_gprs_restricted_state_change, gprs);
