@@ -197,6 +197,14 @@ Properties	string Mode [readonly]
 			Contains the current network time.
 			NITZ time string in the form "ss,mm,hh,dd,mm,yy,dst,utcoff".
 
+		array{dict} SignalStrength [readonly, optional]
+
+			Contains the current signal strength information, like
+			"ReceivedSignalStrengthIndicator", "ReferenceSignalReceivedPower",
+			"ReferenceSignalReceivedQuality",
+			"SingalToNoiseRatio", and "ChannelQualityIndicator".
+
+
 Network operator hierarchy
 ==========================
 

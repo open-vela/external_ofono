@@ -43,6 +43,24 @@ struct ofono_network_operator {
 	int tech;
 };
 
+enum ofono_signal_strength_level {
+	SIGNAL_STRENGTH_UNKNOWN = 0,
+	SIGNAL_STRENGTH_POOR,
+	SIGNAL_STRENGTH_MODERATE,
+	SIGNAL_STRENGTH_GOOD,
+	SIGNAL_STRENGTH_GREATE,
+	SIGNAL_STRENGTH_EXCELLENT,
+};
+
+struct ofono_signal_strength {
+	int rssi;
+	int rsrp;
+	int rsrq;
+	int rssnr;
+	int cqi;
+	enum ofono_signal_strength_level level;
+};
+
 typedef void (*ofono_netreg_operator_cb_t)(const struct ofono_error *error,
 					const struct ofono_network_operator *op,
 					void *data);
@@ -114,6 +132,9 @@ int ofono_netreg_get_status(struct ofono_netreg *netreg);
 int ofono_netreg_get_technology(struct ofono_netreg *netreg);
 const char *ofono_netreg_get_mcc(struct ofono_netreg *netreg);
 const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg);
+
+void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
+		int rssi, int rsrp, int rsrq, int rssnr, int cqi);
 
 #ifdef __cplusplus
 }
