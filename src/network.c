@@ -66,6 +66,7 @@ struct ofono_netreg {
 	int flags;
 	DBusMessage *pending;
 	int signal_strength;
+	struct ofono_signal_strength *signal_strength_data;
 	struct sim_spdi *spdi;
 	struct sim_eons *eons;
 	struct ofono_sim *sim;
@@ -779,6 +780,89 @@ static gboolean update_operator_list(struct ofono_netreg *netreg, int total,
 	return changed;
 }
 
+static void fill_signal_strength_data(struct ofono_netreg *netreg, DBusMessageIter *iter)
+{
+	DBusMessageIter variant;
+	DBusMessageIter array;
+	char typesig[5];
+	char arraysig[6];
+
+	arraysig[0] = DBUS_TYPE_ARRAY;
+	arraysig[1] = typesig[0] = DBUS_DICT_ENTRY_BEGIN_CHAR;
+	arraysig[2] = typesig[1] = DBUS_TYPE_STRING;
+	arraysig[3] = typesig[2] = DBUS_TYPE_VARIANT;
+	arraysig[4] = typesig[3] = DBUS_DICT_ENTRY_END_CHAR;
+	arraysig[5] = typesig[4] = '\0';
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT,
+						arraysig, &variant);
+
+	dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
+						typesig, &array);
+
+	if (netreg->signal_strength_data == NULL)
+		goto done;
+
+	ofono_dbus_dict_append(&array, "ReceivedSignalStrengthIndicator",
+				DBUS_TYPE_INT32, &netreg->signal_strength_data->rssi);
+
+	ofono_dbus_dict_append(&array, "ReferenceSignalReceivedPower",
+				DBUS_TYPE_INT32, &netreg->signal_strength_data->rsrp);
+
+	ofono_dbus_dict_append(&array, "ReferenceSignalReceivedQuality",
+				DBUS_TYPE_INT32, &netreg->signal_strength_data->rsrq);
+
+	ofono_dbus_dict_append(&array, "SingalToNoiseRatio",
+				DBUS_TYPE_INT32, &netreg->signal_strength_data->rssnr);
+
+	ofono_dbus_dict_append(&array, "ChannelQualityIndicator",
+				DBUS_TYPE_INT32, &netreg->signal_strength_data->cqi);
+
+	ofono_dbus_dict_append(&array, "Level",
+				DBUS_TYPE_INT32, &netreg->signal_strength_data->level);
+
+done:
+	dbus_message_iter_close_container(&variant, &array);
+
+	dbus_message_iter_close_container(iter, &variant);
+}
+
+static void append_signal_strength_dict(struct ofono_netreg *netreg, DBusMessageIter *dict)
+{
+	DBusMessageIter entry;
+	const char *key = "SignalStrength";
+
+	dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY,
+						NULL, &entry);
+
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+
+	fill_signal_strength_data(netreg, &entry);
+
+	dbus_message_iter_close_container(dict, &entry);
+}
+
+static void netreg_emit_signal_strength_changed(struct ofono_netreg *netreg)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(netreg->atom);
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	const char *key = "SignalStrength";
+
+	signal = dbus_message_new_signal(path, OFONO_NETWORK_REGISTRATION_INTERFACE,
+						"PropertyChanged");
+
+	if (signal == NULL)
+		return;
+
+	dbus_message_iter_init_append(signal, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
+	fill_signal_strength_data(netreg, &iter);
+
+	g_dbus_send_message(conn, signal);
+}
+
 static DBusMessage *network_get_properties(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
@@ -861,6 +945,9 @@ static DBusMessage *network_get_properties(DBusConnection *conn,
 	if (netreg->base_station)
 		ofono_dbus_dict_append(&dict, "BaseStation", DBUS_TYPE_STRING,
 					&netreg->base_station);
+
+	if (netreg->signal_strength_data)
+		append_signal_strength_dict(netreg, &dict);
 
 	dbus_message_iter_close_container(&iter, &dict);
 
@@ -1671,6 +1758,9 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 					&strength_byte);
 	}
 
+	if (netreg->signal_strength_data)
+		netreg_emit_signal_strength_changed(netreg);
+
 	modem = __ofono_atom_get_modem(netreg->atom);
 	__ofono_modem_foreach_registered_atom(modem,
 				OFONO_ATOM_TYPE_EMULATOR_HFP,
@@ -1856,6 +1946,41 @@ const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg)
 	return netreg->current_operator->mnc;
 }
 
+void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
+	int rssi, int rsrp, int rsrq, int rssnr, int cqi)
+{
+	int level = SIGNAL_STRENGTH_UNKNOWN;
+
+	if (netreg->signal_strength_data == NULL)
+		return;
+
+	if (netreg->signal_strength_data->rsrp == rsrp)
+		return;
+
+	netreg->signal_strength_data->rssi = rssi;
+	netreg->signal_strength_data->rsrp = rsrp;
+	netreg->signal_strength_data->rsrq = rsrq;
+	netreg->signal_strength_data->rssnr = rssnr;
+	netreg->signal_strength_data->cqi = cqi;
+
+	if (rsrp < -140) {
+		level = SIGNAL_STRENGTH_UNKNOWN;
+	} else if (rsrp >= -140 && rsrp < -125) {
+		level = SIGNAL_STRENGTH_POOR;
+	} else if (rsrp >= -125 && rsrp < -115) {
+		level = SIGNAL_STRENGTH_MODERATE;
+	} else if (rsrp >= -115 && rsrp < -110) {
+		level = SIGNAL_STRENGTH_GOOD;
+	} else if (rsrp >= -110 && rsrp < -102) {
+		level = SIGNAL_STRENGTH_GREATE;
+	} else if (rsrp >= -102)  {
+		level = SIGNAL_STRENGTH_EXCELLENT;
+	}
+
+	netreg->signal_strength_data->level = level;
+	ofono_netreg_strength_notify(netreg, netreg->signal_strength);
+}
+
 int ofono_netreg_driver_register(const struct ofono_netreg_driver *d)
 {
 	DBG("driver: %p, name: %s", d, d->name);
@@ -1951,6 +2076,11 @@ static void netreg_unregister(struct ofono_atom *atom)
 					OFONO_NETWORK_REGISTRATION_INTERFACE);
 	ofono_modem_remove_interface(modem,
 					OFONO_NETWORK_REGISTRATION_INTERFACE);
+
+	if (netreg->signal_strength_data) {
+		g_free(netreg->signal_strength_data);
+		netreg->signal_strength_data = NULL;
+	}
 }
 
 static void netreg_remove(struct ofono_atom *atom)
@@ -1992,6 +2122,7 @@ struct ofono_netreg *ofono_netreg_create(struct ofono_modem *modem,
 	netreg->cellid = -1;
 	netreg->technology = -1;
 	netreg->signal_strength = -1;
+	netreg->signal_strength_data = NULL;
 
 	netreg->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_NETREG,
 						netreg_remove, netreg);
@@ -2238,6 +2369,8 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 	netreg->hfp_watch = __ofono_modem_add_atom_watch(modem,
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					emulator_hfp_watch, netreg, NULL);
+
+	netreg->signal_strength_data = g_new0(struct ofono_signal_strength, 1);
 }
 
 void ofono_netreg_remove(struct ofono_netreg *netreg)
