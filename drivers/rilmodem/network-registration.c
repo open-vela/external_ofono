@@ -118,11 +118,12 @@ static int get_gsm_strength(int signal)
 }
 
 static int parse_signal_strength(GRil *gril, const struct ril_msg *message,
-					int ril_tech)
+					int ril_tech, gpointer user_data)
 {
+	struct ofono_netreg *netreg = user_data;
 	struct parcel rilp;
 	int gw_sigstr, gw_signal, cdma_dbm, evdo_dbm;
-	int lte_sigstr = -1, lte_rsrp = -1, lte_rssnr = -1;
+	int lte_sigstr = -1, lte_rsrp = -1, lte_rssnr = -1, lte_rsrq = -1, lte_cqi = -1;
 	int lte_signal;
 	int signal;
 
@@ -152,18 +153,20 @@ static int parse_signal_strength(GRil *gril, const struct ril_msg *message,
 		/* LTE_SignalStrength */
 		lte_sigstr = parcel_r_int32(&rilp);
 		lte_rsrp = parcel_r_int32(&rilp);
-		parcel_r_int32(&rilp); /* rsrq */
+		lte_rsrq = parcel_r_int32(&rilp); /* rsrq */
 		lte_rssnr = parcel_r_int32(&rilp);
-		parcel_r_int32(&rilp); /* cqi */
+		lte_cqi = parcel_r_int32(&rilp); /* cqi */
 		lte_signal = get_lte_strength(lte_sigstr, lte_rsrp, lte_rssnr);
 	} else {
 		lte_signal = -1;
 	}
 
+	ofono_netreg_set_signal_strength(netreg, lte_sigstr, lte_rsrp, lte_rsrq, lte_rssnr, lte_cqi);
+
 	g_ril_append_print_buf(gril,
-				"{gw: %d, cdma: %d, evdo: %d, lte: %d %d %d}",
+				"{gw: %d, cdma: %d, evdo: %d, lte: %d %d %d %d %d}",
 				gw_sigstr, cdma_dbm, evdo_dbm, lte_sigstr,
-				lte_rsrp, lte_rssnr);
+				lte_rsrp, lte_rsrq, lte_rssnr, lte_cqi);
 
 	if (message->unsolicited)
 		g_ril_print_unsol(gril, message);
@@ -689,7 +692,7 @@ static void ril_strength_notify(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
 	struct netreg_data *nd = ofono_netreg_get_data(netreg);
-	int strength = parse_signal_strength(nd->ril, message, nd->tech);
+	int strength = parse_signal_strength(nd->ril, message, nd->tech, netreg);
 
 	ofono_netreg_strength_notify(netreg, strength);
 }
@@ -710,7 +713,7 @@ static void ril_strength_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	/* parse_signal_strength() handles both reply & unsolicited */
-	strength = parse_signal_strength(nd->ril, message, nd->tech);
+	strength = parse_signal_strength(nd->ril, message, nd->tech, cbd->data);
 	cb(&error, strength, cbd->data);
 
 	return;
