@@ -37,6 +37,28 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 
+		void GetCallForwarding(int32 type, int cls)
+
+			Gets call forwarding rules for type and bear class.
+
+			Possible Errors: [service].Error.NotAvailable
+					 [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
+		void SetCallForwarding(int32 type, int cls, string number)
+
+			Sets call forwarding rules for type and bear class.
+
+			Possible Errors: [service].Error.NotAvailable
+					 [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string property, variant value)
 
 			Signal is emitted whenever a property has changed.
