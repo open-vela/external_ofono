@@ -122,7 +122,7 @@ static void cf_cond_list_print(GSList *l)
 	for (; l ; l = l->next) {
 		cond = l->data;
 
-		DBG("CF Condition status: %d, class: %d, number: %s,"
+		ofono_debug("CF Condition status: %d, class: %d, number: %s,"
 			" number_type: %d, time: %d",
 			cond->status, cond->cls, cond->phone_number.number,
 			cond->phone_number.type, cond->time);
@@ -881,6 +881,134 @@ static DBusMessage *cf_disable_all(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void get_call_forwarding_cb(const struct ofono_error *error, int total,
+			const struct ofono_call_forwarding_condition *list,
+			void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	DBusMessageIter dict;
+	GSList *l;
+	char *number;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error get_call_forwarding_cb!");
+
+		reply = __ofono_error_failed(cf->pending);
+		__ofono_dbus_pending_reply(&cf->pending, reply);
+
+		return;
+	}
+
+	l = cf_cond_list_create(total, list);
+	cf_cond_list_print(l);
+
+	number = g_strdup(list->phone_number.number);
+
+	reply = dbus_message_new_method_return(cf->pending);
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
+					OFONO_PROPERTIES_ARRAY_SIGNATURE,
+					&dict);
+
+	ofono_dbus_dict_append(&dict, "Status", DBUS_TYPE_INT32, &list->status);
+	ofono_dbus_dict_append(&dict, "Cls", DBUS_TYPE_INT32, &list->cls);
+	ofono_dbus_dict_append(&dict, "Number", DBUS_TYPE_STRING, &number);
+	ofono_dbus_dict_append(&dict, "Time", DBUS_TYPE_INT32, &list->time);
+
+	dbus_message_iter_close_container(&iter, &dict);
+	__ofono_dbus_pending_reply(&cf->pending, reply);
+
+	g_free(number);
+}
+
+static void set_call_forwarding_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error set_call_forwarding_cb!");
+
+		reply = __ofono_error_failed(cf->pending);
+		__ofono_dbus_pending_reply(&cf->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(cf->pending);
+
+	__ofono_dbus_pending_reply(&cf->pending, reply);
+}
+
+static DBusMessage *cf_get_call_forwarding(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+	int type;
+	int cls;
+
+	if (cf->driver->query == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cf->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &type,
+				DBUS_TYPE_INT32, &cls,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	cf->pending = dbus_message_ref(msg);
+	cf->driver->query(cf, type, cls, get_call_forwarding_cb, cf);
+
+	return NULL;
+}
+
+static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+	int type;
+	int cls;
+	const char *number;
+	struct ofono_phone_number ph;
+
+	if (cf->driver->erasure == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cf->driver->registration == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cf->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &type,
+				DBUS_TYPE_INT32, &cls,
+				DBUS_TYPE_STRING, &number,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	cf->pending = dbus_message_ref(msg);
+
+	ph.number[0] = '\0';
+	if (strlen(number) <= OFONO_MAX_PHONE_NUMBER_LENGTH)
+		strcpy(ph.number, number);
+	ph.type = OFONO_NUMBER_TYPE_UNKNOWN;
+
+	if (ph.number[0] != '\0')
+		cf->driver->registration(cf, type, cls, &ph, DEFAULT_NO_REPLY_TIMEOUT,
+				set_call_forwarding_cb, cf);
+	else
+		cf->driver->erasure(cf, type, cls, set_call_forwarding_cb, cf);
+
+	return NULL;
+}
+
 static const GDBusMethodTable cf_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetProperties",
 				NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -891,6 +1019,13 @@ static const GDBusMethodTable cf_methods[] = {
 	{ GDBUS_ASYNC_METHOD("DisableAll",
 			GDBUS_ARGS({ "type", "s" }), NULL,
 			cf_disable_all) },
+	{ GDBUS_ASYNC_METHOD("GetCallForwarding",
+			GDBUS_ARGS({ "type", "i" }, { "cls", "i" }),
+			NULL, cf_get_call_forwarding) },
+	{ GDBUS_ASYNC_METHOD("SetCallForwarding",
+			GDBUS_ARGS({ "type", "i" },
+			{ "cls", "i" }, { "number", "s" }),
+			NULL, cf_set_call_forwarding) },
 	{ }
 };
 
