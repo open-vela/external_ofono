@@ -561,6 +561,8 @@ static void ril_query_modem_activity_info(struct ofono_modem *modem,
 static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
 	ofono_modem_enable_cb_t cb = cbd->cb;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -570,6 +572,8 @@ static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
 		return;
 	}
+
+	g_ril_print_response_no_args(rd->ril, message);
 
 	CALLBACK_WITH_SUCCESS(cb, cbd->data);
 }
@@ -597,6 +601,8 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
 	ofono_modem_status_query_cb_t cb = cbd->cb;
 	struct parcel rilp;
 	int numparams;
@@ -610,6 +616,8 @@ static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_dat
 		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 		return;
 	}
+
+	g_ril_print_response_no_args(rd->ril, message);
 
 	g_ril_init_parcel(message, &rilp);
 

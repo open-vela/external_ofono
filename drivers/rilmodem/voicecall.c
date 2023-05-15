@@ -111,7 +111,7 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 		reason = OFONO_DISCONNECT_REASON_REMOTE_HANGUP;
 
 done:
-	DBG("Call %d ended with reason %d", reqdata->id, reason);
+	ofono_debug("Call %d ended with reason %d", reqdata->id, reason);
 
 	ofono_voicecall_disconnected(vc, reqdata->id, reason, NULL);
 }
@@ -153,16 +153,13 @@ static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 		return;
 	}
 
+	g_ril_print_response_no_args(vd->ril, message);
 
 	g_ril_init_parcel(message, &rilp);
 
 	/* maguro signals no calls with empty event data */
 	if (rilp.size < sizeof(int32_t))
 		goto no_calls;
-
-	DBG("[%d,%04d]< %s", g_ril_get_slot(vd->ril),
-				message->serial_no,
-				"RIL_REQUEST_GET_CURRENT_CALLS");
 
 	/* Number of RIL_Call structs */
 	num = parcel_r_int32(&rilp);
