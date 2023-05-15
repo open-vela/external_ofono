@@ -304,6 +304,8 @@ static void ril_gprs_registration_status(struct ofono_gprs *gprs,
 static void ril_set_data_allow_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_gprs *gprs = cbd->user;
+	struct ril_gprs_data *gd = ofono_gprs_get_data(gprs);
 	ofono_gprs_status_cb_t cb = cbd->cb;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -314,6 +316,8 @@ static void ril_set_data_allow_cb(struct ril_msg *message, gpointer user_data)
 		CALLBACK_WITH_FAILURE(cb, message->error, cbd);
 		return;
 	}
+
+	g_ril_print_response_no_args(gd->ril, message);
 
 	CALLBACK_WITH_SUCCESS(cb, RIL_E_SUCCESS, cbd);
 }
@@ -342,6 +346,8 @@ static void ril_gprs_set_data_allow(struct ofono_gprs *gprs, ofono_bool_t allow,
 static void ril_set_data_profile_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_gprs *gprs = cbd->user;
+	struct ril_gprs_data *gd = ofono_gprs_get_data(gprs);
 	ofono_gprs_status_cb_t cb = cbd->cb;
 
 	if (message->error != RIL_E_SUCCESS) {
@@ -352,6 +358,8 @@ static void ril_set_data_profile_cb(struct ril_msg *message, gpointer user_data)
 		CALLBACK_WITH_FAILURE(cb, message->error, user_data);
 		return;
 	}
+
+	g_ril_print_response_no_args(gd->ril, message);
 
 	CALLBACK_WITH_SUCCESS(cb, RIL_E_SUCCESS, user_data);
 }
