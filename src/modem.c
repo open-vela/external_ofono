@@ -51,6 +51,8 @@ static int modems_remaining;
 
 static struct ofono_watchlist *g_modemwatches;
 
+static gboolean query_manufacturer(gpointer user);
+
 enum property_type {
 	PROPERTY_TYPE_INVALID = 0,
 	PROPERTY_TYPE_STRING,
@@ -291,6 +293,7 @@ static void radio_status_change(struct ofono_modem *modem)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	enum radio_status status = modem->status;
+	struct ofono_devinfo *info;
 
 	if (modem->powered == FALSE) {
 		status = RADIO_STATUS_UNAVAILABLE;
@@ -308,6 +311,10 @@ static void radio_status_change(struct ofono_modem *modem)
 					OFONO_MODEM_INTERFACE,
 					"RadioState",
 					DBUS_TYPE_UINT32, &modem->status);
+
+		info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
+		if (info != NULL && status != RADIO_STATUS_UNAVAILABLE)
+			query_manufacturer(info);
 	}
 }
 
