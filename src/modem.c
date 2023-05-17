@@ -828,7 +828,7 @@ static void modem_enable_or_disable_cb(const struct ofono_error *error, void *da
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during modem access enable or disable");
+		ofono_error("Error during modem access enable or disable");
 
 		reply = __ofono_error_failed(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
@@ -849,7 +849,7 @@ static void modem_status_query_cb(const struct ofono_error *error,
 	DBusMessageIter iter;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during modem access status query");
+		ofono_error("Error during modem access status query");
 
 		reply = __ofono_error_failed(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
@@ -1354,6 +1354,9 @@ static DBusMessage *modem_enable_or_disable(struct ofono_modem *modem, ofono_boo
 
 	if (modem->pending)
 		return __ofono_error_busy(msg);
+
+	if (modem->modem_state == MODEM_STATE_POWER_OFF)
+		return __ofono_error_not_allowed(msg);
 
 	modem->pending = dbus_message_ref(msg);
 	modem->driver->enable_modem(modem, enable, modem_enable_or_disable_cb, modem);
