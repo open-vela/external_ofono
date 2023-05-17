@@ -98,6 +98,13 @@ extern char print_buf[];
 		sprintf(print_buf, x);		\
 } while (0)
 
+#define g_ril_append_print_buf_with_offset(gril, offset, x...) ({	\
+	int _length = 0;						\
+	if (gril && g_ril_get_trace(gril))				\
+		_length = sprintf(print_buf + offset, x); 		\
+	_length;							\
+})
+
 #define g_ril_print_unsol(gril, message)				\
 	G_RIL_TRACE(gril, "[%d,UNSOL]< %s %s",				\
 			g_ril_get_slot(gril),				\
