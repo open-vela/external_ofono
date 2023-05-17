@@ -21,6 +21,23 @@ Methods		dict GetProperties()
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 
+		void SetCallWaiting(int32 enable)
+
+			Sets call waiting status.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
+		int32 GetCallWaiting()
+
+			Gets call waiting status.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string property, variant value)
 
 			Signal is emitted whenever a property has changed.
