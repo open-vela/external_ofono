@@ -1334,6 +1334,80 @@ static DBusMessage *cs_set_property(DBusConnection *conn, DBusMessage *msg,
 	return __ofono_error_invalid_args(msg);
 }
 
+static void get_call_waiting_cb(const struct ofono_error *error,
+				int status, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occurs during get call waiting status !");
+
+		if (cs->pending) {
+			reply = __ofono_error_failed(cs->pending);
+			__ofono_dbus_pending_reply(&cs->pending, reply);
+		}
+
+		return;
+	}
+
+	if (cs->pending) {
+		reply = dbus_message_new_method_return(cs->pending);
+
+		dbus_message_iter_init_append(reply, &iter);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+
+		__ofono_dbus_pending_reply(&cs->pending, reply);
+	}
+
+	set_cw(cs, status, BEARER_CLASS_VOICE);
+}
+
+static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	int enable;
+
+	if (cs->driver->cw_set == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cs->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &enable,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	cs->pending = dbus_message_ref(msg);
+
+	cs->driver->cw_set(cs, enable, BEARER_CLASS_VOICE, cw_set_callback, cs);
+
+	return NULL;
+
+}
+
+static DBusMessage *cs_get_call_waiting(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_call_settings *cs = data;
+
+	if (cs->driver->cw_query == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cs->pending)
+		return __ofono_error_busy(msg);
+
+	cs->pending = dbus_message_ref(msg);
+
+	cs->driver->cw_query(cs, BEARER_CLASS_DEFAULT, get_call_waiting_cb, cs);
+
+	return NULL;
+}
+
+
 static const GDBusMethodTable cs_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetProperties",
 				NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1341,6 +1415,12 @@ static const GDBusMethodTable cs_methods[] = {
 	{ GDBUS_ASYNC_METHOD("SetProperty",
 			GDBUS_ARGS({ "property", "s" }, { "value", "v" }),
 			NULL, cs_set_property) },
+	{ GDBUS_ASYNC_METHOD("SetCallWaiting",
+			GDBUS_ARGS({ "enable", "i" }), NULL,
+			cs_set_call_waiting) },
+	{ GDBUS_ASYNC_METHOD("GetCallWaiting", NULL,
+			GDBUS_ARGS({ "status", "i" }),
+			cs_get_call_waiting) },
 	{ }
 };
 
