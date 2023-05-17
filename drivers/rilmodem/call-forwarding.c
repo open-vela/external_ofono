@@ -59,6 +59,7 @@ static void ril_query_call_fwd_cb(struct ril_msg *message, gpointer user_data)
 	struct parcel rilp;
 	unsigned int list_size;
 	unsigned int i;
+	int position = 0;
 
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("%s: rild error: %s", __func__,
@@ -83,7 +84,8 @@ static void ril_query_call_fwd_cb(struct ril_msg *message, gpointer user_data)
 
 	list = g_new0(struct ofono_call_forwarding_condition, list_size);
 
-	g_ril_append_print_buf(fd->ril, "{");
+	if (position >= 0)
+		position += g_ril_append_print_buf_with_offset(fd->ril, position, "{");
 
 	for (i = 0; i < list_size; i++) {
 		char *str;
@@ -114,17 +116,18 @@ static void ril_query_call_fwd_cb(struct ril_msg *message, gpointer user_data)
 			goto error;
 		}
 
-		g_ril_append_print_buf(fd->ril, "%s [%d,%d,%d,%s,%d]",
-					print_buf,
-					list[i].status,
-					list[i].cls,
-					list[i].phone_number.type,
-					list[i].phone_number.number,
-					list[i].time);
+		if (position >= 0)
+			position += g_ril_append_print_buf_with_offset(
+						fd->ril, position, "[%d,%d,%d,%s,%d]",
+						list[i].status,
+						list[i].cls,
+						list[i].phone_number.type,
+						list[i].phone_number.number,
+						list[i].time);
 
 	}
-
-	g_ril_append_print_buf(fd->ril, "%s}", print_buf);
+	if (position >= 0)
+		g_ril_append_print_buf_with_offset(fd->ril, position, "}");
 	g_ril_print_response(fd->ril, message);
 
 done:
