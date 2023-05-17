@@ -306,15 +306,16 @@ static void radio_status_change(struct ofono_modem *modem)
 	}
 
 	if (status != modem->status) {
+		info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
+		if (info != NULL && status != RADIO_STATUS_UNAVAILABLE
+			&& modem->status == RADIO_STATUS_UNAVAILABLE)
+			query_manufacturer(info);
+
 		modem->status = status;
 		ofono_dbus_signal_property_changed(conn, modem->path,
 					OFONO_MODEM_INTERFACE,
 					"RadioState",
 					DBUS_TYPE_UINT32, &modem->status);
-
-		info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
-		if (info != NULL && status != RADIO_STATUS_UNAVAILABLE)
-			query_manufacturer(info);
 	}
 }
 
