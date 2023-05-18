@@ -1483,9 +1483,10 @@ static void sim_enable_or_disable_fdn_cb(const struct ofono_error *error, void *
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during sim enable or disable fdn");
+		ofono_error("Error occurred during sim enable or disable fdn");
 		reply = __ofono_error_failed(sim->pending);
 		__ofono_dbus_pending_reply(&sim->pending, reply);
+		return;
 	}
 
 	reply = dbus_message_new_method_return(sim->pending);

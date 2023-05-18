@@ -1407,9 +1407,10 @@ static void modem_invoke_oem_request_raw_cb(const struct ofono_error *error,
 	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during modem invoke oem request raw");
+		ofono_error("Error occurred during modem invoke oem request raw");
 		reply = __ofono_error_failed(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
+		return;
 	}
 
 	reply = dbus_message_new_method_return(modem->pending);
@@ -1473,9 +1474,10 @@ static void modem_invoke_oem_request_strings_cb(const struct ofono_error *error,
 	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during modem invoke oem request strings");
+		ofono_error("Error occurred during modem invoke oem request strings");
 		reply = __ofono_error_failed(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
+		return;
 	}
 
 	reply = dbus_message_new_method_return(modem->pending);
