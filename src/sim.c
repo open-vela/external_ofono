@@ -1178,6 +1178,7 @@ static void sim_enter_pin2_cb(const struct ofono_error *error, void *data)
 		DBG("Error occurred during sim enter pin2");
 		reply = __ofono_error_failed(sim->pending);
 		__ofono_dbus_pending_reply(&sim->pending, reply);
+		return;
 	}
 
 	reply = dbus_message_new_method_return(sim->pending);
