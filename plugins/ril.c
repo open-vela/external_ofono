@@ -719,7 +719,7 @@ static void ril_oem_request_strings_cb(struct ril_msg *message,
 		goto error;
 	}
 
-	g_ril_print_response(rd->ril, message);
+	g_ril_print_response_no_args(rd->ril, message);
 
 	CALLBACK_WITH_SUCCESS(cb, response, g_strv_length(response), cbd->data);
 	g_strfreev(response);
