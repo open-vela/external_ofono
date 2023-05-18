@@ -2012,11 +2012,11 @@ static void ril_enable_uicc_cb(struct ril_msg *message, gpointer user_data)
 		ofono_error("%s: RIL_REQUEST_ENABLE_UICC_APPLICATIONS reply failure: %s",
 				__func__,
 				ril_error_to_string(message->error));
-		CALLBACK_WITH_FAILURE(cb, cbd);
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
 		return;
 	}
 
-	CALLBACK_WITH_SUCCESS(cb, cbd);
+	CALLBACK_WITH_SUCCESS(cb, cbd->data);
 }
 
 static void ril_enable_uicc(struct ofono_sim *sim, int enable,
