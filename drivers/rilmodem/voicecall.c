@@ -53,6 +53,8 @@
 
 /* To use with change_state_req::affected_types */
 #define AFFECTED_STATES_ALL 0x3F
+#define AFFECTED_STATES_WB 0x32  //RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND
+#define AFFECTED_STATES_FG 0x0D  //RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND
 
 /* Auto-answer delay in seconds */
 #define AUTO_ANSWER_DELAY_S 3
@@ -240,7 +242,7 @@ no_calls:
 			}
 
 			clear_dtmf_queue(vd);
-
+			vd->local_release &= ~(1 << oc->id);
 			o = o->next;
 		} else if (nc && (oc == NULL || (nc->id < oc->id))) {
 			/* new call, signal it */
@@ -301,7 +303,8 @@ no_calls:
 	g_slist_free_full(vd->calls, g_free);
 
 	vd->calls = calls;
-	vd->local_release = 0;
+	if (calls == NULL)
+		vd->local_release = 0;
 }
 
 gboolean ril_poll_clcc(gpointer user_data)
@@ -858,21 +861,21 @@ void ril_release_all_held(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
 	ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
-			generic_cb, 0, NULL, cb, data);
+			generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
 }
 
 void ril_release_all_active(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
 	ril_template(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND, vc,
-			generic_cb, 0, NULL, cb, data);
+			generic_cb, AFFECTED_STATES_FG, NULL, cb, data);
 }
 
 void ril_set_udub(struct ofono_voicecall *vc,
 			ofono_voicecall_cb_t cb, void *data)
 {
 	ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
-			generic_cb, 0, NULL, cb, data);
+			generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
 }
 
 void ril_conference_request(const guint rreq, struct ofono_voicecall *vc,
