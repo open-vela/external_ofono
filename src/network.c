@@ -1947,21 +1947,28 @@ const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg)
 }
 
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
-	int rssi, int rsrp, int rsrq, int rssnr, int cqi)
+	int signal_strength, int rsrp, int rsrq, int rssnr, int cqi)
 {
 	int level = SIGNAL_STRENGTH_UNKNOWN;
+	int new_rssi, new_rsrp, new_rsrq, new_rssnr, new_cqi;
 
 	if (netreg->signal_strength_data == NULL)
 		return;
 
-	if (netreg->signal_strength_data->rsrp == rsrp)
+	new_rsrp = in_range_or_unavailable(-rsrp, -140, -43);
+	if (netreg->signal_strength_data->rsrp == new_rsrp)
 		return;
 
-	netreg->signal_strength_data->rssi = rssi;
-	netreg->signal_strength_data->rsrp = rsrp;
-	netreg->signal_strength_data->rsrq = rsrq;
-	netreg->signal_strength_data->rssnr = rssnr;
-	netreg->signal_strength_data->cqi = cqi;
+	new_rssi = in_range_or_unavailable(get_rssi_dbm_from_asu(signal_strength), -113, -51);
+	new_rssnr = in_range_or_unavailable(convert_rssnr_unit_from_ten_db_to_db(rssnr), -20, 30);
+	new_rsrq = in_range_or_unavailable(-rsrq, -34, 3);
+	new_cqi = in_range_or_unavailable(cqi, 0, 15);
+
+	netreg->signal_strength_data->rssi = new_rssi;
+	netreg->signal_strength_data->rsrp = new_rsrp;
+	netreg->signal_strength_data->rsrq = new_rsrq;
+	netreg->signal_strength_data->rssnr = new_rssnr;
+	netreg->signal_strength_data->cqi = new_cqi;
 
 	if (rsrp < -140) {
 		level = SIGNAL_STRENGTH_UNKNOWN;
