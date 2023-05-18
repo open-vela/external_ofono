@@ -220,3 +220,7 @@ gboolean gprs_proto_from_string(const char *str, enum ofono_gprs_proto *proto);
 const char *gprs_auth_method_to_string(enum ofono_gprs_auth_method auth);
 gboolean gprs_auth_method_from_string(const char *str,
 					enum ofono_gprs_auth_method *auth);
+
+int in_range_or_unavailable(int value, int range_min, int range_max);
+int get_rssi_dbm_from_asu(int rssi_asu);
+int convert_rssnr_unit_from_ten_db_to_db(int rssnr);

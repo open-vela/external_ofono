@@ -26,6 +26,7 @@
 #define _GNU_SOURCE
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 #include <glib.h>
 
@@ -852,4 +853,22 @@ gboolean gprs_auth_method_from_string(const char *str,
 	}
 
 	return FALSE;
+}
+
+int in_range_or_unavailable(int value, int range_min, int range_max) {
+	if (value < range_min || value > range_max)
+		return INT_MAX;
+
+	return value;
+}
+
+int get_rssi_dbm_from_asu(int rssi_asu) {
+	if (rssi_asu >= 0 && rssi_asu <= 31)
+		return -113 + (2 * rssi_asu);
+
+	return INT_MAX;
+}
+
+int convert_rssnr_unit_from_ten_db_to_db(int rssnr) {
+	return (int) floor((float) rssnr / 10);
 }
