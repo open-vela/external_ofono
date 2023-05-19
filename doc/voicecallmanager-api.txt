@@ -288,6 +288,15 @@ Methods		dict GetProperties()
 					 [service].Error.Failed
 					 [service].Error.NotImplemented
 
+		void manager_dtmf(byte digit, int flag)
+
+			start/stop playing a DTMF tone
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.Failed
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+
 Signals		CallAdded(object path, dict properties)
 
 			Signal that is sent when a new call is added.  It

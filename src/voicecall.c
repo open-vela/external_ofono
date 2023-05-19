@@ -2669,6 +2669,35 @@ static DBusMessage *manager_answer(DBusConnection *conn,
 	return NULL;
 }
 
+static DBusMessage *manager_dtmf(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	unsigned char digit;
+	int flag;
+
+	if (vc->pending)
+		return __ofono_error_busy(msg);
+
+	if (vc->driver->play_dtmf == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	/* Send DTMFs only if we have at least one connected call */
+	if (!voicecalls_can_dtmf(vc))
+		return __ofono_error_failed(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_BYTE, &digit,
+				DBUS_TYPE_INT32, &flag,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	vc->pending = dbus_message_ref(msg);
+	vc->driver->play_dtmf(vc, flag, digit, generic_callback, vc);
+
+	return NULL;
+}
+
 static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -2713,6 +2742,8 @@ static const GDBusMethodTable manager_methods[] = {
 							manager_deflect) },
 	{ GDBUS_ASYNC_METHOD("Hangup", GDBUS_ARGS({ "path", "o" }), NULL, manager_hangup) },
 	{ GDBUS_ASYNC_METHOD("Answer", GDBUS_ARGS({ "path", "o" }), NULL, manager_answer) },
+	{ GDBUS_ASYNC_METHOD("PlayDtmf", GDBUS_ARGS({ "digit", "y" }, { "flag", "i" }), NULL,
+							manager_dtmf) },
 	{ }
 };
 

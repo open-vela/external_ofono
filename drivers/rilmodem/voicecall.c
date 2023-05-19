@@ -51,6 +51,10 @@
 
 #define MAX_DTMF_BUFFER 32
 
+/*action flag of send DTMF*/
+#define START_PLAY_DTMF 1
+#define STOP_PLAY_DTMF 2
+
 /* To use with change_state_req::affected_types */
 #define AFFECTED_STATES_ALL 0x3F
 #define AFFECTED_STATES_WB 0x32  //RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND
@@ -472,6 +476,25 @@ out:
 		cb(&error, cbd->data);
 }
 
+static void ril_play_dtmf_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	struct ofono_voicecall *vc = cbd->user;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	ofono_voicecall_cb_t cb = cbd->cb;
+	struct ofono_error error;
+
+	if (message->error == RIL_E_SUCCESS) {
+		decode_ril_error(&error, "OK");
+
+		g_ril_print_response_no_args(vd->ril, message);
+	} else {
+		decode_ril_error(&error, "FAIL");
+	}
+
+	if (cb)
+		cb(&error, cbd->data);
+}
 static void dial(struct ofono_voicecall *vc,
 			const struct ofono_phone_number *ph,
 			enum ofono_clir_option clir, ofono_voicecall_cb_t cb,
@@ -939,8 +962,43 @@ void ril_set_emergency_number(struct ofono_voicecall *vc,
 		parcel_w_int32(&rilp, ecc->condition);
 	}
 
-	if (g_ril_send(vd->ril, RIL_REQUEST_SET_EMERGENCY_NUMBER, &rilp, 
+	if (g_ril_send(vd->ril, RIL_REQUEST_SET_EMERGENCY_NUMBER, &rilp,
 			rild_set_cust_ecc_cb, cbd, g_free) == 0) {
+		g_free(cbd);
+		CALLBACK_WITH_FAILURE(cb, data);
+	}
+}
+
+void ril_play_dtmf(struct ofono_voicecall *vc, int flag,
+				unsigned char digit, ofono_voicecall_cb_t cb, void *data)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct cb_data *cbd = cb_data_new(cb, data, vc);
+	struct parcel rilp;
+	char ril_dtmf[2];
+	int ret = 0;
+
+	if (flag == START_PLAY_DTMF) {
+		parcel_init(&rilp);
+
+		/* Ril wants just one character, but we need to send as string */
+		ril_dtmf[0] = digit;
+		ril_dtmf[1] = '\0';
+
+		parcel_w_string(&rilp, ril_dtmf);
+
+		g_ril_append_print_buf(vd->ril, "(%s)", ril_dtmf);
+
+		ret = g_ril_send(vd->ril, RIL_REQUEST_DTMF_START, &rilp,
+				ril_play_dtmf_cb, cbd, g_free);
+
+	} else if(flag == STOP_PLAY_DTMF) {
+
+		ret = g_ril_send(vd->ril, RIL_REQUEST_DTMF_STOP, NULL,
+				ril_play_dtmf_cb, cbd, g_free);
+	}
+
+	if (ret == 0) {
 		g_free(cbd);
 		CALLBACK_WITH_FAILURE(cb, data);
 	}
@@ -1040,6 +1098,7 @@ static const struct ofono_voicecall_driver driver = {
 	.dial_conferece		= ril_dial_conferece,
 	.invite_participants	= ril_invite_participants,
 	.set_cust_ecc		= ril_set_emergency_number,
+	.play_dtmf		= ril_play_dtmf,
 };
 
 void ril_voicecall_init(void)

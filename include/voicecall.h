@@ -159,6 +159,12 @@ struct ofono_voicecall_driver {
 	/* set custom ecc list to modem */
 	void (*set_cust_ecc)(struct ofono_voicecall *vc,
 			GSList *l, ofono_voicecall_cb_t cb, void *data);
+
+	/*
+	 * start/sop playing a DTMF tone.
+	 */
+	void (*play_dtmf)(struct ofono_voicecall *vc, int flag,
+			unsigned char digit, ofono_voicecall_cb_t cb, void *data);
 };
 
 void ofono_voicecall_en_list_notify(struct ofono_voicecall *vc,
