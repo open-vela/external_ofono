@@ -503,8 +503,7 @@ static void ril_cops_list_cb(struct ril_msg *message, gpointer user_data)
 	unsigned int i = 0;
 	unsigned int num_strings;
 	int strings_per_opt = 4;
-
-	DBG("");
+	int position = 0;
 
 	if (message->error != RIL_E_SUCCESS)
 		goto error;
@@ -522,7 +521,8 @@ static void ril_cops_list_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	g_ril_init_parcel(message, &rilp);
-	g_ril_append_print_buf(nd->ril, "{");
+	if (position >= 0)
+		position += g_ril_append_print_buf_with_offset(nd->ril, position, "{");
 
 	if (g_ril_vendor(nd->ril) == OFONO_RIL_VENDOR_MTK)
 		strings_per_opt = 5;
@@ -593,17 +593,19 @@ static void ril_cops_list_cb(struct ril_msg *message, gpointer user_data)
 
 		i++;
 next:
-		g_ril_append_print_buf(nd->ril, "%s [lalpha=%s, salpha=%s, "
-				" numeric=%s status=%s]",
-				print_buf,
-				lalpha, salpha, numeric, status);
+		if (position >= 0)
+			position += g_ril_append_print_buf_with_offset(
+				nd->ril, position, "[lalpha=%s, salpha=%s,"
+				" numeric=%s, status=%s, access_tech=%d]",
+				lalpha, salpha, numeric, status, tech);
 		g_free(lalpha);
 		g_free(salpha);
 		g_free(numeric);
 		g_free(status);
 	}
 
-	g_ril_append_print_buf(nd->ril, "%s}", print_buf);
+	if (position >= 0)
+		g_ril_append_print_buf_with_offset(nd->ril, position, "}");
 	g_ril_print_response(nd->ril, message);
 
 	CALLBACK_WITH_SUCCESS(cb, i, ops, cbd->data);
