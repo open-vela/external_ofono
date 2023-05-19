@@ -313,13 +313,13 @@ static void ril_set_data_allow_cb(struct ril_msg *message, gpointer user_data)
 				__func__,
 				ril_error_to_string(message->error));
 
-		CALLBACK_WITH_FAILURE(cb, message->error, cbd);
+		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 		return;
 	}
 
 	g_ril_print_response_no_args(gd->ril, message);
 
-	CALLBACK_WITH_SUCCESS(cb, RIL_E_SUCCESS, cbd);
+	CALLBACK_WITH_SUCCESS(cb, 0, cbd->data);
 }
 
 static void ril_gprs_set_data_allow(struct ofono_gprs *gprs, ofono_bool_t allow,
@@ -355,13 +355,13 @@ static void ril_set_data_profile_cb(struct ril_msg *message, gpointer user_data)
 				__func__,
 				ril_error_to_string(message->error));
 
-		CALLBACK_WITH_FAILURE(cb, message->error, user_data);
+		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 		return;
 	}
 
 	g_ril_print_response_no_args(gd->ril, message);
 
-	CALLBACK_WITH_SUCCESS(cb, RIL_E_SUCCESS, user_data);
+	CALLBACK_WITH_SUCCESS(cb, 0, cbd->data);
 }
 
 static void ril_gprs_set_data_profile(struct ofono_gprs *gprs,
@@ -385,11 +385,17 @@ static void ril_gprs_set_data_profile(struct ofono_gprs *gprs,
 	for (i = 0; i < length; i++) {
 		pri_ctx = *(contexts + i);
 
+		parcel_w_int32(&rilp, 0); /* profile id */
 		parcel_w_string(&rilp, pri_ctx.apn);
+		parcel_w_string(&rilp, gprs_proto_to_string(pri_ctx.proto));
+		parcel_w_int32(&rilp, pri_ctx.auth_method);
 		parcel_w_string(&rilp, pri_ctx.username);
 		parcel_w_string(&rilp, pri_ctx.password);
-		parcel_w_int32(&rilp, pri_ctx.proto);
-		parcel_w_int32(&rilp, pri_ctx.auth_method);
+		parcel_w_int32(&rilp, 0); /* the profile type, 0 - COMMON, 1 - 3GPP, 2 - 3GPP2 */
+		parcel_w_int32(&rilp, 0); /* the period in seconds to limit the maximum connections */
+		parcel_w_int32(&rilp, 0); /* the maximum connections during maxConnsTime */
+		parcel_w_int32(&rilp, 0); /* wait time */
+		parcel_w_int32(&rilp, 1); /* true to enable the profile, false to disable */
 	}
 
 	if (g_ril_send(gd->ril, RIL_REQUEST_SET_DATA_PROFILE, &rilp,
