@@ -41,6 +41,7 @@
 #include <gdbus.h>
 
 #include "ofono.h"
+#include "ril_constants.h"
 
 #include "common.h"
 #include "storage.h"
@@ -154,6 +155,9 @@ static void gprs_deactivate_next(struct ofono_gprs *gprs);
 static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type);
 static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type);
 static void gprs_context_changed(struct pri_context *context);
+static void gprs_set_data_profile_callback(const struct ofono_error *error,
+						int status, void *data);
+static void gprs_set_data_profile(struct ofono_gprs *gprs);
 
 static GSList *g_drivers = NULL;
 static GSList *g_context_drivers = NULL;
@@ -3733,6 +3737,20 @@ static void gprs_unregister(struct ofono_atom *atom)
 					OFONO_CONNECTION_MANAGER_INTERFACE);
 }
 
+static void gprs_handle_command(int command_id, void *data)
+{
+	struct ofono_atom *atom = data;
+	struct ofono_gprs *gprs = __ofono_atom_get_data(atom);
+
+	switch (command_id) {
+	case RIL_REQUEST_SET_DATA_PROFILE:
+		gprs_set_data_profile(gprs);
+		break;
+	default:
+		break;
+	}
+}
+
 static void gprs_remove(struct ofono_atom *atom)
 {
 	struct ofono_gprs *gprs = __ofono_atom_get_data(atom);
@@ -3779,6 +3797,8 @@ struct ofono_gprs *ofono_gprs_create(struct ofono_modem *modem,
 
 	gprs->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_GPRS,
 						gprs_remove, gprs);
+
+	__ofono_atom_setup_dispatcher(gprs->atom, gprs_handle_command);
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_gprs_driver *drv = l->data;
@@ -4087,16 +4107,36 @@ static void gprs_set_data_profile_callback(const struct ofono_error *error,
 	DBG("error = %d", error->type);
 }
 
+static void gprs_set_data_profile(struct ofono_gprs *gprs)
+{
+	const struct ofono_gprs_driver *driver = gprs->driver;
+	struct ofono_gprs_primary_context *contexts;
+	GSList *l;
+	int length;
+	int i;
+
+	length = g_slist_length(gprs->contexts);
+	contexts = g_new0(struct ofono_gprs_primary_context, length);
+	if (contexts == NULL)
+		return;
+
+	i = 0;
+	for (l = gprs->contexts; l; l = l->next) {
+		struct pri_context *ctx = l->data;
+		contexts[i++] = ctx->context;
+	}
+
+	if (driver->set_data_profile != NULL)
+		driver->set_data_profile(gprs, contexts, i, gprs_set_data_profile_callback, gprs);
+	g_free(contexts);
+}
+
 static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
 	const char *path = __ofono_atom_get_path(gprs->atom);
 	const struct ofono_gprs_driver *driver = gprs->driver;
-	struct ofono_gprs_primary_context *contexts;
-	GSList *l;
-	int length;
-	int i;
 
 	if (!g_dbus_register_interface(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
@@ -4121,24 +4161,11 @@ static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 	/* Find any context activated during init */
 	if (driver->list_active_contexts)
 		driver->list_active_contexts(gprs,
-					     gprs_list_active_contexts_callback,
-					     gprs);
+						gprs_list_active_contexts_callback,
+						gprs);
 
-	/* Sync APN profile to modem side */
-	length = g_slist_length(gprs->contexts);
-	contexts = g_new0(struct ofono_gprs_primary_context, length);
-	if (contexts == NULL)
-		return;
-
-	i = 0;
-	for (l = gprs->contexts; l; l = l->next) {
-		struct pri_context *ctx = l->data;
-		contexts[i++] = ctx->context;
-	}
-
-	if (driver->set_data_profile != NULL)
-		driver->set_data_profile(gprs, contexts, i, gprs_set_data_profile_callback, gprs);
-	g_free(contexts);
+	/* Set data profile to modem */
+	gprs_set_data_profile(gprs);
 
 	if (gprs->driver->attached_status != NULL)
 		gprs->driver->attached_status(gprs, registration_status_cb, gprs);
