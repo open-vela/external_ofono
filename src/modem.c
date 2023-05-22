@@ -118,6 +118,7 @@ struct ofono_atom {
 	enum modem_state modem_state;
 	void (*destruct)(struct ofono_atom *atom);
 	void (*unregister)(struct ofono_atom *atom);
+	void (*dispatch)(int command_id, void *data);
 	void *data;
 	struct ofono_modem *modem;
 };
@@ -254,6 +255,7 @@ struct ofono_atom *__ofono_modem_add_atom(struct ofono_modem *modem,
 	atom->destruct = destruct;
 	atom->data = data;
 	atom->modem = modem;
+	atom->dispatch = NULL;
 
 	modem->atoms = g_slist_prepend(modem->atoms, atom);
 
@@ -364,6 +366,12 @@ void __ofono_atom_unregister(struct ofono_atom *atom)
 gboolean __ofono_atom_get_registered(struct ofono_atom *atom)
 {
 	return atom->unregister ? TRUE : FALSE;
+}
+
+void __ofono_atom_setup_dispatcher(struct ofono_atom *atom,
+				void (*dispatch)(int command_id, void *data))
+{
+	atom->dispatch = dispatch;
 }
 
 unsigned int __ofono_modem_add_atom_watch(struct ofono_modem *modem,
@@ -1533,6 +1541,33 @@ static DBusMessage *modem_invoke_oem_request_strings(DBusConnection *conn,
 	return NULL;
 }
 
+static DBusMessage *modem_handle_command(DBusConnection *conn,
+				DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	struct ofono_atom *atom = NULL;
+	DBusMessage *reply;
+	int atom_id, command_id;
+
+	reply = dbus_message_new_method_return(msg);
+	if (reply == NULL)
+		return NULL;
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_INT32, &atom_id,
+				DBUS_TYPE_INT32, &command_id,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	atom = __ofono_modem_find_atom(modem, atom_id);
+	if (atom != NULL && atom->dispatch != NULL) {
+		ofono_debug("dispatch command to atom : %d with command : %d", atom_id, command_id);
+		atom->dispatch(command_id, atom);
+	}
+
+	return reply;
+}
+
 static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -1560,6 +1595,9 @@ static const GDBusMethodTable modem_methods[] = {
 			GDBUS_ARGS({ "request", "as" }),
 			GDBUS_ARGS({ "response", "as" }),
 			modem_invoke_oem_request_strings) },
+	{ GDBUS_METHOD("HandleCommand",
+			GDBUS_ARGS({ "atom", "i" }, { "command", "i" }),
+			NULL, modem_handle_command) },
 	{ }
 };
 
