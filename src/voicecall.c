@@ -2536,14 +2536,18 @@ static DBusMessage *manager_hangup(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 	struct voicecall *call;
-	gboolean single_call = vc->call_list->next == 0;
+	gboolean single_call;
 	const char *path;
+
+	if(vc->call_list == NULL)
+		return __ofono_error_invalid_args(msg);
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_OBJECT_PATH, &path,
 				DBUS_TYPE_INVALID) == FALSE)
 		return __ofono_error_invalid_args(msg);
 
+	single_call = vc->call_list->next == 0;
 	call = voicecall_by_path(vc, path);
 	if (call == NULL)
 		return __ofono_error_invalid_args(msg);
