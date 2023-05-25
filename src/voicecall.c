@@ -3262,6 +3262,8 @@ static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 		return;
 	}
 
+	free_cust_ecc_numbers(vc);
+
 	ecc_db_len = sizeof(cust_ecc_list) / sizeof(struct ofono_ecc_info);
 
 	for (int i = 0; i < ecc_db_len; i++) {
