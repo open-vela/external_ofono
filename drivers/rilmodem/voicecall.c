@@ -569,12 +569,14 @@ void ril_dial(struct ofono_voicecall *vc, const struct ofono_phone_number *ph,
 	GSList *l;
 
 	/* Check for current active calls */
-	for (l = vd->calls; l; l = l->next) {
-		call = l->data;
+	if (0) { //Unisoc modem will hold call by itsself before dial
+		for (l = vd->calls; l; l = l->next) {
+			call = l->data;
 
-		if (call->status == CALL_STATUS_ACTIVE) {
-			current_active = 1;
-			break;
+			if (call->status == CALL_STATUS_ACTIVE) {
+				current_active = 1;
+				break;
+			}
 		}
 	}
 
