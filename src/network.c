@@ -71,6 +71,10 @@ struct ofono_netreg {
 	struct sim_eons *eons;
 	struct ofono_sim *sim;
 	struct ofono_sim_context *sim_context;
+	unsigned int sim_watch;
+	unsigned int sim_state_watch;
+	unsigned int sim_efpnn_watch;
+	unsigned int sim_efopl_watch;
 	GKeyFile *settings;
 	char *imsi;
 	struct ofono_watchlist *status_watches;
@@ -2069,12 +2073,34 @@ static void netreg_unregister(struct ofono_atom *atom)
 		netreg->settings = NULL;
 	}
 
-	if (netreg->spn_watch)
+	if (netreg->spn_watch) {
 		ofono_sim_remove_spn_watch(netreg->sim, &netreg->spn_watch);
+		netreg->spn_watch = 0;
+	}
 
 	if (netreg->sim_context) {
+		if (netreg->sim_efpnn_watch) {
+			ofono_sim_remove_file_watch(netreg->sim_context, netreg->sim_efpnn_watch);
+			netreg->sim_efpnn_watch = 0;
+		}
+
+		if (netreg->sim_efopl_watch) {
+			ofono_sim_remove_file_watch(netreg->sim_context, netreg->sim_efopl_watch);
+			netreg->sim_efopl_watch = 0;
+		}
+
 		ofono_sim_context_free(netreg->sim_context);
 		netreg->sim_context = NULL;
+	}
+
+	if (netreg->sim_state_watch) {
+		ofono_sim_remove_state_watch(netreg->sim, netreg->sim_state_watch);
+		netreg->sim_state_watch = 0;
+	}
+
+	if (netreg->sim_watch) {
+		__ofono_modem_remove_atom_watch(modem, netreg->sim_watch);
+		netreg->sim_watch = 0;
 	}
 
 	netreg->sim = NULL;
@@ -2250,6 +2276,109 @@ static void sim_spdi_changed(int id, void *userdata)
 			sim_spdi_read_cb, netreg);
 }
 
+static void sim_state_watch(enum ofono_sim_state new_state, void *user)
+{
+	struct ofono_netreg *netreg = user;
+
+	if (netreg->sim == NULL)
+		return;
+
+	ofono_info("network - %s, sim_state : %d", __func__, new_state);
+
+	switch (new_state) {
+	case OFONO_SIM_STATE_INSERTED:
+		break;
+	case OFONO_SIM_STATE_NOT_PRESENT:
+	case OFONO_SIM_STATE_RESETTING:
+
+		if (netreg->settings) {
+			storage_close(netreg->imsi, SETTINGS_STORE,
+					netreg->settings, TRUE);
+
+			g_free(netreg->imsi);
+			netreg->imsi = NULL;
+			netreg->settings = NULL;
+		}
+
+		if (netreg->spn_watch) {
+			ofono_sim_remove_spn_watch(netreg->sim, &netreg->spn_watch);
+			netreg->spn_watch = 0;
+		}
+
+		if (netreg->sim_context) {
+			if (netreg->sim_efpnn_watch) {
+				ofono_sim_remove_file_watch(netreg->sim_context, netreg->sim_efpnn_watch);
+				netreg->sim_efpnn_watch = 0;
+			}
+
+			if (netreg->sim_efopl_watch) {
+				ofono_sim_remove_file_watch(netreg->sim_context, netreg->sim_efopl_watch);
+				netreg->sim_efopl_watch = 0;
+			}
+
+			ofono_sim_context_free(netreg->sim_context);
+			netreg->sim_context = NULL;
+		}
+
+		break;
+	case OFONO_SIM_STATE_READY:
+		netreg->sim_context = ofono_sim_context_create(netreg->sim);
+		netreg_load_settings(netreg);
+
+		netreg->flags |= NETWORK_REGISTRATION_FLAG_READING_PNN;
+		ofono_sim_read(netreg->sim_context, SIM_EFPNN_FILEID,
+				OFONO_SIM_FILE_STRUCTURE_FIXED,
+				sim_pnn_read_cb, netreg);
+		netreg->sim_efpnn_watch = ofono_sim_add_file_watch(
+						netreg->sim_context, SIM_EFPNN_FILEID,
+						sim_pnn_opl_changed, netreg,
+						NULL);
+		netreg->sim_efopl_watch = ofono_sim_add_file_watch(
+						netreg->sim_context, SIM_EFOPL_FILEID,
+						sim_pnn_opl_changed, netreg,
+						NULL);
+
+		ofono_sim_add_spn_watch(netreg->sim, &netreg->spn_watch,
+						spn_read_cb, netreg, NULL);
+
+		if (__ofono_sim_service_available(netreg->sim,
+				SIM_UST_SERVICE_PROVIDER_DISPLAY_INFO,
+				SIM_SST_SERVICE_PROVIDER_DISPLAY_INFO)) {
+			ofono_sim_read(netreg->sim_context, SIM_EFSPDI_FILEID,
+					OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
+					sim_spdi_read_cb, netreg);
+
+			ofono_sim_add_file_watch(netreg->sim_context,
+							SIM_EFSPDI_FILEID,
+							sim_spdi_changed,
+							netreg, NULL);
+		}
+		break;
+	case OFONO_SIM_STATE_LOCKED_OUT:
+		break;
+	}
+}
+
+static void sim_watch(struct ofono_atom *atom,
+			enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_netreg *netreg = data;
+	struct ofono_sim *sim = __ofono_atom_get_data(atom);
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		netreg->sim_state_watch = 0;
+		netreg->sim = NULL;
+		return;
+	}
+
+	netreg->sim = sim;
+	netreg->sim_state_watch = ofono_sim_add_state_watch(sim,
+							sim_state_watch,
+							netreg, NULL);
+
+	sim_state_watch(ofono_sim_get_state(sim), netreg);
+}
+
 static void emulator_cops_cb(struct ofono_emulator *em,
 			struct ofono_emulator_request *req, void *userdata)
 {
@@ -2336,40 +2465,9 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 		netreg->driver->registration_status(netreg,
 					init_registration_status, netreg);
 
-	netreg->sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-	if (netreg->sim != NULL) {
-		/* Assume that if sim atom exists, it is ready */
-		netreg->sim_context = ofono_sim_context_create(netreg->sim);
-
-		netreg_load_settings(netreg);
-
-		netreg->flags |= NETWORK_REGISTRATION_FLAG_READING_PNN;
-		ofono_sim_read(netreg->sim_context, SIM_EFPNN_FILEID,
-				OFONO_SIM_FILE_STRUCTURE_FIXED,
-				sim_pnn_read_cb, netreg);
-		ofono_sim_add_file_watch(netreg->sim_context, SIM_EFPNN_FILEID,
-						sim_pnn_opl_changed, netreg,
-						NULL);
-		ofono_sim_add_file_watch(netreg->sim_context, SIM_EFOPL_FILEID,
-						sim_pnn_opl_changed, netreg,
-						NULL);
-
-		ofono_sim_add_spn_watch(netreg->sim, &netreg->spn_watch,
-						spn_read_cb, netreg, NULL);
-
-		if (__ofono_sim_service_available(netreg->sim,
-				SIM_UST_SERVICE_PROVIDER_DISPLAY_INFO,
-				SIM_SST_SERVICE_PROVIDER_DISPLAY_INFO)) {
-			ofono_sim_read(netreg->sim_context, SIM_EFSPDI_FILEID,
-					OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
-					sim_spdi_read_cb, netreg);
-
-			ofono_sim_add_file_watch(netreg->sim_context,
-							SIM_EFSPDI_FILEID,
-							sim_spdi_changed,
-							netreg, NULL);
-		}
-	}
+	netreg->sim_watch = __ofono_modem_add_atom_watch(modem,
+						OFONO_ATOM_TYPE_SIM,
+						sim_watch, netreg, NULL);
 
 	__ofono_atom_register(netreg->atom, netreg_unregister);
 
