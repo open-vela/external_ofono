@@ -61,10 +61,9 @@ enum property_type {
 };
 
 enum modem_state {
-	MODEM_STATE_POWER_OFF,
-	MODEM_STATE_PRE_SIM,
-	MODEM_STATE_OFFLINE,
-	MODEM_STATE_ONLINE,
+	MODEM_STATE_POWER_OFF,  /* ril not connected */
+	MODEM_STATE_AWARE,      /* ril connected but disabled */
+	MODEM_STATE_ALIVE,      /* ril alive */
 };
 
 struct ofono_modem {
@@ -79,14 +78,13 @@ struct ofono_modem {
 	guint			interface_update;
 	ofono_bool_t		powered;
 	ofono_bool_t		powered_pending;
-	ofono_bool_t		get_online;
 	ofono_bool_t		lockdown;
 	char			*lock_owner;
 	guint			lock_watch;
 	guint			timeout;
 	guint			timeout_hint;
 	ofono_bool_t		online;
-	enum radio_status	status;
+	enum radio_status	radio_status;
 	struct ofono_watchlist	*online_watches;
 	struct ofono_watchlist	*powered_watches;
 	guint			emergency;
@@ -271,7 +269,7 @@ struct ofono_atom *__ofono_modem_add_atom_offline(struct ofono_modem *modem,
 
 	atom = __ofono_modem_add_atom(modem, type, destruct, data);
 
-	atom->modem_state = MODEM_STATE_OFFLINE;
+	atom->modem_state = MODEM_STATE_AWARE;
 
 	return atom;
 }
@@ -291,33 +289,35 @@ struct ofono_modem *__ofono_atom_get_modem(struct ofono_atom *atom)
 	return atom->modem;
 }
 
-static void radio_status_change(struct ofono_modem *modem)
+static void radio_status_change(struct ofono_modem *modem,
+	enum radio_status old_status, enum radio_status new_status)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
-	enum radio_status status = modem->status;
 	struct ofono_devinfo *info;
 
-	if (modem->powered == FALSE) {
-		status = RADIO_STATUS_UNAVAILABLE;
+	ofono_debug("%s old status : %d  new status : %d", __func__, old_status, new_status);
+
+	/* radio state depends on modem state somehow */
+	if (modem->powered == FALSE
+		|| modem->modem_state < MODEM_STATE_ALIVE) {
+		new_status = RADIO_STATUS_UNAVAILABLE;
 	} else if (modem->emergency == TRUE) {
-		status = RADIO_STATUS_EMERGENCY_ONLY;
-	} else if (modem->online == TRUE) {
-		status = RADIO_STATUS_ON;
-	} else {
-		status = RADIO_STATUS_OFF;
+		new_status = RADIO_STATUS_EMERGENCY_ONLY;
 	}
 
-	if (status != modem->status) {
+	if (new_status != modem->radio_status)
+		modem->radio_status = new_status;
+
+	if (old_status != new_status) {
 		info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
-		if (info != NULL && status != RADIO_STATUS_UNAVAILABLE
-			&& modem->status == RADIO_STATUS_UNAVAILABLE)
+		if (info != NULL && new_status != RADIO_STATUS_UNAVAILABLE
+			&& old_status == RADIO_STATUS_UNAVAILABLE)
 			query_manufacturer(info);
 
-		modem->status = status;
 		ofono_dbus_signal_property_changed(conn, modem->path,
 					OFONO_MODEM_INTERFACE,
 					"RadioState",
-					DBUS_TYPE_UINT32, &modem->status);
+					DBUS_TYPE_UINT32, &modem->radio_status);
 	}
 }
 
@@ -544,8 +544,6 @@ static void notify_online_watches(struct ofono_modem *modem)
 		notify = item->notify;
 		notify(modem, modem->online, item->notify_data);
 	}
-
-	radio_status_change(modem);
 }
 
 static void notify_powered_watches(struct ofono_modem *modem)
@@ -562,8 +560,6 @@ static void notify_powered_watches(struct ofono_modem *modem)
 		notify = item->notify;
 		notify(modem, modem->powered, item->notify_data);
 	}
-
-	radio_status_change(modem);
 }
 
 static void set_online(struct ofono_modem *modem, ofono_bool_t new_online)
@@ -590,10 +586,11 @@ static void set_online(struct ofono_modem *modem, ofono_bool_t new_online)
 static void modem_change_state(struct ofono_modem *modem,
 				enum modem_state new_state)
 {
+	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem_driver const *driver = modem->driver;
 	enum modem_state old_state = modem->modem_state;
 
-	DBG("old state: %d, new state: %d", old_state, new_state);
+	ofono_debug("%s, old state: %d, new state: %d", __func__, old_state, new_state);
 
 	if (old_state == new_state)
 		return;
@@ -608,28 +605,27 @@ static void modem_change_state(struct ofono_modem *modem,
 		modem->call_ids = 0;
 		break;
 
-	case MODEM_STATE_PRE_SIM:
-		if (old_state < MODEM_STATE_PRE_SIM && driver->pre_sim)
+	case MODEM_STATE_AWARE:
+		break;
+
+	case MODEM_STATE_ALIVE:
+		/* batch initialization */
+		if (driver->pre_sim)
 			driver->pre_sim(modem);
-		break;
 
-	case MODEM_STATE_OFFLINE:
-		if (old_state < MODEM_STATE_OFFLINE) {
-			if (driver->post_sim)
-				driver->post_sim(modem);
+		if (driver->post_sim)
+			driver->post_sim(modem);
 
-			__ofono_history_probe_drivers(modem);
-			__ofono_nettime_probe_drivers(modem);
-		}
-
-		break;
-
-	case MODEM_STATE_ONLINE:
 		if (driver->post_online)
 			driver->post_online(modem);
 
 		break;
 	}
+
+	ofono_dbus_signal_property_changed(conn, modem->path,
+			OFONO_MODEM_INTERFACE,
+			"ModemState",
+			DBUS_TYPE_UINT32, &modem->radio_status);
 }
 
 unsigned int __ofono_modem_add_online_watch(struct ofono_modem *modem,
@@ -680,21 +676,6 @@ void __ofono_modem_remove_powered_watch(struct ofono_modem *modem,
 	__ofono_watchlist_remove_item(modem->powered_watches, id);
 }
 
-static gboolean modem_has_sim(struct ofono_modem *modem)
-{
-	GSList *l;
-	struct ofono_atom *atom;
-
-	for (l = modem->atoms; l; l = l->next) {
-		atom = l->data;
-
-		if (atom->type == OFONO_ATOM_TYPE_SIM)
-			return TRUE;
-	}
-
-	return FALSE;
-}
-
 static gboolean modem_is_always_online(struct ofono_modem *modem)
 {
 	if (modem->driver->set_online == NULL)
@@ -709,46 +690,15 @@ static gboolean modem_is_always_online(struct ofono_modem *modem)
 static void common_online_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_modem *modem = data;
+	enum radio_status old_radio_state = modem->radio_status;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		return;
 
-	/*
-	 * If we need to get online after a silent reset this callback
-	 * is called.  The callback should not consider the pending dbus
-	 * message.
-	 *
-	 * Additionally, this process can be interrupted by the following
-	 * events:
-	 *	- Sim being removed or reset
-	 *	- SetProperty(Powered, False) being called
-	 *	- SetProperty(Lockdown, True) being called
-	 *
-	 * We should not set the modem to the online state in these cases.
-	 */
-	switch (modem->modem_state) {
-	case MODEM_STATE_OFFLINE:
-		set_online(modem, TRUE);
+	set_online(modem, TRUE);
 
-		/* Will this increase emergency call setup time??? */
-		modem_change_state(modem, MODEM_STATE_ONLINE);
-		break;
-	case MODEM_STATE_POWER_OFF:
-		/* The powered operation is pending */
-		break;
-	case MODEM_STATE_PRE_SIM:
-		/*
-		 * Its valid to be in online even without a SIM/SIM being
-		 * PIN locked. e.g.: Emergency mode
-		 */
-		DBG("Online in PRE SIM state");
-
-		set_online(modem, TRUE);
-		break;
-	case MODEM_STATE_ONLINE:
-		ofono_error("Online called when the modem is already online!");
-		break;
-	};
+	modem->radio_status = RADIO_STATUS_ON;
+	radio_status_change(modem, old_radio_state, RADIO_STATUS_ON);
 }
 
 static void online_cb(const struct ofono_error *error, void *data)
@@ -774,6 +724,10 @@ static void offline_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_modem *modem = data;
 	DBusMessage *reply;
+	enum radio_status old_radio_state = modem->radio_status;
+
+	if (!modem->pending)
+		goto out;
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(modem->pending);
@@ -782,19 +736,11 @@ static void offline_cb(const struct ofono_error *error, void *data)
 
 	__ofono_dbus_pending_reply(&modem->pending, reply);
 
-	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
-		switch (modem->modem_state) {
-		case MODEM_STATE_PRE_SIM:
-			set_online(modem, FALSE);
-			break;
-		case MODEM_STATE_ONLINE:
-			set_online(modem, FALSE);
-			modem_change_state(modem, MODEM_STATE_OFFLINE);
-			break;
-		default:
-			break;
-		}
-	}
+out:
+	set_online(modem, FALSE);
+
+	modem->radio_status = RADIO_STATUS_OFF;
+	radio_status_change(modem, old_radio_state, RADIO_STATUS_OFF);
 }
 
 static void modem_activity_info_query_cb(const struct ofono_error *error,
@@ -831,19 +777,44 @@ static void modem_activity_info_query_cb(const struct ofono_error *error,
 	__ofono_dbus_pending_reply(&modem->pending, reply);
 }
 
-static void modem_enable_or_disable_cb(const struct ofono_error *error, void *data)
+static void modem_enable_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_modem *modem = data;
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("Error during modem access enable or disable");
+		ofono_error("Error occus when enabling modem.");
 
 		reply = __ofono_error_failed(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
 
 		return;
 	}
+
+	if (modem->modem_state < MODEM_STATE_ALIVE)
+		modem_change_state(modem, MODEM_STATE_ALIVE);
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static void modem_disable_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when disabling modem.");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	if (modem->modem_state > MODEM_STATE_AWARE)
+		modem_change_state(modem, MODEM_STATE_AWARE);
 
 	reply = dbus_message_new_method_return(modem->pending);
 
@@ -858,52 +829,41 @@ static void modem_status_query_cb(const struct ofono_error *error,
 	DBusMessageIter iter;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("Error during modem access status query");
+		ofono_error("Error occurs when querying modem status.");
 
-		reply = __ofono_error_failed(modem->pending);
-		__ofono_dbus_pending_reply(&modem->pending, reply);
+		if (modem->pending) {
+			reply = __ofono_error_failed(modem->pending);
+			__ofono_dbus_pending_reply(&modem->pending, reply);
+		}
+
+		/* likely, some modems don't support modem state query */
+		modem_change_state(modem, MODEM_STATE_ALIVE);
+		modem->driver->set_online(modem, modem->online,
+			modem->online ? online_cb : offline_cb, modem);
 
 		return;
 	}
 
-	reply = dbus_message_new_method_return(modem->pending);
-	dbus_message_iter_init_append(reply, &iter);
+	if (modem->pending) {
+		reply = dbus_message_new_method_return(modem->pending);
+		dbus_message_iter_init_append(reply, &iter);
 
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
 
-	__ofono_dbus_pending_reply(&modem->pending, reply);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
+
+	modem_change_state(modem, status ? MODEM_STATE_ALIVE : MODEM_STATE_AWARE);
+
+	if (status) {
+		modem->driver->set_online(modem, modem->online,
+			modem->online ? online_cb : offline_cb, modem);
+	}
 }
 
 static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 {
-	struct ofono_modem *modem = user;
-
-	switch (new_state) {
-	case OFONO_SIM_STATE_NOT_PRESENT:
-		modem_change_state(modem, MODEM_STATE_PRE_SIM);
-	case OFONO_SIM_STATE_INSERTED:
-	case OFONO_SIM_STATE_RESETTING:
-		break;
-	case OFONO_SIM_STATE_LOCKED_OUT:
-		modem_change_state(modem, MODEM_STATE_PRE_SIM);
-		break;
-	case OFONO_SIM_STATE_READY:
-		modem_change_state(modem, MODEM_STATE_OFFLINE);
-
-		/* Modem is always online, proceed to online state. */
-		if (modem_is_always_online(modem) == TRUE)
-			set_online(modem, TRUE);
-
-		if (modem->online == TRUE)
-			modem_change_state(modem, MODEM_STATE_ONLINE);
-		else if (modem->get_online)
-			modem->driver->set_online(modem, 1, common_online_cb,
-							modem);
-
-		modem->get_online = FALSE;
-
-		break;
-	}
+	ofono_info("modem - %s, sim state = %d", __func__, new_state);
 }
 
 static DBusMessage *set_property_online(struct ofono_modem *modem,
@@ -982,8 +942,11 @@ void __ofono_modem_append_properties(struct ofono_modem *modem,
 	ofono_dbus_dict_append(dict, "Emergency", DBUS_TYPE_BOOLEAN,
 				&emergency);
 
+	ofono_dbus_dict_append(dict, "ModemState", DBUS_TYPE_UINT32,
+				&modem->modem_state);
+
 	ofono_dbus_dict_append(dict, "RadioState", DBUS_TYPE_UINT32,
-				&modem->status);
+				&modem->radio_status);
 
 	info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
 	if (info) {
@@ -1319,11 +1282,13 @@ static DBusMessage *modem_set_property(DBusConnection *conn,
 						&powered);
 
 		if (powered) {
-			modem_change_state(modem, MODEM_STATE_PRE_SIM);
-
-			/* Force SIM Ready for devies with no sim atom */
-			if (modem_has_sim(modem) == FALSE)
-				sim_state_watch(OFONO_SIM_STATE_READY, modem);
+			if (modem->driver->query_modem_status != NULL) {
+				/* for rilmodem, query modem status once RIL connected */
+				modem->driver->query_modem_status(modem, modem_status_query_cb, modem);
+			} else {
+				/* for atmodem, set modem state as alive directly */
+				modem_change_state(modem, MODEM_STATE_ALIVE);
+			}
 		} else {
 			set_online(modem, FALSE);
 			modem_change_state(modem, MODEM_STATE_POWER_OFF);
@@ -1364,11 +1329,18 @@ static DBusMessage *modem_enable_or_disable(struct ofono_modem *modem, ofono_boo
 	if (modem->pending)
 		return __ofono_error_busy(msg);
 
-	if (modem->modem_state == MODEM_STATE_POWER_OFF)
+	if (modem->modem_state <= MODEM_STATE_POWER_OFF)
+		return __ofono_error_not_allowed(msg);
+
+	if (enable && modem->modem_state >= MODEM_STATE_ALIVE)
+		return __ofono_error_not_allowed(msg);
+
+	if (!enable && modem->modem_state <= MODEM_STATE_AWARE)
 		return __ofono_error_not_allowed(msg);
 
 	modem->pending = dbus_message_ref(msg);
-	modem->driver->enable_modem(modem, enable, modem_enable_or_disable_cb, modem);
+	modem->driver->enable_modem(modem, enable,
+		enable ? modem_enable_cb : modem_disable_cb, modem);
 
 	return NULL;
 }
@@ -1659,11 +1631,13 @@ void ofono_modem_set_powered(struct ofono_modem *modem, ofono_bool_t powered)
 					&dbus_powered);
 
 	if (powered) {
-		modem_change_state(modem, MODEM_STATE_PRE_SIM);
-
-		/* Force SIM Ready for devices with no sim atom */
-		if (modem_has_sim(modem) == FALSE)
-			sim_state_watch(OFONO_SIM_STATE_READY, modem);
+		if (modem->driver->query_modem_status != NULL) {
+			/* for rilmodem, query modem status once RIL connected */
+			modem->driver->query_modem_status(modem, modem_status_query_cb, modem);
+		} else {
+			/* for atmodem, set modem state as alive directly */
+			modem_change_state(modem, MODEM_STATE_ALIVE);
+		}
 	} else {
 		set_online(modem, FALSE);
 
@@ -1674,6 +1648,7 @@ out:
 	if (powering_down && powered == FALSE) {
 		modems_remaining -= 1;
 
+		ofono_warn("modems_remaining : %d .", modems_remaining);
 		if (modems_remaining == 0)
 			__ofono_exit();
 	}
@@ -2666,26 +2641,15 @@ void ofono_modem_reset(struct ofono_modem *modem)
 		__ofono_dbus_pending_reply(&modem->pending, reply);
 	}
 
-	if (modem->modem_state == MODEM_STATE_ONLINE)
-		modem->get_online = TRUE;
-
 	ofono_modem_set_powered(modem, FALSE);
 
 	err = set_powered(modem, TRUE);
-	if (err == -EINPROGRESS)
-		return;
-
-	if (err < 0)
-		return;
-
-	modem_change_state(modem, MODEM_STATE_PRE_SIM);
+	ofono_debug("%s , err : %d", __func__, err);
 }
 
 void __ofono_modem_sim_reset(struct ofono_modem *modem)
 {
 	DBG("%p", modem);
-
-	modem_change_state(modem, MODEM_STATE_PRE_SIM);
 }
 
 int ofono_modem_driver_register(const struct ofono_modem_driver *d)
@@ -2779,6 +2743,7 @@ void __ofono_modem_inc_emergency_mode(struct ofono_modem *modem)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t emergency = TRUE;
+	enum radio_status old_radio_status = modem->radio_status;
 
 	if (++modem->emergency > 1)
 		return;
@@ -2788,13 +2753,15 @@ void __ofono_modem_inc_emergency_mode(struct ofono_modem *modem)
 						"Emergency", DBUS_TYPE_BOOLEAN,
 						&emergency);
 
-	radio_status_change(modem);
+	modem->radio_status = RADIO_STATUS_EMERGENCY_ONLY;
+	radio_status_change(modem, old_radio_status, RADIO_STATUS_EMERGENCY_ONLY);
 }
 
 void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t emergency = FALSE;
+	enum radio_status old_radio_status = modem->radio_status;
 
 	if (modem->emergency == 0) {
 		ofono_error("emergency mode is already deactivated!!!");
@@ -2809,14 +2776,30 @@ void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 						"Emergency", DBUS_TYPE_BOOLEAN,
 						&emergency);
 
-	radio_status_change(modem);
+	modem->radio_status = RADIO_STATUS_EMERGENCY_ONLY;
+	radio_status_change(modem, old_radio_status, RADIO_STATUS_EMERGENCY_ONLY);
 
 out:
 	modem->emergency--;
 }
 
-void ofono_modem_process_radio_state(struct ofono_modem *modem,
-				const char *radio_state)
+void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 {
-	set_online(modem, g_str_equal(radio_state, "ON"));
+	enum radio_status old_radio_state = modem->radio_status;
+
+	switch (radio_state) {
+	case 0:
+		modem->radio_status = RADIO_STATUS_OFF;
+		set_online(modem, FALSE);
+		break;
+	case 1:
+		modem->radio_status = RADIO_STATUS_UNAVAILABLE;
+		break;
+	case 10:
+		modem->radio_status = RADIO_STATUS_ON;
+		set_online(modem, TRUE);
+		break;
+	}
+
+	radio_status_change(modem, old_radio_state, modem->radio_status);
 }
