@@ -139,8 +139,7 @@ void ofono_modem_remove(struct ofono_modem *modem);
 void ofono_modem_reset(struct ofono_modem *modem);
 
 void ofono_modem_set_powered(struct ofono_modem *modem, ofono_bool_t powered);
-void ofono_modem_process_radio_state(struct ofono_modem *modem,
-					const char *radio_state);
+void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state);
 ofono_bool_t ofono_modem_get_powered(struct ofono_modem *modem);
 
 ofono_bool_t ofono_modem_get_online(struct ofono_modem *modem);

@@ -151,8 +151,7 @@ static void ril_radio_state_changed(struct ril_msg *message, gpointer user_data)
 			break;
 		}
 
-		ofono_modem_process_radio_state(modem,
-			ril_radio_state_to_string(radio_state));
+		ofono_modem_process_radio_state(modem, radio_state);
 	}
 }
 
@@ -301,8 +300,10 @@ static void ril_set_online_cb(struct ril_msg *message, gpointer user_data)
 	struct ril_data *rd = cbd->user;
 	ofono_modem_online_cb_t cb = cbd->cb;
 
+	g_ril_print_response_no_args(rd->ril, message);
+
 	if (message->error == RIL_E_SUCCESS) {
-		DBG("%s: set_online OK: rd->ofono_online: %d", __func__,
+		ofono_debug("%s: set_online OK: rd->ofono_online: %d", __func__,
 			rd->ofono_online);
 		CALLBACK_WITH_SUCCESS(cb, cbd->data);
 	} else {
