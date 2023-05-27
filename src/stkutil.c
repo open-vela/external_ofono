@@ -6357,6 +6357,10 @@ char *stk_text_to_html(const char *utf8,
 			break;
 
 		clen = l_utf8_get_codepoint(text, 4, &c);
+
+		if (clen < 0)
+			break;
+
 		switch (c) {
 		case '\n':
 			l_string_append(string, "<br/>");
@@ -6387,6 +6391,11 @@ char *stk_text_to_html(const char *utf8,
 	}
 
 	l_free(formats);
+
+	if (pos != text_len) {
+		l_string_free(string);
+		return NULL;
+	}
 
 	/* return characters from string. Caller must free char data */
 	return l_string_unwrap(string);
