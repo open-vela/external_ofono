@@ -52,8 +52,8 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 	ofono_ims_status_cb_t cb = cbd->cb;
 	struct ril_ims_data *rid = cbd->user;
 	struct ofono_error error;
-	int reg_info;
-	int ext_info;
+	int reg_info = 0;
+	int ext_info = 0;
 	int num;
 	struct parcel rilp;
 
@@ -81,7 +81,7 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, -1, -1, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, 0, 0, cbd->data);
 }
 
 static void ril_ims_registration_status(struct ofono_ims *ims,
@@ -94,7 +94,7 @@ static void ril_ims_registration_status(struct ofono_ims *ims,
 			ril_registration_status_cb, cbd, g_free) == 0) {
 		g_free(cbd);
 
-		CALLBACK_WITH_FAILURE(cb, -1, -1, data);
+		CALLBACK_WITH_FAILURE(cb, 0, 0, data);
 	}
 }
 
@@ -120,14 +120,16 @@ static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
 
 	struct ofono_ims *ims = user_data;
 	struct ril_ims_data *rid = ofono_ims_get_data(ims);
-	int reg_info;
-	int ext_info;
+	int reg_info = 0;
+	int ext_info = 0;
 	int num;
 	struct parcel rilp;
 
-	if (message->error != RIL_E_SUCCESS) {
+	if (message->error != RIL_E_SUCCESS &&
+			message->error != RIL_E_RADIO_NOT_AVAILABLE) {
 		ofono_error("ims_state_change_cb error");
-		return;
+
+		goto result;
 	}
 
 	g_ril_print_response_no_args(rid->ril, message);
@@ -135,7 +137,7 @@ static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
 	g_ril_init_parcel(message, &rilp);
 
 	if (rilp.size < sizeof(int32_t))
-		return;
+		goto result;
 
 	num = parcel_r_int32(&rilp);
 	if(num > 0) {
@@ -143,6 +145,7 @@ static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
 		ext_info = parcel_r_int32(&rilp);
 	}
 
+result:
 	ofono_debug("ims_state_change_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
 	ofono_ims_status_notify(ims, reg_info, ext_info);
 }
@@ -219,31 +222,15 @@ static void ril_ims_set_capable(struct ofono_ims *ims, int cap,
 	}
 }
 
-static void ril_ims_support_cb(struct ril_msg *message, gpointer user_data)
-{
-	struct ofono_ims *ims = user_data;
-	struct ril_ims_data *rid = ofono_ims_get_data(ims);
-
-	if (message->error != RIL_E_SUCCESS){
-		ofono_ims_remove(ims);
-		return;
-	}
-
-	g_ril_print_response_no_args(rid->ril, message);
-
-	ofono_ims_register(ims);
-
-	g_ril_register(rid->ril, RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED,
-			ims_registration_notify, ims);
-}
-
 static gboolean ril_delayed_register(gpointer user_data)
 {
 	struct ofono_ims *ims = user_data;
 	struct ril_ims_data *rid = ofono_ims_get_data(ims);
 
-	g_ril_send(rid->ril, RIL_REQUEST_IMS_REGISTRATION_STATE, NULL,
-			ril_ims_support_cb, ims, NULL);
+	ofono_ims_register(ims);
+
+	g_ril_register(rid->ril, RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED,
+			ims_registration_notify, ims);
 
 	return FALSE;
 }
