@@ -139,11 +139,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 	char *end;
 	int status;
 	int tech = -1;
-	gboolean attached = FALSE;
 	gboolean notify_status = FALSE;
-	int old_status;
-
-	old_status = gd->rild_status;
 
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("%s: DATA_REGISTRATION_STATE reply failure: %s",
@@ -202,66 +198,16 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 		}
 	}
 
-	/*
-	 * There are two cases that can result in this callback
-	 * running:
-	 *
-	 * 1) ril_gprs_state_change() is called due to an unsolicited
-	 *    event from RILD.  No ofono cb exists.
-	 *
-	 * 2) The ofono code code calls the driver's attached_status()
-	 *    function.  A valid ofono cb exists.
-	 */
-
 	if (gd->rild_status != status) {
+		ofono_debug("%s - old status : %d, new status : %d",
+					__func__, gd->rild_status, status);
 		gd->rild_status = status;
 
-		if (cb == NULL)
-			notify_status = TRUE;
+		notify_status = TRUE;
 	}
 
-	/*
-	 * Override the actual status based upon the desired
-	 * attached status set by the core GPRS code ( controlled
-	 * by the ConnnectionManager's 'Powered' property ).
-	 */
-	attached = status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
-			status == NETWORK_REGISTRATION_STATUS_ROAMING;
-
-	if (attached && gd->ofono_attached == FALSE) {
-		DBG("attached=true; ofono_attached=false; return !REGISTERED");
-		status = NETWORK_REGISTRATION_STATUS_NOT_REGISTERED;
-
-		/*
-		 * Further optimization so that if ril_status ==
-		 * NOT_REGISTERED, ofono_attached == false, and status ==
-		 * ROAMING | REGISTERED, then notify gets cleared...
-		 *
-		 * As is, this results in unecessary status notify calls
-		 * when nothing has changed.
-		 */
-		if (notify_status && status == old_status)
-			notify_status = FALSE;
-	}
-
-	/* Just need to notify ofono if it's already attached */
-	if (notify_status) {
-		/*
-		 * If network disconnect has occurred, call detached_notify()
-		 * instead of status_notify().
-		 */
-		if (!attached &&
-			(old_status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
-				old_status ==
-					NETWORK_REGISTRATION_STATUS_ROAMING)) {
-			DBG("calling ofono_gprs_detached_notify()");
-			ofono_gprs_detached_notify(gprs);
-			tech = RADIO_TECH_UNKNOWN;
-		} else {
-			DBG("calling ofono_gprs_status_notify()");
-			ofono_gprs_status_notify(gprs, status);
-		}
-	}
+	if (notify_status && cb == NULL)
+		ofono_gprs_status_notify(gprs, status);
 
 	modem = ofono_gprs_get_modem(gprs);
 	ofono_debug("DATA_REGISTRATION_STATE with tech %d", tech);
