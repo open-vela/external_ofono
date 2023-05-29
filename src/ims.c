@@ -177,11 +177,6 @@ static void registration_status_cb(const struct ofono_error *error,
 {
 	struct ofono_ims *ims = data;
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during IMS registration/unregistration");
-		return;
-	}
-
 	ofono_ims_status_notify(ims, reg_info, ext_info);
 }
 
@@ -336,7 +331,7 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 						ims_atom_remove, ims);
 
 	ims->reg_info = 0;
-	ims->ext_info = -1;
+	ims->ext_info = 0;
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_ims_driver *drv = l->data;
@@ -351,7 +346,7 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 		break;
 	}
 
-	DBG("IMS atom created");
+	ofono_debug("IMS atom created");
 
 	return ims;
 }
