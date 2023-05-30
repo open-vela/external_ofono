@@ -395,7 +395,6 @@ static void query_max_cids_cb(struct ril_msg *message, gpointer user_data)
 reg_atom:
 	g_strfreev(strv);
 	ofono_gprs_set_cid_range(gprs, 1, max_calls);
-	ofono_gprs_register(gprs);
 	return;
 
 error_free:
@@ -403,7 +402,6 @@ error_free:
 
 error:
 	ofono_error("Unable to query max CIDs");
-	ofono_gprs_remove(gprs);
 }
 
 static void ril_gprs_state_change(struct ril_msg *message, gpointer user_data)
@@ -413,12 +411,7 @@ static void ril_gprs_state_change(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_unsol_no_args(gd->ril, message);
 
-	/*
-	 * We just want to track network data status if ofono
-	 * itself is attached, so we avoid unnecessary data state requests.
-	 */
-	if (gd->ofono_attached == TRUE)
-		ril_gprs_registration_status(gprs, NULL, NULL);
+	ril_gprs_registration_status(gprs, NULL, NULL);
 }
 
 static void query_max_cids(struct ofono_gprs *gprs)
@@ -431,13 +424,12 @@ static void query_max_cids(struct ofono_gprs *gprs)
 	 */
 	if (g_ril_vendor(gd->ril) == OFONO_RIL_VENDOR_MTK) {
 		ofono_gprs_set_cid_range(gprs, 1, 3);
-		ofono_gprs_register(gprs);
 		return;
 	}
 
 	if (g_ril_send(gd->ril, RIL_REQUEST_DATA_REGISTRATION_STATE, NULL,
 			query_max_cids_cb, gprs, NULL) < 0)
-		ofono_gprs_remove(gprs);
+		ofono_error("error in %s", __func__);
 }
 
 static void drop_data_call_cb(struct ril_msg *message, gpointer user_data)
@@ -556,6 +548,24 @@ static void ril_gprs_restricted_state_change(struct ril_msg *message, gpointer u
 	ofono_gprs_restricted_notify(gprs, resticted_state);
 }
 
+static gboolean ril_delayed_register(gpointer user_data)
+{
+	struct ofono_gprs *gprs = user_data;
+	struct ril_gprs_data *gd = ofono_gprs_get_data(gprs);
+
+	ofono_gprs_register(gprs);
+
+	get_active_data_calls(gprs);
+
+	g_ril_register(gd->ril, RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED,
+					ril_gprs_state_change, gprs);
+
+	g_ril_register(gd->ril, RIL_UNSOL_RESTRICTED_STATE_CHANGED,
+			ril_gprs_restricted_state_change, gprs);
+
+	return FALSE;
+}
+
 static int ril_gprs_probe(struct ofono_gprs *gprs, unsigned int vendor,
 								void *userdata)
 {
@@ -572,13 +582,7 @@ static int ril_gprs_probe(struct ofono_gprs *gprs, unsigned int vendor,
 
 	ofono_gprs_set_data(gprs, gd);
 
-	get_active_data_calls(gprs);
-
-	g_ril_register(gd->ril, RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED,
-					ril_gprs_state_change, gprs);
-
-	g_ril_register(gd->ril, RIL_UNSOL_RESTRICTED_STATE_CHANGED,
-			ril_gprs_restricted_state_change, gprs);
+	g_idle_add(ril_delayed_register, gprs);
 
 	return 0;
 }
