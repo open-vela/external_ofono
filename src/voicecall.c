@@ -2536,7 +2536,6 @@ static DBusMessage *manager_hangup(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 	struct voicecall *call;
-	gboolean single_call;
 	const char *path;
 
 	if(vc->call_list == NULL)
@@ -2547,7 +2546,6 @@ static DBusMessage *manager_hangup(DBusConnection *conn,
 				DBUS_TYPE_INVALID) == FALSE)
 		return __ofono_error_invalid_args(msg);
 
-	single_call = vc->call_list->next == 0;
 	call = voicecall_by_path(vc, path);
 	if (call == NULL)
 		return __ofono_error_invalid_args(msg);
@@ -2555,81 +2553,8 @@ static DBusMessage *manager_hangup(DBusConnection *conn,
 	if (vc->pending || vc->pending_em)
 		return __ofono_error_busy(msg);
 
-	if (vc->dial_req && vc->dial_req->call != call)
-		return __ofono_error_busy(msg);
-
-	switch (call->call->status) {
-	case CALL_STATUS_DISCONNECTED:
+	if (call->call->status == CALL_STATUS_DISCONNECTED)
 		return __ofono_error_failed(msg);
-
-	case CALL_STATUS_INCOMING:
-		if (vc->driver->hangup_all == NULL &&
-				vc->driver->hangup_active == NULL)
-			return __ofono_error_not_implemented(msg);
-
-		vc->pending = dbus_message_ref(msg);
-
-		if (vc->driver->hangup_all)
-			vc->driver->hangup_all(vc, generic_callback, vc);
-		else
-			vc->driver->hangup_active(vc, generic_callback, vc);
-
-		return NULL;
-
-	case CALL_STATUS_WAITING:
-		if (vc->driver->set_udub == NULL)
-			return __ofono_error_not_implemented(msg);
-
-		vc->pending = dbus_message_ref(msg);
-		vc->driver->set_udub(vc, generic_callback, vc);
-
-		return NULL;
-
-	case CALL_STATUS_HELD:
-		if (vc->driver->release_all_held &&
-				voicecalls_num_held(vc) == 1 &&
-				voicecalls_have_waiting(vc) == FALSE) {
-			vc->pending = dbus_message_ref(msg);
-			vc->driver->release_all_held(vc, generic_callback, vc);
-
-			return NULL;
-		}
-
-		break;
-
-	case CALL_STATUS_DIALING:
-	case CALL_STATUS_ALERTING:
-		if (vc->driver->hangup_active != NULL) {
-			vc->pending = dbus_message_ref(msg);
-			vc->driver->hangup_active(vc, generic_callback, vc);
-
-			return NULL;
-		}
-
-		/*
-		 * We check if we have a single alerting, dialing or activeo
-		 * call and try to hang it up with hangup_all or hangup_active
-		 */
-
-		/* fall through */
-	case CALL_STATUS_ACTIVE:
-		if (single_call == TRUE && vc->driver->hangup_all != NULL) {
-			vc->pending = dbus_message_ref(msg);
-			vc->driver->hangup_all(vc, generic_callback, vc);
-
-			return NULL;
-		}
-
-		if (voicecalls_num_active(vc) == 1 &&
-				vc->driver->hangup_active != NULL) {
-			vc->pending = dbus_message_ref(msg);
-			vc->driver->hangup_active(vc, generic_callback, vc);
-
-			return NULL;
-		}
-
-		break;
-	}
 
 	if (vc->driver->release_specific == NULL)
 		return __ofono_error_not_implemented(msg);
@@ -2657,18 +2582,31 @@ static DBusMessage *manager_answer(DBusConnection *conn,
 	if (call == NULL)
 		return __ofono_error_invalid_args(msg);
 
-	if (call->call->status != CALL_STATUS_INCOMING)
-		return __ofono_error_failed(msg);
-
-	if (vc->driver->answer == NULL)
-		return __ofono_error_not_implemented(msg);
-
 	if (vc->pending || vc->dial_req || vc->pending_em)
 		return __ofono_error_busy(msg);
 
-	vc->pending = dbus_message_ref(msg);
+	/*
+	 * We have waiting call and both an active and held call.  According
+	 * to 22.030 we cannot use CHLD=2 in this situation.
+	 */
+	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
+		return __ofono_error_failed(msg);
 
-	vc->driver->answer(vc, generic_callback, vc);
+	if (call->call->status == CALL_STATUS_INCOMING) {
+		if (vc->driver->answer == NULL)
+			return __ofono_error_not_implemented(msg);
+
+		vc->pending = dbus_message_ref(msg);
+
+		vc->driver->answer(vc, generic_callback, vc);
+	} else if (call->call->status == CALL_STATUS_WAITING) {
+		if (vc->driver->hold_all_active == NULL)
+			return __ofono_error_not_implemented(msg);
+
+		vc->pending = dbus_message_ref(msg);
+
+		vc->driver->hold_all_active(vc, generic_callback, vc);
+	}
 
 	return NULL;
 }
