@@ -37,7 +37,7 @@ Properties	string DefaultAccessPointName [readwrite]
 		string Protocol [readwrite, experimental]
 
 			Holds the protocol for this context.  Valid values
-			are: "ip", "ipv6" and "dual". Default value is "ip".
+			are: "IP", "IPV6" and "IPV4V6". Default value is "ip".
 
 		string AuthenticationMethod [readwrite, experimental]
 

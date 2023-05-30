@@ -798,11 +798,11 @@ const char *gprs_proto_to_string(enum ofono_gprs_proto proto)
 {
 	switch (proto) {
 	case OFONO_GPRS_PROTO_IP:
-		return "ip";
+		return "IP";
 	case OFONO_GPRS_PROTO_IPV6:
-		return "ipv6";
+		return "IPV6";
 	case OFONO_GPRS_PROTO_IPV4V6:
-		return "dual";
+		return "IPV4V6";
 	};
 
 	return NULL;
@@ -810,13 +810,13 @@ const char *gprs_proto_to_string(enum ofono_gprs_proto proto)
 
 gboolean gprs_proto_from_string(const char *str, enum ofono_gprs_proto *proto)
 {
-	if (g_str_equal(str, "ip")) {
+	if (g_str_equal(str, "IP")) {
 		*proto = OFONO_GPRS_PROTO_IP;
 		return TRUE;
-	} else if (g_str_equal(str, "ipv6")) {
+	} else if (g_str_equal(str, "IPV6")) {
 		*proto = OFONO_GPRS_PROTO_IPV6;
 		return TRUE;
-	} else if (g_str_equal(str, "dual")) {
+	} else if (g_str_equal(str, "IPV4V6")) {
 		*proto = OFONO_GPRS_PROTO_IPV4V6;
 		return TRUE;
 	}
