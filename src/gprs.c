@@ -88,6 +88,9 @@ struct ofono_gprs {
 	const struct ofono_gprs_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
+	struct ofono_sim *sim;
+	unsigned int sim_watch;
+	unsigned int sim_state_watch;
 	unsigned int spn_watch;
 };
 
@@ -153,6 +156,7 @@ static void gprs_context_changed(struct pri_context *context);
 static void gprs_set_data_profile_callback(const struct ofono_error *error,
 						int status, void *data);
 static void gprs_set_data_profile(struct ofono_gprs *gprs);
+static void spn_read_cb(const char *spn, const char *dc, void *data);
 
 static GSList *g_drivers = NULL;
 static GSList *g_context_drivers = NULL;
@@ -3492,10 +3496,18 @@ static void gprs_unregister(struct ofono_atom *atom)
 	}
 
 	if (gprs->spn_watch) {
-		struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM,
-								modem);
+		ofono_sim_remove_spn_watch(gprs->sim, &gprs->spn_watch);
+		gprs->spn_watch = 0;
+	}
 
-		ofono_sim_remove_spn_watch(sim, &gprs->spn_watch);
+	if (gprs->sim_state_watch) {
+		ofono_sim_remove_state_watch(gprs->sim, gprs->sim_state_watch);
+		gprs->sim_state_watch = 0;
+	}
+
+	if (gprs->sim_watch) {
+		__ofono_modem_remove_atom_watch(modem, gprs->sim_watch);
+		gprs->sim_watch = 0;
 	}
 
 	ofono_modem_remove_interface(modem,
@@ -3896,12 +3908,96 @@ static void gprs_set_data_profile(struct ofono_gprs *gprs)
 	g_free(contexts);
 }
 
-static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
+static void sim_state_watch(enum ofono_sim_state new_state, void *user)
+{
+	struct ofono_gprs *gprs = user;
+
+	if (gprs->sim == NULL)
+		return;
+
+	ofono_info("gprs - %s, sim_state : %d", __func__, new_state);
+
+	switch (new_state) {
+	case OFONO_SIM_STATE_INSERTED:
+		break;
+	case OFONO_SIM_STATE_NOT_PRESENT:
+	case OFONO_SIM_STATE_RESETTING:
+		if (gprs->spn_watch) {
+			ofono_sim_remove_spn_watch(gprs->sim, &gprs->spn_watch);
+			gprs->spn_watch = 0;
+		}
+		break;
+	case OFONO_SIM_STATE_READY:
+		gprs_load_settings(gprs, ofono_sim_get_imsi(gprs->sim));
+		ofono_sim_add_spn_watch(gprs->sim, &gprs->spn_watch,
+						spn_read_cb, gprs, NULL);
+		break;
+	case OFONO_SIM_STATE_LOCKED_OUT:
+		break;
+	}
+}
+
+static void sim_watch(struct ofono_atom *atom,
+			enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_gprs *gprs = data;
+	struct ofono_sim *sim = __ofono_atom_get_data(atom);
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		gprs->sim_state_watch = 0;
+		gprs->sim = NULL;
+		return;
+	}
+
+	gprs->sim = sim;
+	gprs->sim_state_watch = ofono_sim_add_state_watch(sim,
+							sim_state_watch,
+							gprs, NULL);
+
+	sim_state_watch(ofono_sim_get_state(sim), gprs);
+}
+
+static void spn_read_cb(const char *spn, const char *dc, void *data)
+{
+	struct ofono_gprs *gprs	= data;
+	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
+	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
+	const struct ofono_gprs_driver *driver = gprs->driver;
+
+	provision_contexts(gprs, ofono_sim_get_mcc(sim),
+					ofono_sim_get_mnc(sim), spn);
+
+	if (gprs->spn_watch) {
+		ofono_sim_remove_spn_watch(sim, &gprs->spn_watch);
+		gprs->spn_watch = 0;
+	}
+
+	if (driver == NULL)
+		return;
+
+	/* Find any context activated during init */
+	if (driver->list_active_contexts)
+		driver->list_active_contexts(gprs,
+						gprs_list_active_contexts_callback,
+						gprs);
+
+	/* Set data profile to modem */
+	gprs_set_data_profile(gprs);
+
+	if (gprs->driver->attached_status != NULL)
+		gprs->driver->attached_status(gprs, registration_status_cb, gprs);
+}
+
+struct ofono_modem *ofono_gprs_get_modem(struct ofono_gprs *gprs)
+{
+	return __ofono_atom_get_modem(gprs->atom);
+}
+
+void ofono_gprs_register(struct ofono_gprs *gprs)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
 	const char *path = __ofono_atom_get_path(gprs->atom);
-	const struct ofono_gprs_driver *driver = gprs->driver;
 
 	if (!g_dbus_register_interface(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
@@ -3917,62 +4013,15 @@ static void ofono_gprs_finish_register(struct ofono_gprs *gprs)
 	ofono_modem_add_interface(modem,
 				OFONO_CONNECTION_MANAGER_INTERFACE);
 
+	__ofono_atom_register(gprs->atom, gprs_unregister);
+
 	gprs->netreg_watch = __ofono_modem_add_atom_watch(modem,
 					OFONO_ATOM_TYPE_NETREG,
 					netreg_watch, gprs, NULL);
 
-	__ofono_atom_register(gprs->atom, gprs_unregister);
-
-	/* Find any context activated during init */
-	if (driver->list_active_contexts)
-		driver->list_active_contexts(gprs,
-						gprs_list_active_contexts_callback,
-						gprs);
-
-	/* Set data profile to modem */
-	gprs_set_data_profile(gprs);
-
-	if (gprs->driver->attached_status != NULL)
-		gprs->driver->attached_status(gprs, registration_status_cb, gprs);
-}
-
-static void spn_read_cb(const char *spn, const char *dc, void *data)
-{
-	struct ofono_gprs *gprs	= data;
-	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
-	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-
-	provision_contexts(gprs, ofono_sim_get_mcc(sim),
-					ofono_sim_get_mnc(sim), spn);
-
-	ofono_sim_remove_spn_watch(sim, &gprs->spn_watch);
-
-	ofono_gprs_finish_register(gprs);
-}
-
-struct ofono_modem *ofono_gprs_get_modem(struct ofono_gprs *gprs)
-{
-	return __ofono_atom_get_modem(gprs->atom);
-}
-
-void ofono_gprs_register(struct ofono_gprs *gprs)
-{
-	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
-	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-
-	if (sim == NULL)
-		goto finish;
-
-	gprs_load_settings(gprs, ofono_sim_get_imsi(sim));
-
-	if (gprs->contexts)
-		goto finish;
-
-	ofono_sim_add_spn_watch(sim, &gprs->spn_watch, spn_read_cb, gprs, NULL);
-	return;
-
-finish:
-	ofono_gprs_finish_register(gprs);
+	gprs->sim_watch = __ofono_modem_add_atom_watch(modem,
+						OFONO_ATOM_TYPE_SIM,
+						sim_watch, gprs, NULL);
 }
 
 void ofono_gprs_remove(struct ofono_gprs *gprs)
