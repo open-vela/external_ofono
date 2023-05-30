@@ -118,13 +118,13 @@ static int config_file_provision_get_settings(const char *mcc,
 
 	if (value != NULL) {
 		DBG("CRO value:%s", value);
-		if (g_strcmp0(value, "ip") == 0) {
+		if (g_strcmp0(value, "IP") == 0) {
 			DBG("CRO value=ip");
 			(*settings)[0].proto = OFONO_GPRS_PROTO_IP;
-		} else if (g_strcmp0(value, "ipv6") == 0) {
+		} else if (g_strcmp0(value, "IPV6") == 0) {
 			DBG("CRO value=ipv6");
 			(*settings)[0].proto = OFONO_GPRS_PROTO_IPV6;
-		} else if (g_strcmp0(value, "dual") == 0)
+		} else if (g_strcmp0(value, "IPV4V6") == 0)
 			(*settings)[0].proto = OFONO_GPRS_PROTO_IPV4V6;
 		else
 			DBG("Unknown protocol: %s", value);

@@ -194,6 +194,37 @@ static void usage_start(GMarkupParseContext *context,
 					"Unknown usage attribute: %s", text);
 }
 
+static void proto_start(GMarkupParseContext *context,
+			const gchar **attribute_names,
+			const gchar **attribute_values,
+			enum ofono_gprs_proto *proto, GError **error)
+{
+	const char *text = NULL;
+	int i;
+
+	for (i = 0; attribute_names[i]; i++)
+		if (g_str_equal(attribute_names[i], "protocol") == TRUE)
+			text = attribute_values[i];
+
+	if (text == NULL) {
+		mbpi_g_set_error(context, error, G_MARKUP_ERROR,
+					G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+					"Missing attribute: protocal");
+		return;
+	}
+
+	if (strcmp(text, "IP") == 0)
+		*proto = OFONO_GPRS_PROTO_IP;
+	else if (strcmp(text, "IPV6") == 0)
+		*proto = OFONO_GPRS_PROTO_IPV6;
+	else if (strcmp(text, "IPV4V6") == 0)
+		*proto = OFONO_GPRS_PROTO_IPV4V6;
+	else
+		mbpi_g_set_error(context, error, G_MARKUP_ERROR,
+					G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE,
+					"Unknown protocal attribute: %s", text);
+}
+
 static void apn_start(GMarkupParseContext *context, const gchar *element_name,
 			const gchar **attribute_names,
 			const gchar **attribute_values,
@@ -221,6 +252,9 @@ static void apn_start(GMarkupParseContext *context, const gchar *element_name,
 	else if (g_str_equal(element_name, "usage"))
 		usage_start(context, attribute_names, attribute_values,
 				&apn->type, error);
+	else if (g_str_equal(element_name, "protocol"))
+		proto_start(context, attribute_names, attribute_values,
+				&apn->proto, error);
 }
 
 static void apn_end(GMarkupParseContext *context, const gchar *element_name,
@@ -328,7 +362,7 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 	ap = g_new0(struct ofono_gprs_provision_data, 1);
 	ap->apn = g_strdup(apn);
 	ap->type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
-	ap->proto = OFONO_GPRS_PROTO_IP;
+	ap->proto = OFONO_GPRS_PROTO_IPV4V6;
 	ap->auth_method = OFONO_GPRS_AUTH_METHOD_CHAP;
 
 	g_markup_parse_context_push(context, &apn_parser, ap);

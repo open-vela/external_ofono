@@ -84,6 +84,7 @@ static int provision_get_settings(const char *mcc, const char *mnc,
 		DBG("Name: '%s'", ap->name);
 		DBG("APN: '%s'", ap->apn);
 		DBG("Type: %s", mbpi_ap_type(ap->type));
+		DBG("Protocal: %d", ap->proto);
 		DBG("Username: '%s'", ap->username);
 		DBG("Password: '%s'", ap->password);
 
