@@ -42,6 +42,7 @@
 struct ofono_ims {
 	int reg_info;
 	int ext_info;
+	struct ofono_watchlist *status_watches;
 	const struct ofono_ims_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
@@ -140,6 +141,44 @@ static void ims_set_registered(struct ofono_ims *ims, ofono_bool_t status)
 						&new_value);
 }
 
+int ofono_ims_get_reg_info(struct ofono_ims *ims)
+{
+	if (ims == NULL)
+		return -1;
+
+	return ims->reg_info;
+}
+
+int ofono_ims_get_ext_info(struct ofono_ims *ims)
+{
+	if (ims == NULL)
+		return -1;
+
+	return ims->ext_info;
+}
+
+ofono_bool_t ofono_ims_has_sms_capable(int reg_info, int ext_info)
+{
+	return reg_info && (ext_info & SMS_CAPABLE_FLAG);
+}
+
+static void notify_status_watches(struct ofono_ims *ims)
+{
+	struct ofono_watchlist_item *item;
+	GSList *l;
+	ofono_ims_status_notify_cb_t notify;
+
+	if (ims->status_watches == NULL)
+		return;
+
+	for (l = ims->status_watches->items; l; l = l->next) {
+		item = l->data;
+		notify = item->notify;
+
+		notify(ims->reg_info, ims->ext_info, item->notify_data);
+	}
+}
+
 void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info, int ext_info)
 {
 	dbus_bool_t new_reg_info;
@@ -169,6 +208,8 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info, int ext_info)
 skip:
 	ims->reg_info = reg_info;
 	ims->ext_info = ext_info;
+
+	notify_status_watches(ims);
 }
 
 static void registration_status_cb(const struct ofono_error *error,
@@ -278,6 +319,40 @@ static DBusMessage *ofono_ims_set_capability(DBusConnection *conn,
 	return NULL;
 }
 
+unsigned int __ofono_ims_add_status_watch(struct ofono_ims *ims,
+				ofono_ims_status_notify_cb_t notify,
+				void *data, ofono_destroy_func destroy)
+{
+	struct ofono_watchlist_item *item;
+
+	DBG("%p", ims);
+
+	if (ims == NULL)
+		return 0;
+
+	if (notify == NULL)
+		return 0;
+
+	item = g_new0(struct ofono_watchlist_item, 1);
+
+	item->notify = notify;
+	item->destroy = destroy;
+	item->notify_data = data;
+
+	return __ofono_watchlist_add_item(ims->status_watches, item);
+}
+
+gboolean __ofono_ims_remove_status_watch(struct ofono_ims *ims,
+						unsigned int id)
+{
+	DBG("%p", ims);
+
+	if (ims == NULL)
+		return FALSE;
+
+	return __ofono_watchlist_remove_item(ims->status_watches, id);
+}
+
 static const GDBusMethodTable ims_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -372,9 +447,13 @@ void ofono_ims_driver_unregister(const struct ofono_ims_driver *d)
 
 static void ims_atom_unregister(struct ofono_atom *atom)
 {
+	struct ofono_ims *ims = __ofono_atom_get_data(atom);
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem = __ofono_atom_get_modem(atom);
 	const char *path = __ofono_atom_get_path(atom);
+
+	__ofono_watchlist_free(ims->status_watches);
+	ims->status_watches = NULL;
 
 	ofono_modem_remove_interface(modem, OFONO_IMS_INTERFACE);
 	g_dbus_unregister_interface(conn, path, OFONO_IMS_INTERFACE);
@@ -394,6 +473,8 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 				OFONO_IMS_INTERFACE);
 		return;
 	}
+
+	ims->status_watches = __ofono_watchlist_new(g_free);
 
 	ofono_modem_add_interface(modem, OFONO_IMS_INTERFACE);
 	__ofono_atom_register(ims->atom, ims_atom_unregister);
