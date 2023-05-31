@@ -4726,7 +4726,7 @@ static void notify_phone_status_changed(struct ofono_voicecall *vc)
 			return;
 
 		dbus_message_iter_init_append(signal, &iter);
-		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &vc->status);
 		g_dbus_send_message(ofono_dbus_get_connection(), signal);
 	}
 }
