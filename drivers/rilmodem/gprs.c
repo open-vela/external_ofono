@@ -582,6 +582,12 @@ static int ril_gprs_probe(struct ofono_gprs *gprs, unsigned int vendor,
 
 	ofono_gprs_set_data(gprs, gd);
 
+	/*
+	 * set default cid range and it should be consitent with
+	 * gprs context count in ril.c/ril_post_online().
+	 */
+	ofono_gprs_set_cid_range(gprs, 1, 6);
+
 	g_idle_add(ril_delayed_register, gprs);
 
 	return 0;
