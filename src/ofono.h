@@ -577,3 +577,13 @@ ofono_bool_t __ofono_private_network_request(ofono_private_network_cb_t cb,
 #include <ofono/netmon.h>
 #include <ofono/lte.h>
 #include <ofono/ims.h>
+
+typedef void (*ofono_ims_status_notify_cb_t)(int reg_info, int ext_info,
+			void *data);
+
+unsigned int __ofono_ims_add_status_watch(struct ofono_ims *ims,
+				ofono_ims_status_notify_cb_t cb,
+				void *data, ofono_destroy_func destroy);
+
+gboolean __ofono_ims_remove_status_watch(struct ofono_ims *ims,
+						unsigned int id);
