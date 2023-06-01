@@ -625,7 +625,7 @@ static void modem_change_state(struct ofono_modem *modem,
 	ofono_dbus_signal_property_changed(conn, modem->path,
 			OFONO_MODEM_INTERFACE,
 			"ModemState",
-			DBUS_TYPE_UINT32, &modem->radio_status);
+			DBUS_TYPE_UINT32, &modem->modem_state);
 }
 
 unsigned int __ofono_modem_add_online_watch(struct ofono_modem *modem,
@@ -793,6 +793,9 @@ static void modem_enable_cb(const struct ofono_error *error, void *data)
 
 	if (modem->modem_state < MODEM_STATE_ALIVE)
 		modem_change_state(modem, MODEM_STATE_ALIVE);
+
+	modem->driver->set_online(modem, modem->online,
+		modem->online ? online_cb : offline_cb, modem);
 
 	reply = dbus_message_new_method_return(modem->pending);
 
