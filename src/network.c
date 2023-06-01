@@ -1192,6 +1192,9 @@ static void set_registration_status(struct ofono_netreg *netreg, int status)
 	const char *path = __ofono_atom_get_path(netreg->atom);
 	DBusConnection *conn = ofono_dbus_get_connection();
 
+	if (netreg->status == status)
+		return;
+
 	netreg->status = status;
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -1206,13 +1209,10 @@ static void set_registration_location(struct ofono_netreg *netreg, int lac)
 	const char *path = __ofono_atom_get_path(netreg->atom);
 	dbus_uint16_t dbus_lac = lac;
 
-	if (lac > 0xffff)
+	if (lac > 0xffff || netreg->location == lac)
 		return;
 
 	netreg->location = lac;
-
-	if (netreg->location == -1)
-		return;
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
@@ -1226,10 +1226,10 @@ static void set_registration_cellid(struct ofono_netreg *netreg, int ci)
 	const char *path = __ofono_atom_get_path(netreg->atom);
 	dbus_uint32_t dbus_ci = ci;
 
-	netreg->cellid = ci;
-
-	if (netreg->cellid == -1)
+	if (netreg->cellid == ci)
 		return;
+
+	netreg->cellid = ci;
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
@@ -1259,10 +1259,10 @@ static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(netreg->atom);
 
-	netreg->technology = tech;
-
-	if (netreg->technology == -1)
+	if (netreg->technology == tech)
 		return;
+
+	netreg->technology = tech;
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
