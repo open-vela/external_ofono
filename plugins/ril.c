@@ -127,12 +127,6 @@ static void ril_radio_state_changed(struct ril_msg *message, gpointer user_data)
 
 		switch (radio_state) {
 		case RADIO_STATE_ON:
-			if (rd->radio_settings == NULL)
-				rd->radio_settings =
-					ofono_radio_settings_create(modem,
-							rd->vendor, RILMODEM,
-							rd->ril);
-
 			break;
 
 		case RADIO_STATE_UNAVAILABLE:
@@ -208,6 +202,7 @@ void ril_pre_sim(struct ofono_modem *modem)
 
 	DBG("");
 
+	ofono_radio_settings_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_devinfo_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_voicecall_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_call_volume_create(modem, rd->vendor, RILMODEM, rd->ril);
