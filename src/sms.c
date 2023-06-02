@@ -725,8 +725,6 @@ static void tx_finished(const struct ofono_error *error, int mr, void *data)
 	if (ok == FALSE) {
 		/* Retry again when back in online mode */
 		/* Note this does not increment retry count */
-		if (sms->registered == FALSE)
-			return;
 
 		tx_state = MESSAGE_STATE_FAILED;
 
@@ -778,9 +776,6 @@ next_q:
 	sms_tx_queue_remove_entry(sms, g_queue_peek_head_link(sms->txq),
 					tx_state);
 
-	if (sms->registered == FALSE)
-		return;
-
 	if (g_queue_peek_head(sms->txq)) {
 		DBG("Scheduling next");
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
@@ -803,9 +798,6 @@ static gboolean tx_next(gpointer user_data)
 
 	sms->tx_source = 0;
 
-	if (sms->registered == FALSE)
-		return FALSE;
-
 	if (g_queue_get_length(sms->txq) > 1
 			|| (entry->num_pdus - entry->cur_pdu) > 1)
 		send_mms = 1;
@@ -827,9 +819,6 @@ static gboolean tx_write_to_sim(gpointer user_data)
 	DBG("tx_write_to_sim: %p", entry);
 
 	sms->tx_source = 0;
-
-	if (sms->registered == FALSE)
-		return FALSE;
 
 	sms->driver->sms_write_to_sim(sms, pdu->pdu, pdu->pdu_len, pdu->tpdu_len,
                                  				0, tx_write_to_sim_finish, sms);
@@ -2466,7 +2455,7 @@ int __ofono_sms_txq_submit(struct ofono_sms *sms, GSList *list,
 
 	g_queue_push_tail(sms->txq, entry);
 
-	if (sms->registered && g_queue_get_length(sms->txq) == 1)
+	if (g_queue_get_length(sms->txq) == 1)
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
 
 	if (uuid)
@@ -2532,7 +2521,7 @@ int __ofono_sms_txq_write_to_sim(struct ofono_sms *sms, GSList *list,
 	entry->id = sms->tx_counter++;
 
 	g_queue_push_tail(sms->txq, entry);
-	if (sms->registered && g_queue_get_length(sms->txq) == 1)
+	if (g_queue_get_length(sms->txq) == 1)
 		sms->tx_source = g_timeout_add(0, tx_write_to_sim, sms);
 
 	return 0;
