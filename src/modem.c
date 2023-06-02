@@ -575,10 +575,6 @@ static void set_online(struct ofono_modem *modem, ofono_bool_t new_online)
 						OFONO_MODEM_INTERFACE,
 						"Online", DBUS_TYPE_BOOLEAN,
 						&modem->online);
-	g_key_file_set_boolean(modem->settings, SETTINGS_GROUP,
-						"Online",
-						new_online);
-	storage_sync(SETTINGS_KEY, SETTINGS_STORE, modem->settings);
 
 	notify_online_watches(modem);
 }
