@@ -3964,8 +3964,9 @@ static void spn_read_cb(const char *spn, const char *dc, void *data)
 	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
 	const struct ofono_gprs_driver *driver = gprs->driver;
 
-	provision_contexts(gprs, ofono_sim_get_mcc(sim),
-					ofono_sim_get_mnc(sim), spn);
+	if (gprs->settings == NULL)
+		provision_contexts(gprs, ofono_sim_get_mcc(sim),
+						ofono_sim_get_mnc(sim), spn);
 
 	if (gprs->spn_watch) {
 		ofono_sim_remove_spn_watch(sim, &gprs->spn_watch);
