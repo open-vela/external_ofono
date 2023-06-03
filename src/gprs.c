@@ -83,6 +83,7 @@ struct ofono_gprs {
 	unsigned int status_watch;
 	GKeyFile *settings;
 	char *imsi;
+	ofono_bool_t provisioned;
 	DBusMessage *pending;
 	GSList *context_drivers;
 	const struct ofono_gprs_driver *driver;
@@ -3779,6 +3780,18 @@ static void gprs_load_settings(struct ofono_gprs *gprs, const char *imsi)
 	gprs->imsi = g_strdup(imsi);
 
 	error = NULL;
+	gprs->provisioned = g_key_file_get_boolean(gprs->settings, SETTINGS_GROUP,
+						"Provisioned", &error);
+
+	if (error) {
+		g_error_free(error);
+		gprs->provisioned = FALSE;
+		g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
+					"Provisioned",
+					gprs->provisioned);
+	}
+
+	error = NULL;
 	gprs->powered = g_key_file_get_boolean(gprs->settings, SETTINGS_GROUP,
 						"Powered", &error);
 
@@ -3964,9 +3977,15 @@ static void spn_read_cb(const char *spn, const char *dc, void *data)
 	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
 	const struct ofono_gprs_driver *driver = gprs->driver;
 
-	if (gprs->settings == NULL)
+	if (!gprs->provisioned) {
+		gprs->provisioned = TRUE;
+		g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
+			"Provisioned",
+			gprs->provisioned);
+
 		provision_contexts(gprs, ofono_sim_get_mcc(sim),
-						ofono_sim_get_mnc(sim), spn);
+					ofono_sim_get_mnc(sim), spn);
+	}
 
 	if (gprs->spn_watch) {
 		ofono_sim_remove_spn_watch(sim, &gprs->spn_watch);
