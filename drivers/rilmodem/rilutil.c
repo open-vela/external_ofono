@@ -105,8 +105,9 @@ const char *ril_util_gprs_proto_to_ril_string(enum ofono_gprs_proto proto)
 	case OFONO_GPRS_PROTO_IPV4V6:
 		return "IPV4V6";
 	case OFONO_GPRS_PROTO_IP:
-	default:
 		return "IP";
+	default:
+		return "IPV4V6";
 	}
 }
 

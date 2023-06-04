@@ -3670,7 +3670,7 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	protostr = g_key_file_get_string(gprs->settings, group,
 							"Protocol", NULL);
 	if (protostr == NULL)
-		protostr = g_strdup("ip");
+		protostr = g_strdup("IPV4V6");
 
 	if (gprs_proto_from_string(protostr, &proto) == FALSE)
 		goto error;
