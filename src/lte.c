@@ -101,7 +101,7 @@ static void lte_load_settings(struct ofono_lte *lte)
 				strcpy(lte->info.apn, apn);
 
 			if (proto_str == NULL)
-				proto_str = g_strdup("ip");
+				proto_str = g_strdup("IPV4V6");
 
 			/* this must have a valid default */
 			if (!gprs_proto_from_string(proto_str, &lte->info.proto))
