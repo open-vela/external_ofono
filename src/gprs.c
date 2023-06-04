@@ -2773,7 +2773,7 @@ static void provision_contexts(struct ofono_gprs *gprs, const char *mcc,
 	__ofono_gprs_provision_free_settings(settings, count);
 }
 
-static void remove_non_active_context(struct ofono_gprs *gprs,
+static void remove_context(struct ofono_gprs *gprs,
 				struct pri_context *ctx, DBusConnection *conn)
 {
 	char *path;
@@ -2824,12 +2824,7 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_INVALID))
 		return __ofono_error_invalid_args(msg);
 
-	for (l = gprs->contexts; l; l = l->next) {
-		struct pri_context *ctx = l->data;
-
-		if (ctx->active)
-			return __ofono_error_not_allowed(msg);
-	}
+	release_active_contexts(gprs);
 
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL)
@@ -2839,7 +2834,7 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 
 	while (gprs->contexts != NULL) {
 		struct pri_context *ctx = gprs->contexts->data;
-		remove_non_active_context(gprs, ctx, conn);
+		remove_context(gprs, ctx, conn);
 	}
 
 	gprs->last_context_id = 0;
@@ -2860,6 +2855,8 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 	for (l = gprs->contexts; l; l = l->next) {
 		struct pri_context *ctx = l->data;
 		send_context_added_signal(gprs, ctx, conn);
+
+		gprs_try_setup_data_call(gprs, ctx->type);
 	}
 
 	return reply;
