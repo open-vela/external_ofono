@@ -4622,6 +4622,7 @@ static void ssn_mt_remote_held_notify(struct ofono_voicecall *vc,
 						OFONO_VOICECALL_INTERFACE,
 						"RemoteHeld", DBUS_TYPE_BOOLEAN,
 						&v->remote_held);
+	voicecalls_emit_call_changed(vc, v);
 }
 
 static void ssn_mt_remote_multiparty_notify(struct ofono_voicecall *vc,
@@ -4646,6 +4647,7 @@ static void ssn_mt_remote_multiparty_notify(struct ofono_voicecall *vc,
 					OFONO_VOICECALL_INTERFACE,
 					"RemoteMultiparty", DBUS_TYPE_BOOLEAN,
 					&v->remote_multiparty);
+	voicecalls_emit_call_changed(vc, v);
 }
 
 void ofono_voicecall_ssn_mt_notify(struct ofono_voicecall *vc,
