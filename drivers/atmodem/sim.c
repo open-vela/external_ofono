@@ -1600,7 +1600,7 @@ static void at_clck_query_cb(gboolean ok, GAtResult *result, gpointer user)
 	}
 
 done:
-	ofono_sim_register(sim);
+	return;
 }
 
 static void at_discover_apps_cb(gboolean ok, GAtResult *result,
@@ -2013,6 +2013,7 @@ static int at_sim_probe(struct ofono_sim *sim, unsigned int vendor,
 	sd->vendor = vendor;
 
 	ofono_sim_set_data(sim, sd);
+	ofono_sim_register(sim);
 
 	/* <fac>s supported by default */
 	for (i = 0; i < ARRAY_SIZE(at_clck_cpwd_fac); i++)
