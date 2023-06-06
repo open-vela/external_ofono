@@ -3838,7 +3838,7 @@ static void gprs_load_settings(struct ofono_gprs *gprs, const char *imsi)
 
 	if (error) {
 		g_error_free(error);
-		gprs->preferred_apn = NULL;
+		gprs->preferred_apn = g_strdup("");
 		g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
 					"PreferredApn",
 					gprs->preferred_apn);
