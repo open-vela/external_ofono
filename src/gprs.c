@@ -2842,7 +2842,7 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 	/* Reset Preferred Apn as well */
 	if (gprs->preferred_apn != NULL) {
 		g_free(gprs->preferred_apn);
-		gprs->preferred_apn = NULL;
+		gprs->preferred_apn = g_strdup("");
 
 		g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
 			"PreferredApn",
