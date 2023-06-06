@@ -586,6 +586,8 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 	parcel_w_int32(&rilp, 1);	/* Number of params */
 	parcel_w_int32(&rilp, enable);
 
+	g_ril_append_print_buf(rd->ril, "(%d)", enable);
+
 	if (g_ril_send(rd->ril, RIL_REQUEST_ENABLE_MODEM, &rilp,
 			ril_enable_modem_cb, cbd, g_free) > 0)
 		return;
