@@ -96,7 +96,7 @@ struct ofono_radio_settings_driver {
 	void (*query_rat_mode)(struct ofono_radio_settings *rs,
 				ofono_radio_settings_rat_mode_query_cb_t cb,
 				void *data);
-	void (*set_rat_mode)(struct ofono_radio_settings *rs, unsigned int mode,
+	void (*set_rat_mode)(struct ofono_radio_settings *rs, int mode,
 				ofono_radio_settings_rat_mode_set_cb_t cb,
 				void *data);
 	void (*query_band)(struct ofono_radio_settings *rs,
