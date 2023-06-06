@@ -105,12 +105,15 @@ extern char print_buf[];
 	_length;							\
 })
 
-#define g_ril_print_unsol(gril, message)				\
+#define g_ril_print_unsol(gril, message) do {				\
 	G_RIL_TRACE(gril, "[%d,UNSOL]< %s %s",				\
 			g_ril_get_slot(gril),				\
 			g_ril_unsol_request_to_string(gril,		\
 							message->req),	\
-			print_buf)
+			print_buf);					\
+	print_buf[0] = '\0';						\
+} while (0)
+
 #define g_ril_print_unsol_no_args(gril, message)			\
 	G_RIL_TRACE(gril, "[%d,UNSOL]< %s", g_ril_get_slot(gril),	\
 			g_ril_unsol_request_to_string(gril, message->req))
