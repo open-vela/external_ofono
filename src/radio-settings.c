@@ -44,11 +44,11 @@ static GSList *g_drivers = NULL;
 struct ofono_radio_settings {
 	DBusMessage *pending;
 	int flags;
-	unsigned int mode;
+	int mode;
 	enum ofono_radio_band_gsm band_gsm;
 	enum ofono_radio_band_umts band_umts;
 	ofono_bool_t fast_dormancy;
-	unsigned int pending_mode;
+	int pending_mode;
 	enum ofono_radio_band_gsm pending_band_gsm;
 	enum ofono_radio_band_umts pending_band_umts;
 	ofono_bool_t fast_dormancy_pending;
@@ -60,7 +60,7 @@ struct ofono_radio_settings {
 	struct ofono_atom *atom;
 };
 
-static const char *radio_access_mode_to_string(unsigned int m)
+static const char *radio_access_mode_to_string(int m)
 {
 	switch (m) {
 	case OFONO_RADIO_ACCESS_MODE_GSM:
@@ -69,22 +69,21 @@ static const char *radio_access_mode_to_string(unsigned int m)
 		return "umts";
 	case OFONO_RADIO_ACCESS_MODE_LTE_ONLY:
 		return "lte";
+	case OFONO_RADIO_ACCESS_MODE_UMTS:
+		return "umts,gsm";
+	case OFONO_RADIO_ACCESS_MODE_LTE_WCDMA:
+		return "lte,umts";
+	case OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA:
+		return "lte,umts,gsm";
+	case OFONO_RADIO_ACCESS_MODE_ANY:
+		return "any";
 	}
 
-	if (m == OFONO_RADIO_ACCESS_MODE_UMTS)
-		return "umts,gsm";
-
-	if (m == OFONO_RADIO_ACCESS_MODE_LTE_WCDMA)
-		return "lte,umts";
-
-	if (m == OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA)
-		return "lte,umts,gsm";
-
-	return NULL;
+	return "";
 }
 
 static gboolean radio_access_mode_from_string(const char *str,
-					unsigned int *mode)
+					int *mode)
 
 {
 	if (g_str_equal(str, "gsm")) {
@@ -104,6 +103,9 @@ static gboolean radio_access_mode_from_string(const char *str,
 		return TRUE;
 	} else if (g_str_equal(str, "lte,umts,gsm")) {
 		*mode = OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA;
+		return TRUE;
+	} else if (g_str_equal(str, "any")) {
+		*mode = OFONO_RADIO_ACCESS_MODE_ANY;
 		return TRUE;
 	}
 
@@ -127,7 +129,7 @@ static const char *radio_band_gsm_to_string(enum ofono_radio_band_gsm band)
 		return "1900";
 	}
 
-	return NULL;
+	return "";
 }
 
 static gboolean radio_band_gsm_from_string(const char *str,
@@ -173,7 +175,7 @@ static const char *radio_band_umts_to_string(enum ofono_radio_band_umts band)
 		return "2100";
 	}
 
-	return NULL;
+	return "";
 }
 
 static gboolean radio_band_umts_from_string(const char *str,
@@ -374,7 +376,7 @@ static void radio_band_set_callback(const struct ofono_error *error,
 }
 
 static void radio_set_rat_mode(struct ofono_radio_settings *rs,
-				unsigned int mode)
+				int mode)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path;
@@ -588,7 +590,7 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 
 	if (g_strcmp0(property, "TechnologyPreference") == 0) {
 		const char *value;
-		unsigned int mode;
+		int mode;
 
 		if (rs->driver->set_rat_mode == NULL)
 			return __ofono_error_not_implemented(msg);
