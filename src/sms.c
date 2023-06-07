@@ -1221,9 +1221,6 @@ static void sim_sms_read_cb(int ok, int total_length, int record,
 		struct sms s;
 		if (simple_tlv_iter_get_tag(&tlv_iter) != 0xDD)
 			continue;
-		if (simple_tlv_iter_get_length(&tlv_iter) < 0) {
-			break;
-		}
 		sms_decode(simple_tlv_iter_get_data(&tlv_iter) + 1,
 					simple_tlv_iter_get_length(&tlv_iter) - 1,
 					FALSE, simple_tlv_iter_get_data(&tlv_iter)[0], &s);
