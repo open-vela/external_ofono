@@ -620,6 +620,33 @@ static void signal_settings(struct pri_context *ctx, const char *prop,
 	g_dbus_send_message(conn, signal);
 }
 
+static void update_preferred_context(struct ofono_gprs *gprs, const char *path)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *atompath;
+
+	if (path == NULL)
+		return;
+
+	if (g_strcmp0(path, gprs->preferred_apn)) {
+		if (gprs->preferred_apn)
+			g_free(gprs->preferred_apn);
+
+		gprs->preferred_apn = g_strdup(path);
+		if (gprs->preferred_apn == NULL)
+			return;
+
+		if (gprs->settings)
+			g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
+						"PreferredApn", gprs->preferred_apn);
+
+		atompath = __ofono_atom_get_path(gprs->atom);
+		ofono_dbus_signal_property_changed(conn, atompath,
+				OFONO_CONNECTION_MANAGER_INTERFACE,
+				"PreferredApn", DBUS_TYPE_STRING, &gprs->preferred_apn);
+	}
+}
+
 static void pri_context_signal_settings(struct pri_context *ctx,
 					gboolean ipv4, gboolean ipv6)
 {
@@ -937,6 +964,7 @@ static DBusMessage *pri_get_properties(DBusConnection *conn,
 static void pri_activate_callback(const struct ofono_error *error, void *data)
 {
 	struct pri_context *ctx = data;
+	struct ofono_gprs *gprs = ctx->gprs;
 	struct ofono_gprs_context *gc = ctx->context_driver;
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t value;
@@ -983,10 +1011,9 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 
 	ctx->status = CONTEXT_STATUS_ACTIVATED;
 
-	// automatically set preferred apn.
 	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET
-			&& (ctx->gprs->preferred_apn == NULL)) {
-		ctx->gprs->preferred_apn = g_strdup(ctx->path);
+			&& g_strcmp0(gprs->preferred_apn, "") == 0) {
+		update_preferred_context(gprs, ctx->path);
 	}
 }
 
@@ -2494,6 +2521,10 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 	g_dbus_emit_signal(conn, atompath, OFONO_CONNECTION_MANAGER_INTERFACE,
 				"ContextRemoved", DBUS_TYPE_OBJECT_PATH, &path,
 				DBUS_TYPE_INVALID);
+
+	if (g_strcmp0(path, gprs->preferred_apn) == 0)
+		update_preferred_context(gprs, "");
+
 	g_free(path);
 }
 
@@ -2548,14 +2579,8 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 				"ContextRemoved", DBUS_TYPE_OBJECT_PATH, &path,
 				DBUS_TYPE_INVALID);
 
-	if (gprs->preferred_apn != NULL && g_strcmp0(path, gprs->preferred_apn) == 0) {
-		g_free(gprs->preferred_apn);
-		gprs->preferred_apn = g_strdup("");
-
-		ofono_dbus_signal_property_changed(conn, atompath,
-				OFONO_CONNECTION_MANAGER_INTERFACE,
-				"PreferredApn", DBUS_TYPE_STRING, &gprs->preferred_apn);
-	}
+	if (g_strcmp0(path, gprs->preferred_apn) == 0)
+		update_preferred_context(gprs, "");
 
 	return NULL;
 }
@@ -2850,15 +2875,7 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 
 	gprs->last_context_id = 0;
 
-	/* Reset Preferred Apn as well */
-	if (gprs->preferred_apn != NULL) {
-		g_free(gprs->preferred_apn);
-		gprs->preferred_apn = g_strdup("");
-
-		g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
-			"PreferredApn",
-			gprs->preferred_apn);
-	}
+	update_preferred_context(gprs, "");
 
 	provision_contexts(gprs, ofono_sim_get_mcc(sim),
 				ofono_sim_get_mnc(sim), ofono_sim_get_spn(sim));
