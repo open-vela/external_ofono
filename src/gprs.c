@@ -1841,6 +1841,17 @@ static void pri_context_signal_active(struct pri_context *ctx)
 					"Active", DBUS_TYPE_BOOLEAN, &value);
 }
 
+static void try_activate_contexts(struct ofono_gprs *gprs)
+{
+	GSList *l;
+	struct pri_context *ctx;
+
+	for (l = gprs->contexts; l; l = l->next) {
+		ctx = l->data;
+		gprs_try_setup_data_call(gprs, ctx->type);
+	}
+}
+
 static void release_active_contexts(struct ofono_gprs *gprs)
 {
 	GSList *l;
@@ -1884,7 +1895,7 @@ static void gprs_attached_update(struct ofono_gprs *gprs)
 	gprs_set_attached_property(gprs, attached);
 
 	if (attached)
-		gprs_try_setup_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+		try_activate_contexts(gprs);
 	else
 		release_active_contexts(gprs);
 }
