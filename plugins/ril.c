@@ -243,9 +243,11 @@ void ril_post_online(struct ofono_modem *modem)
 	ofono_ussd_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_call_settings_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_call_barring_create(modem, rd->vendor, RILMODEM, rd->ril);
+	ofono_ims_create(modem, RILMODEM, rd->ril);
+	ofono_lte_create(modem, rd->vendor, RILMODEM, rd->ril);
+
 	gprs = ofono_gprs_create(modem, rd->vendor, RILMODEM, rd->ril);
 	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
-	ofono_ims_create(modem, RILMODEM, rd->ril);
 
 	if (gc) {
 		ofono_gprs_context_set_type(gc,

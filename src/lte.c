@@ -353,7 +353,7 @@ static void lte_atom_remove(struct ofono_atom *atom)
 {
 	struct ofono_lte *lte = __ofono_atom_get_data(atom);
 
-	DBG("atom: %p", atom);
+	ofono_debug("LTE atom removed");
 
 	if (lte == NULL)
 		return;
@@ -403,7 +403,7 @@ struct ofono_lte *ofono_lte_create(struct ofono_modem *modem,
 		break;
 	}
 
-	DBG("LTE atom created");
+	ofono_debug("LTE atom created");
 
 	return lte;
 }
