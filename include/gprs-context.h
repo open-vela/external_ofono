@@ -46,6 +46,7 @@ enum ofono_gprs_context_type {
 struct ofono_gprs_primary_context {
 	unsigned int cid;
 	char apn[OFONO_GPRS_MAX_APN_LENGTH + 1];
+	enum ofono_gprs_context_type type;
 	char username[OFONO_GPRS_MAX_USERNAME_LENGTH + 1];
 	char password[OFONO_GPRS_MAX_PASSWORD_LENGTH + 1];
 	enum ofono_gprs_proto proto;
