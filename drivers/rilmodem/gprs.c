@@ -103,6 +103,16 @@ static int ril_tech_to_bearer_tech(int ril_tech)
 	}
 }
 
+static int ril_get_apn_profile_id(enum ofono_gprs_context_type type) {
+	if (type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		return RIL_DATA_PROFILE_DEFAULT;
+	} else if (type == OFONO_GPRS_CONTEXT_TYPE_IMS) {
+		return RIL_DATA_PROFILE_IMS;
+	} else {
+		return RIL_DATA_PROFILE_DEFAULT;
+	}
+}
+
 static void ril_gprs_set_attached(struct ofono_gprs *gprs, int attached,
 					ofono_gprs_cb_t cb, void *data)
 {
@@ -331,7 +341,7 @@ static void ril_gprs_set_data_profile(struct ofono_gprs *gprs,
 	for (i = 0; i < length; i++) {
 		pri_ctx = *(contexts + i);
 
-		parcel_w_int32(&rilp, 0); /* profile id */
+		parcel_w_int32(&rilp, ril_get_apn_profile_id(pri_ctx.type)); /* profile id */
 		parcel_w_string(&rilp, pri_ctx.apn);
 		parcel_w_string(&rilp, gprs_proto_to_string(pri_ctx.proto));
 		parcel_w_int32(&rilp, pri_ctx.auth_method);
