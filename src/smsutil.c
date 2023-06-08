@@ -1878,7 +1878,9 @@ time_t sms_scts_to_time(const struct sms_scts *scts, struct tm *remote)
  */
 gboolean time_to_sms_scts(char *date, struct sms_scts *scts)
 {
-	scts = calloc(1, sizeof(scts));
+	if (scts == NULL)
+		return false;
+
 	sscanf(date, "%4hhu%2hhu%2hhu%2hhu%2hhu%2hhu", &scts->year, &scts->month,
 				&scts->day, &scts->hour, &scts->minute, &scts->second);
 	return true;
