@@ -1728,6 +1728,7 @@ static struct pri_context *pri_context_create(struct ofono_gprs *gprs,
 
 	context->context.proto = protocal;
 	context->context.auth_method = authtype;
+	context->context.type = type;
 
 	if (type == OFONO_GPRS_CONTEXT_TYPE_INTERNET)
 		context->ref_count = 1;
@@ -2774,6 +2775,8 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 		if (ap->message_center != NULL)
 			strcpy(context->message_center, ap->message_center);
 	}
+
+	context->context.type = ap->type;
 
 	if (context_dbus_register(context) == FALSE)
 		return;
