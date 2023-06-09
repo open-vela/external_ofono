@@ -439,7 +439,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 
 	/* Split DNS addresses */
 	if (raw_dns) {
-		char **dns_addrs = g_strsplit(raw_dns, " ", 3);
+		char **dns_addrs = g_strsplit(raw_dns, " ", -1);
 
 		/* Check for valid DNS settings, except for MMS contexts */
 		if (ofono_gprs_context_get_type(gc) != OFONO_GPRS_CONTEXT_TYPE_MMS &&
@@ -463,7 +463,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	 * setting a single IPv4 gateway.
 	 */
 	if (raw_gws) {
-		char **gateways = g_strsplit(raw_gws, " ", 3);
+		char **gateways = g_strsplit(raw_gws, " ", -1);
 
 		if (gateways == NULL || g_strv_length(gateways) == 0) {
 			g_strfreev(gateways);
