@@ -34,6 +34,7 @@
 
 #include "common.h"
 #include "smsutil.h"
+#include "util.h"
 
 #define MAX_USSD_LENGTH 160
 
@@ -785,6 +786,12 @@ static const GDBusSignalTable ussd_signals[] = {
 
 int ofono_ussd_driver_register(const struct ofono_ussd_driver *d)
 {
+	/* Check for USSD interface support */
+	if (!is_ofono_interface_supported(SUPPLEMENTARY_SERVICES_INTERFACE)) {
+		ofono_debug("%s : not support for ussd! \n", __func__);
+		return 0;
+	}
+
 	DBG("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
@@ -859,6 +866,12 @@ struct ofono_ussd *ofono_ussd_create(struct ofono_modem *modem,
 {
 	struct ofono_ussd *ussd;
 	GSList *l;
+
+	/* Check for USSD interface support */
+	if (!is_ofono_interface_supported(SUPPLEMENTARY_SERVICES_INTERFACE)) {
+		ofono_debug("%s : not support for ussd! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

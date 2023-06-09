@@ -559,6 +559,12 @@ static const GDBusSignalTable cbs_signals[] = {
 
 int ofono_cbs_driver_register(const struct ofono_cbs_driver *d)
 {
+	/* Check for CBS interface support */
+	if (!is_ofono_interface_supported(CELL_BROADCAST_INTERFACE)) {
+		ofono_debug("%s : not support for cbs! \n", __func__);
+		return 0;
+	}
+
 	DBG("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
@@ -666,6 +672,12 @@ struct ofono_cbs *ofono_cbs_create(struct ofono_modem *modem,
 {
 	struct ofono_cbs *cbs;
 	GSList *l;
+
+	/* Check for CBS interface support */
+	if (!is_ofono_interface_supported(CELL_BROADCAST_INTERFACE)) {
+		ofono_debug("%s : not support for cbs! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

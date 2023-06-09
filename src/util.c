@@ -3756,3 +3756,60 @@ unsigned char *convert_ucs2_to_gsm(const unsigned char *text, long len,
 						GSM_DIALECT_DEFAULT,
 						GSM_DIALECT_DEFAULT);
 }
+
+static const char *ofono_interface_to_string(enum ofono_interface interface)
+{
+	switch (interface) {
+	case MODEM_INTERFACE:
+		return "OFONO_MODEM_INTERFACE_SUPPORT";
+	case RADIO_SETTINGS_INTERFACE:
+		return "OFONO_RADIO_SETTINGS_INTERFACE_SUPPORT";
+	case VOICECALL_MANAGER_INTERFACE:
+		return "OFONO_VOICECALL_MANAGER_INTERFACE_SUPPORT";
+	case SIM_MANAGER_INTERFACE:
+		return "OFONO_SIM_MANAGER_INTERFACE_SUPPORT";
+	case STK_INTERFACE:
+		return "OFONO_STK_INTERFACE_SUPPORT";
+	case CONNECTION_MANAGER_INTERFACE:
+		return "OFONO_CONNECTION_MANAGER_INTERFACE_SUPPORT";
+	case MESSAGE_MANAGER_INTERFACE:
+		return "OFONO_MESSAGE_MANAGER_INTERFACE_SUPPORT";
+	case CELL_BROADCAST_INTERFACE:
+		return "OFONO_CELL_BROADCAST_INTERFACE_SUPPORT";
+	case NETWORK_REGISTRATION_INTERFACE:
+		return "OFONO_NETWORK_REGISTRATION_INTERFACE_SUPPORT";
+	case NETMON_INTERFACE:
+		return "OFONO_NETMON_INTERFACE_SUPPORT";
+	case CALL_BARRING_INTERFACE:
+		return "OFONO_CALL_BARRING_INTERFACE_SUPPORT";
+	case CALL_FORWARDING_INTERFACE:
+		return "OFONO_CALL_FORWARDING_INTERFACE_SUPPORT";
+	case SUPPLEMENTARY_SERVICES_INTERFACE:
+		return "OFONO_SUPPLEMENTARY_SERVICES_INTERFACE_SUPPORT";
+	case CALL_SETTINGS_INTERFACE:
+		return "OFONO_CALL_SETTINGS_INTERFACE_SUPPORT";
+	case IMS_INTERFACE:
+		return "OFONO_IMS_INTERFACE_SUPPORT";
+	case PHONEBOOK_INTERFACE:
+		return "OFONO_PHONEBOOK_INTERFACE_SUPPORT";
+	}
+
+	return NULL;
+}
+
+bool is_ofono_interface_supported(enum ofono_interface interface)
+{
+	const char *interface_support_str;
+
+	interface_support_str = getenv(ofono_interface_to_string(interface));
+	if (interface_support_str != NULL && *interface_support_str != '\0') {
+		bool interface_cap;
+		char *endp;
+
+		interface_cap = (bool)strtoul(interface_support_str, &endp, 10);
+		if (*endp == '\0')
+			return interface_cap;
+	}
+
+	return TRUE;
+}
