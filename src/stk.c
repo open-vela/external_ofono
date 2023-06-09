@@ -3119,6 +3119,12 @@ out:
 
 int ofono_stk_driver_register(const struct ofono_stk_driver *d)
 {
+	/* Check for STK interface support */
+	if (!is_ofono_interface_supported(STK_INTERFACE)) {
+		ofono_debug("%s : not support for stk! \n", __func__);
+		return 0;
+	}
+
 	DBG("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
@@ -3196,6 +3202,12 @@ struct ofono_stk *ofono_stk_create(struct ofono_modem *modem,
 {
 	struct ofono_stk *stk;
 	GSList *l;
+
+	/* Check for STK interface support */
+	if (!is_ofono_interface_supported(STK_INTERFACE)) {
+		ofono_debug("%s : not support for stk! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;
