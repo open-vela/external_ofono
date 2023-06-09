@@ -38,6 +38,25 @@ enum gsm_dialect {
 	GSM_DIALECT_URDU,
 };
 
+enum ofono_interface {
+	MODEM_INTERFACE,
+	RADIO_SETTINGS_INTERFACE,
+	VOICECALL_MANAGER_INTERFACE,
+	SIM_MANAGER_INTERFACE,
+	STK_INTERFACE,
+	CONNECTION_MANAGER_INTERFACE,
+	MESSAGE_MANAGER_INTERFACE,
+	CELL_BROADCAST_INTERFACE,
+	NETWORK_REGISTRATION_INTERFACE,
+	NETMON_INTERFACE,
+	CALL_BARRING_INTERFACE,
+	CALL_FORWARDING_INTERFACE,
+	SUPPLEMENTARY_SERVICES_INTERFACE,
+	CALL_SETTINGS_INTERFACE,
+	IMS_INTERFACE,
+	PHONEBOOK_INTERFACE,
+};
+
 char *convert_gsm_to_utf8(const unsigned char *text, long len, long *items_read,
 				long *items_written, unsigned char terminator);
 
@@ -105,3 +124,5 @@ unsigned char *convert_ucs2_to_gsm_with_lang(const unsigned char *text,
 unsigned char *convert_ucs2_to_gsm(const unsigned char *text, long len,
 					long *items_read, long *items_written,
 					unsigned char terminator);
+
+bool is_ofono_interface_supported(enum ofono_interface interface);

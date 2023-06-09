@@ -35,6 +35,7 @@
 #include "ofono.h"
 
 #include "common.h"
+#include "util.h"
 
 #define CALL_BARRING_FLAG_CACHED 0x1
 #define NUM_OF_BARRINGS 5
@@ -998,6 +999,12 @@ static const GDBusSignalTable cb_signals[] = {
 
 int ofono_call_barring_driver_register(const struct ofono_call_barring_driver *d)
 {
+	/* Check for Call Barring interface support */
+	if (!is_ofono_interface_supported(CALL_BARRING_INTERFACE)) {
+		ofono_debug("%s : not support for call barring! \n", __func__);
+		return 0;
+	}
+
 	DBG("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
@@ -1054,6 +1061,12 @@ struct ofono_call_barring *ofono_call_barring_create(struct ofono_modem *modem,
 {
 	struct ofono_call_barring *cb;
 	GSList *l;
+
+	/* Check for Call Barring interface support */
+	if (!is_ofono_interface_supported(CALL_BARRING_INTERFACE)) {
+		ofono_debug("%s : not support for call barring! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

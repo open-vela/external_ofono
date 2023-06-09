@@ -35,6 +35,7 @@
 #include "ofono.h"
 
 #include "common.h"
+#include "util.h"
 
 #define LEN_MAX 128
 #define TYPE_INTERNATIONAL 145
@@ -835,6 +836,12 @@ static const GDBusSignalTable phonebook_signals[] = {
 
 int ofono_phonebook_driver_register(const struct ofono_phonebook_driver *d)
 {
+	/* Check for Phonebook interface support */
+	if (!is_ofono_interface_supported(PHONEBOOK_INTERFACE)) {
+		ofono_debug("%s : not support for phonebook! \n", __func__);
+		return 0;
+	}
+
 	DBG("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
@@ -885,6 +892,12 @@ struct ofono_phonebook *ofono_phonebook_create(struct ofono_modem *modem,
 {
 	struct ofono_phonebook *pb;
 	GSList *l;
+
+	/* Check for Phonebook interface support */
+	if (!is_ofono_interface_supported(PHONEBOOK_INTERFACE)) {
+		ofono_debug("%s : not support for phonebook! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;
