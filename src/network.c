@@ -83,6 +83,7 @@ struct ofono_netreg {
 	struct ofono_atom *atom;
 	unsigned int hfp_watch;
 	unsigned int spn_watch;
+	unsigned int radio_online_watch;
 };
 
 struct network_operator_data {
@@ -2103,6 +2104,11 @@ static void netreg_unregister(struct ofono_atom *atom)
 		netreg->sim_watch = 0;
 	}
 
+	if (netreg->radio_online_watch) {
+		__ofono_modem_remove_online_watch(modem, netreg->radio_online_watch);
+		netreg->radio_online_watch = 0;
+	}
+
 	netreg->sim = NULL;
 
 	g_dbus_unregister_interface(conn, path,
@@ -2440,6 +2446,30 @@ static void emulator_hfp_watch(struct ofono_atom *atom,
 		emulator_hfp_init(atom, data);
 }
 
+static void radio_online_watch_cb(struct ofono_modem *modem,
+						ofono_bool_t online,
+						void *data)
+{
+	struct ofono_netreg *netreg = data;
+
+	if (!online) {
+		set_registration_cellid(netreg, -1);
+		set_registration_status(netreg, NETWORK_REGISTRATION_STATUS_NOT_REGISTERED);
+		set_registration_technology(netreg, -1);
+		set_registration_location(netreg, -1);
+		ofono_netreg_set_signal_strength(netreg, 0, 0, 0, 0, 0);
+
+		if (netreg->current_operator == NULL)
+			return;
+
+		netreg->current_operator->name[0] = '\0';
+		netreg->current_operator->mcc[0] = '\0';
+		netreg->current_operator->mnc[0] = '\0';
+		netreg->current_operator->status = -1;
+		netreg->current_operator->techs = -1;
+	}
+}
+
 void ofono_netreg_register(struct ofono_netreg *netreg)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -2468,6 +2498,10 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 	netreg->sim_watch = __ofono_modem_add_atom_watch(modem,
 						OFONO_ATOM_TYPE_SIM,
 						sim_watch, netreg, NULL);
+
+	netreg->radio_online_watch = __ofono_modem_add_online_watch(modem,
+					radio_online_watch_cb,
+					netreg, NULL);
 
 	__ofono_atom_register(netreg->atom, netreg_unregister);
 

@@ -47,6 +47,7 @@ struct ofono_ims {
 	void *driver_data;
 	struct ofono_atom *atom;
 	DBusMessage *pending;
+	unsigned int radio_online_watch;
 };
 
 static GSList *g_drivers = NULL;
@@ -455,8 +456,27 @@ static void ims_atom_unregister(struct ofono_atom *atom)
 	__ofono_watchlist_free(ims->status_watches);
 	ims->status_watches = NULL;
 
+	if (ims->radio_online_watch) {
+		__ofono_modem_remove_online_watch(modem, ims->radio_online_watch);
+		ims->radio_online_watch = 0;
+	}
+
 	ofono_modem_remove_interface(modem, OFONO_IMS_INTERFACE);
 	g_dbus_unregister_interface(conn, path, OFONO_IMS_INTERFACE);
+}
+
+static void radio_online_watch_cb(struct ofono_modem *modem,
+						ofono_bool_t online,
+						void *data)
+{
+	struct ofono_ims *ims = data;
+
+	if (!online) {
+		// TODO : need to remove when vowifi is supported
+		ims_set_registered(ims, FALSE);
+		ims_set_voice_capable(ims, FALSE);
+		ims_set_sms_capable(ims, FALSE);
+	}
 }
 
 static void ofono_ims_finish_register(struct ofono_ims *ims)
@@ -475,6 +495,10 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 	}
 
 	ims->status_watches = __ofono_watchlist_new(g_free);
+
+	ims->radio_online_watch = __ofono_modem_add_online_watch(modem,
+				radio_online_watch_cb,
+				ims, NULL);
 
 	ofono_modem_add_interface(modem, OFONO_IMS_INTERFACE);
 	__ofono_atom_register(ims->atom, ims_atom_unregister);
