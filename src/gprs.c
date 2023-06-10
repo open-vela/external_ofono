@@ -93,6 +93,7 @@ struct ofono_gprs {
 	unsigned int sim_watch;
 	unsigned int sim_state_watch;
 	unsigned int spn_watch;
+	unsigned int radio_online_watch;
 };
 
 struct ipv4_settings {
@@ -3539,6 +3540,11 @@ static void gprs_unregister(struct ofono_atom *atom)
 		gprs->sim_watch = 0;
 	}
 
+	if (gprs->radio_online_watch) {
+		__ofono_modem_remove_online_watch(modem, gprs->radio_online_watch);
+		gprs->radio_online_watch = 0;
+	}
+
 	ofono_modem_remove_interface(modem,
 					OFONO_CONNECTION_MANAGER_INTERFACE);
 	g_dbus_unregister_interface(conn, path,
@@ -4036,6 +4042,18 @@ static void spn_read_cb(const char *spn, const char *dc, void *data)
 		gprs->driver->attached_status(gprs, registration_status_cb, gprs);
 }
 
+static void radio_online_watch_cb(struct ofono_modem *modem,
+						ofono_bool_t online,
+						void *data)
+{
+	struct ofono_gprs *gprs = data;
+
+	if (!online) {
+		ofono_gprs_status_notify(gprs, NETWORK_REGISTRATION_STATUS_NOT_REGISTERED);
+		ofono_gprs_bearer_notify(gprs, -1);
+	}
+}
+
 struct ofono_modem *ofono_gprs_get_modem(struct ofono_gprs *gprs)
 {
 	return __ofono_atom_get_modem(gprs->atom);
@@ -4070,6 +4088,10 @@ void ofono_gprs_register(struct ofono_gprs *gprs)
 	gprs->sim_watch = __ofono_modem_add_atom_watch(modem,
 						OFONO_ATOM_TYPE_SIM,
 						sim_watch, gprs, NULL);
+
+	gprs->radio_online_watch = __ofono_modem_add_online_watch(modem,
+					radio_online_watch_cb,
+					gprs, NULL);
 }
 
 void ofono_gprs_remove(struct ofono_gprs *gprs)
