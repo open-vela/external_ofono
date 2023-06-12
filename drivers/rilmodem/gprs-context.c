@@ -561,6 +561,16 @@ error:
 #define DATA_PROFILE_OEM_BASE_STR "1000"
 #define DATA_PROFILE_MTK_MMS_STR "1001"
 
+static const char *ril_get_apn_profile_id(enum ofono_gprs_context_type type) {
+	if (type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		return DATA_PROFILE_DEFAULT_STR;
+	} else if (type == OFONO_GPRS_CONTEXT_TYPE_IMS) {
+		return DATA_PROFILE_IMS_STR;
+	} else {
+		return DATA_PROFILE_DEFAULT_STR;
+	}
+}
+
 static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 				const struct ofono_gprs_primary_context *ctx,
 				ofono_gprs_context_cb_t cb, void *data)
@@ -600,7 +610,7 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 	sprintf(buf, "%d", tech);
 	parcel_w_string(&rilp, buf);
 
-	profile = DATA_PROFILE_DEFAULT_STR;
+	profile = ril_get_apn_profile_id(ctx->type);
 
 	if (g_ril_vendor(gcd->ril) == OFONO_RIL_VENDOR_MTK &&
 			ofono_gprs_context_get_type(gc) ==
