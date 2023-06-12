@@ -184,6 +184,8 @@ static void usage_start(GMarkupParseContext *context,
 
 	if (strcmp(text, "internet") == 0)
 		*type = OFONO_GPRS_CONTEXT_TYPE_INTERNET;
+	else if (strcmp(text, "ims") == 0)
+		*type = OFONO_GPRS_CONTEXT_TYPE_IMS;
 	else if (strcmp(text, "mms") == 0)
 		*type = OFONO_GPRS_CONTEXT_TYPE_MMS;
 	else if (strcmp(text, "wap") == 0)
