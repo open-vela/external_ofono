@@ -667,9 +667,11 @@ void ril_hangup_specific(struct ofono_voicecall *vc,
 
 	g_ril_append_print_buf(vd->ril, "(%u)", id);
 
+	vd->local_release |= (1 << id);
+
 	/* Send request to RIL */
 	ril_template(RIL_REQUEST_HANGUP, vc, generic_cb,
-			AFFECTED_STATES_ALL, &rilp, cb, data);
+			0, &rilp, cb, data);
 }
 
 void ril_call_state_notify(struct ril_msg *message, gpointer user_data)
