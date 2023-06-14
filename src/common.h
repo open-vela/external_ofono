@@ -37,7 +37,19 @@ enum access_technology {
 	ACCESS_TECHNOLOGY_NB_IOT_NB1 =		9,
 };
 
-/* 27.007 Section 7.2 <stat> */
+/*
+ * 27.007 Section 7.2 <stat>
+ * registration state as follows:
+ * 1 - Registered, home network.
+ * 2 - Not registered, but MT is currently searching a new operator to register.
+ * 3 - Registration denied.
+ * 4 - Unknown.
+ * 5 - Registered, roaming.
+ * 10 - Same as 0, but indicates that emergency calls are enabled.
+ * 12 - Same as 2, but indicates that emergency calls are enabled.
+ * 13 - Same as 3, but indicates that emergency calls are enabled.
+ * 14 - Same as 4, but indicates that emergency calls are enabled.
+ */
 enum network_registration_status {
 	NETWORK_REGISTRATION_STATUS_NOT_REGISTERED =		0,
 	NETWORK_REGISTRATION_STATUS_REGISTERED =		1,
@@ -47,6 +59,10 @@ enum network_registration_status {
 	NETWORK_REGISTRATION_STATUS_ROAMING =			5,
 	NETWORK_REGISTRATION_STATUS_REGISTERED_SMS_EUTRAN =	6,
 	NETWORK_REGISTRATION_STATUS_ROAMING_SMS_EUTRAN =	7,
+	NETWORK_REGISTRATION_STATUS_NOT_REGISTERED_EM =		10,
+	NETWORK_REGISTRATION_STATUS_SEARCHING_EM =		12,
+	NETWORK_REGISTRATION_STATUS_DENIED_EM =			13,
+	NETWORK_REGISTRATION_STATUS_UNKNOWN_EM =		14,
 };
 
 /* 27.007 Section 7.3 <stat> */
