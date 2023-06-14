@@ -2452,21 +2452,32 @@ static void radio_online_watch_cb(struct ofono_modem *modem,
 {
 	struct ofono_netreg *netreg = data;
 
+	ofono_debug("network - %s , online : %d", __func__, online);
+
 	if (!online) {
 		set_registration_cellid(netreg, -1);
-		set_registration_status(netreg, NETWORK_REGISTRATION_STATUS_NOT_REGISTERED);
+		set_registration_status(netreg, NETWORK_REGISTRATION_STATUS_UNKNOWN);
 		set_registration_technology(netreg, -1);
 		set_registration_location(netreg, -1);
-		ofono_netreg_set_signal_strength(netreg, 0, 0, 0, 0, 0);
 
-		if (netreg->current_operator == NULL)
-			return;
+		if (netreg->signal_strength_data) {
+			netreg->signal_strength_data->rssi = INT_MAX;
+			netreg->signal_strength_data->rsrp = INT_MAX;
+			netreg->signal_strength_data->rsrq = INT_MAX;
+			netreg->signal_strength_data->rssnr = INT_MAX;
+			netreg->signal_strength_data->cqi = INT_MAX;
+			netreg->signal_strength_data->level = 0;
 
-		netreg->current_operator->name[0] = '\0';
-		netreg->current_operator->mcc[0] = '\0';
-		netreg->current_operator->mnc[0] = '\0';
-		netreg->current_operator->status = -1;
-		netreg->current_operator->techs = -1;
+			netreg_emit_signal_strength_changed(netreg);
+		}
+
+		if (netreg->current_operator) {
+			netreg->current_operator->name[0] = '\0';
+			netreg->current_operator->mcc[0] = '\0';
+			netreg->current_operator->mnc[0] = '\0';
+			netreg->current_operator->status = -1;
+			netreg->current_operator->techs = -1;
+		}
 	}
 }
 
