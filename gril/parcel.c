@@ -230,16 +230,37 @@ int parcel_w_raw(struct parcel *p, const void *data, size_t len)
 	parcel_w_int32(p, len);
 
 	for (;;) {
-
+		//Calculate the padded length for 4-byte alignment
+		size_t padded = PAD_SIZE(len);
 		if (p->offset + len < p->capacity) {
 			/* There's enough space */
 			memcpy(p->data + p->offset, data, len);
-			p->offset += len;
-			p->size += len;
+			p->offset += padded;
+			p->size += padded;
+
+			//Endianness processing
+			if (padded != len) {
+#if BYTE_ORDER == BIG_ENDIAN
+				static const uint32_t mask[4] = {
+					0x00000000, 0xffffff00,
+					0xffff0000, 0xff000000
+				};
+#endif
+#if BYTE_ORDER == LITTLE_ENDIAN
+				static const uint32_t mask[4] = {
+					0x00000000, 0x00ffffff,
+					0x0000ffff, 0x000000ff
+				};
+#endif
+
+				*((uint32_t *) (void *)
+					(p->data + p->offset - 4)) &=
+							mask[padded - len];
+			}
 			break;
 		} else {
 			/* Grow data and retry */
-			parcel_grow(p, len);
+			parcel_grow(p, padded);
 		}
 	}
 	return 0;
