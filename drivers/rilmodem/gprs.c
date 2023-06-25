@@ -155,6 +155,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 		ofono_error("%s: DATA_REGISTRATION_STATE reply failure: %s",
 				__func__,
 				ril_error_to_string(message->error));
+		gd->rild_status = -1;
 		goto error;
 	}
 
