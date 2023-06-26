@@ -2111,7 +2111,7 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 
 		gprs->data_on = value;
 		if (gprs->settings) {
-			g_key_file_set_integer(gprs->settings, SETTINGS_GROUP,
+			g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
 						"DataOn", gprs->data_on);
 			storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 		}
