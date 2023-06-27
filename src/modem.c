@@ -790,6 +790,13 @@ static void modem_enable_cb(const struct ofono_error *error, void *data)
 	if (modem->modem_state < MODEM_STATE_ALIVE)
 		modem_change_state(modem, MODEM_STATE_ALIVE);
 
+	if (g_key_file_has_group(modem->settings, SETTINGS_GROUP)
+		&& g_key_file_has_key(modem->settings, SETTINGS_GROUP,
+				"Online", NULL)) {
+		modem->online = g_key_file_get_boolean(modem->settings, SETTINGS_GROUP,
+							"Online", NULL);
+	}
+
 	modem->driver->set_online(modem, modem->online,
 		modem->online ? online_cb : offline_cb, modem);
 
