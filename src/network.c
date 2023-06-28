@@ -75,6 +75,7 @@ struct ofono_netreg {
 	unsigned int sim_state_watch;
 	unsigned int sim_efpnn_watch;
 	unsigned int sim_efopl_watch;
+	unsigned int sim_efcphs_csp_watch;
 	GKeyFile *settings;
 	char *imsi;
 	struct ofono_watchlist *status_watches;
@@ -1710,16 +1711,6 @@ static void init_registration_status(const struct ofono_error *error,
 					NETWORK_REGISTRATION_MODE_AUTO_ONLY);
 		return;
 	}
-
-	if (netreg->sim_context) {
-		ofono_sim_read(netreg->sim_context, SIM_EF_CPHS_CSP_FILEID,
-				OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
-				sim_csp_read_cb, netreg);
-
-		ofono_sim_add_file_watch(netreg->sim_context,
-						SIM_EF_CPHS_CSP_FILEID,
-						sim_csp_changed, netreg, NULL);
-	}
 }
 
 static void notify_emulator_strength(struct ofono_atom *atom, void *data)
@@ -2090,6 +2081,11 @@ static void netreg_unregister(struct ofono_atom *atom)
 			netreg->sim_efopl_watch = 0;
 		}
 
+		if (netreg->sim_efcphs_csp_watch) {
+			ofono_sim_remove_file_watch(netreg->sim_context, netreg->sim_efcphs_csp_watch);
+			netreg->sim_efcphs_csp_watch = 0;
+		}
+
 		ofono_sim_context_free(netreg->sim_context);
 		netreg->sim_context = NULL;
 	}
@@ -2322,6 +2318,11 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 				netreg->sim_efopl_watch = 0;
 			}
 
+			if (netreg->sim_efcphs_csp_watch) {
+				ofono_sim_remove_file_watch(netreg->sim_context, netreg->sim_efcphs_csp_watch);
+				netreg->sim_efcphs_csp_watch = 0;
+			}
+
 			ofono_sim_context_free(netreg->sim_context);
 			netreg->sim_context = NULL;
 		}
@@ -2359,6 +2360,13 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 							sim_spdi_changed,
 							netreg, NULL);
 		}
+		ofono_sim_read(netreg->sim_context, SIM_EF_CPHS_CSP_FILEID,
+				OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
+				sim_csp_read_cb, netreg);
+
+		netreg->sim_efcphs_csp_watch = ofono_sim_add_file_watch(
+						netreg->sim_context, SIM_EF_CPHS_CSP_FILEID,
+						sim_csp_changed, netreg, NULL);
 		break;
 	case OFONO_SIM_STATE_LOCKED_OUT:
 		break;
