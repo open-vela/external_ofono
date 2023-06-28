@@ -58,6 +58,11 @@ struct ofono_message_waiting {
 	struct ofono_phone_number mailbox_number[5];
 	struct ofono_sim *sim;
 	struct ofono_sim_context *sim_context;
+	unsigned int sim_watch;
+	unsigned int sim_state_watch;
+	unsigned int sim_efmwis_watch;
+	unsigned int sim_efcphs_mwis_watch;
+	unsigned int sim_efmbi_watch;
 	struct ofono_atom *atom;
 };
 
@@ -971,8 +976,31 @@ static void message_waiting_unregister(struct ofono_atom *atom)
 	struct ofono_message_waiting *mw = __ofono_atom_get_data(atom);
 
 	if (mw->sim_context) {
+		if (mw->sim_efmwis_watch) {
+			ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efmwis_watch);
+			mw->sim_efmwis_watch = 0;
+		}
+		if (mw->sim_efcphs_mwis_watch) {
+			ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efcphs_mwis_watch);
+			mw->sim_efcphs_mwis_watch = 0;
+		}
+		if (mw->sim_efmbi_watch) {
+			ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efmbi_watch);
+			mw->sim_efmbi_watch = 0;
+		}
+
 		ofono_sim_context_free(mw->sim_context);
 		mw->sim_context = NULL;
+	}
+
+	if (mw->sim_state_watch) {
+		ofono_sim_remove_state_watch(mw->sim, mw->sim_state_watch);
+		mw->sim_state_watch = 0;
+	}
+
+	if (mw->sim_watch) {
+		__ofono_modem_remove_atom_watch(modem, mw->sim_watch);
+		mw->sim_watch = 0;
 	}
 
 	mw->sim = NULL;
@@ -1022,6 +1050,91 @@ static void mw_mbi_changed(int id, void *userdata)
 			mw_mbi_read_cb, mw);
 }
 
+static void sim_state_watch(enum ofono_sim_state new_state, void *user)
+{
+	struct ofono_message_waiting *mw = user;
+
+	if (mw->sim == NULL)
+		return;
+
+	ofono_info("message_waiting - %s, sim_state : %d", __func__, new_state);
+
+	switch (new_state) {
+	case OFONO_SIM_STATE_NOT_PRESENT:
+	case OFONO_SIM_STATE_RESETTING:
+		if (mw->sim_context) {
+			if (mw->sim_efmwis_watch) {
+				ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efmwis_watch);
+				mw->sim_efmwis_watch = 0;
+			}
+			if (mw->sim_efcphs_mwis_watch) {
+				ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efcphs_mwis_watch);
+				mw->sim_efcphs_mwis_watch = 0;
+			}
+			if (mw->sim_efmbi_watch) {
+				ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efmbi_watch);
+				mw->sim_efmbi_watch = 0;
+			}
+
+			ofono_sim_context_free(mw->sim_context);
+			mw->sim_context = NULL;
+		}
+		break;
+	case OFONO_SIM_STATE_READY:
+		mw->sim_context = ofono_sim_context_create(mw->sim);
+		/* Loads MWI states and MBDN from SIM */
+		ofono_sim_read(mw->sim_context, SIM_EFMWIS_FILEID,
+				OFONO_SIM_FILE_STRUCTURE_FIXED,
+				mw_mwis_read_cb, mw);
+		ofono_sim_read(mw->sim_context, SIM_EFMBI_FILEID,
+				OFONO_SIM_FILE_STRUCTURE_FIXED,
+				mw_mbi_read_cb, mw);
+
+		/* Also read CPHS MWIS field */
+		ofono_sim_read(mw->sim_context, SIM_EF_CPHS_MWIS_FILEID,
+				OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
+				mw_cphs_mwis_read_cb, mw);
+
+		/*
+		 * The operator could send us SMS mwi updates, but let's be
+		 * extra careful and track the file contents too.
+		 */
+		mw->sim_efmwis_watch = ofono_sim_add_file_watch(
+						mw->sim_context, SIM_EFMWIS_FILEID,
+						mw_mwis_changed, mw, NULL);
+		mw->sim_efcphs_mwis_watch = ofono_sim_add_file_watch(
+						mw->sim_context, SIM_EF_CPHS_MWIS_FILEID,
+						mw_cphs_mwis_changed, mw, NULL);
+
+		mw->sim_efmbi_watch = ofono_sim_add_file_watch(
+						mw->sim_context, SIM_EFMBI_FILEID,
+						mw_mbi_changed, mw, NULL);
+		break;
+	default:
+		break;
+	}
+}
+
+static void sim_watch(struct ofono_atom *atom,
+			enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_message_waiting *mw = data;
+	struct ofono_sim *sim = __ofono_atom_get_data(atom);
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		mw->sim_state_watch = 0;
+		mw->sim = NULL;
+		return;
+	}
+
+	mw->sim = sim;
+	mw->sim_state_watch = ofono_sim_add_state_watch(sim,
+							sim_state_watch,
+							mw, NULL);
+
+	sim_state_watch(ofono_sim_get_state(sim), mw);
+}
+
 void ofono_message_waiting_register(struct ofono_message_waiting *mw)
 {
 	DBusConnection *conn;
@@ -1047,37 +1160,9 @@ void ofono_message_waiting_register(struct ofono_message_waiting *mw)
 
 	ofono_modem_add_interface(modem, OFONO_MESSAGE_WAITING_INTERFACE);
 
-	mw->sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-	if (mw->sim) {
-		/* Assume that if sim atom exists, it is ready */
-		mw->sim_context = ofono_sim_context_create(mw->sim);
-
-		/* Loads MWI states and MBDN from SIM */
-		ofono_sim_read(mw->sim_context, SIM_EFMWIS_FILEID,
-				OFONO_SIM_FILE_STRUCTURE_FIXED,
-				mw_mwis_read_cb, mw);
-		ofono_sim_read(mw->sim_context, SIM_EFMBI_FILEID,
-				OFONO_SIM_FILE_STRUCTURE_FIXED,
-				mw_mbi_read_cb, mw);
-
-		/* Also read CPHS MWIS field */
-		ofono_sim_read(mw->sim_context, SIM_EF_CPHS_MWIS_FILEID,
-				OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
-				mw_cphs_mwis_read_cb, mw);
-
-		/*
-		 * The operator could send us SMS mwi updates, but let's be
-		 * extra careful and track the file contents too.
-		 */
-		ofono_sim_add_file_watch(mw->sim_context, SIM_EFMWIS_FILEID,
-						mw_mwis_changed, mw, NULL);
-		ofono_sim_add_file_watch(mw->sim_context,
-						SIM_EF_CPHS_MWIS_FILEID,
-						mw_cphs_mwis_changed, mw, NULL);
-
-		ofono_sim_add_file_watch(mw->sim_context, SIM_EFMBI_FILEID,
-						mw_mbi_changed, mw, NULL);
-	}
+	mw->sim_watch = __ofono_modem_add_atom_watch(modem,
+						OFONO_ATOM_TYPE_SIM,
+						sim_watch, mw, NULL);
 
 	__ofono_atom_register(mw->atom, message_waiting_unregister);
 }
