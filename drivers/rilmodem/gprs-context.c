@@ -591,7 +591,7 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 	 * 0: CDMA 1: GSM/UMTS, 2...
 	 * anything 2+ is a RadioTechnology value +2
 	 */
-	DBG("*gc: %p activating cid: %d; curr_tech: %d", gc, ctx->cid, tech);
+	ofono_debug("*gc: %p activating cid: %d; curr_tech: %d", gc, ctx->cid, tech);
 
 	parcel_init(&rilp);
 
@@ -782,7 +782,7 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 	struct cb_data *cbd = NULL;
 	struct parcel rilp;
 
-	DBG("*gc: %p cid: %d active_rild_cid: %d", gc, id,
+	ofono_debug("*gc: %p cid: %d active_rild_cid: %d", gc, id,
 		gcd->active_rild_cid);
 
 	if (gcd->state == STATE_IDLE || gcd->state == STATE_DISABLING) {
