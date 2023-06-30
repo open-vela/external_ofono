@@ -207,7 +207,7 @@ static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 		else
 			call->clip_validity = 2;
 
-		DBG("[id=%d,status=%d,type=%d,number=%s,name=%s]",
+		ofono_debug("[id=%d,status=%d,type=%d,number=%s,name=%s]",
 			call->id, call->status, call->type,
 			call->phone_number.number, call->name);
 
@@ -682,7 +682,7 @@ void ril_call_state_notify(struct ril_msg *message, gpointer user_data)
 	g_ril_print_unsol_no_args(vd->ril, message);
 
 	if (vd->suppress_clcc_poll) {
-		DBG("suppress clcc poll!");
+		ofono_debug("suppress clcc poll!");
 		return;
 	}
 
