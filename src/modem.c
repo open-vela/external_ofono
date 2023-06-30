@@ -683,28 +683,30 @@ static void online_cb(const struct ofono_error *error, void *data)
 	struct ofono_modem *modem = data;
 	DBusMessage *reply;
 
-	if (!modem->pending)
-		goto out;
-
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(modem->pending);
 	else
 		reply = __ofono_error_failed(modem->pending);
 
 	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
 
-out:
-	common_online_cb(error, data);
+static void common_offline_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	enum radio_status old_radio_state = modem->radio_status;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+		return;
+
+	modem->radio_status = RADIO_STATUS_OFF;
+	radio_status_change(modem, old_radio_state, RADIO_STATUS_OFF);
 }
 
 static void offline_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_modem *modem = data;
 	DBusMessage *reply;
-	enum radio_status old_radio_state = modem->radio_status;
-
-	if (!modem->pending)
-		goto out;
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(modem->pending);
@@ -712,25 +714,15 @@ static void offline_cb(const struct ofono_error *error, void *data)
 		reply = __ofono_error_failed(modem->pending);
 
 	__ofono_dbus_pending_reply(&modem->pending, reply);
-
-out:
-	modem->radio_status = RADIO_STATUS_OFF;
-	radio_status_change(modem, old_radio_state, RADIO_STATUS_OFF);
 }
 
-static void set_radio_power(struct ofono_modem *modem, ofono_bool_t new_online)
+static void set_radio_power(struct ofono_modem *modem, ofono_bool_t new_online,
+	void (*callback)(const struct ofono_error *error, void *data))
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem_driver const *driver = modem->driver;
 
-	if (modem->modem_state != MODEM_STATE_ALIVE)
-		return;
-
-	if ((new_online && modem->radio_status == RADIO_STATUS_OFF)
-			|| (!new_online && modem->radio_status == RADIO_STATUS_ON)) {
-		driver->set_online(modem, new_online,
-					new_online ? online_cb : offline_cb, modem);
-	}
+	driver->set_online(modem, new_online, callback, modem);
 
 	if (new_online == modem->online)
 		return;
@@ -801,6 +793,10 @@ static void modem_enable_cb(const struct ofono_error *error, void *data)
 	if (modem->modem_state < MODEM_STATE_ALIVE)
 		modem_change_state(modem, MODEM_STATE_ALIVE);
 
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+
 	if (g_key_file_has_group(modem->settings, SETTINGS_GROUP)
 		&& g_key_file_has_key(modem->settings, SETTINGS_GROUP,
 				"Online", NULL)) {
@@ -808,11 +804,8 @@ static void modem_enable_cb(const struct ofono_error *error, void *data)
 							"Online", NULL);
 	}
 
-	set_radio_power(modem, modem->online);
-
-	reply = dbus_message_new_method_return(modem->pending);
-
-	__ofono_dbus_pending_reply(&modem->pending, reply);
+	set_radio_power(modem, modem->online,
+			modem->online ? common_online_cb : common_offline_cb);
 }
 
 static void modem_disable_cb(const struct ofono_error *error, void *data)
@@ -854,7 +847,8 @@ static void modem_status_query_cb(const struct ofono_error *error,
 
 		/* likely, some modems don't support modem state query */
 		modem_change_state(modem, MODEM_STATE_ALIVE);
-		set_radio_power(modem, modem->online);
+		set_radio_power(modem, modem->online,
+				modem->online ? common_online_cb : common_offline_cb);
 
 		return;
 	}
@@ -871,7 +865,8 @@ static void modem_status_query_cb(const struct ofono_error *error,
 	modem_change_state(modem, status ? MODEM_STATE_ALIVE : MODEM_STATE_AWARE);
 
 	if (status) {
-		set_radio_power(modem, modem->online);
+		set_radio_power(modem, modem->online,
+				modem->online ? common_online_cb : common_offline_cb);
 	}
 }
 
@@ -898,6 +893,9 @@ static DBusMessage *set_property_online(struct ofono_modem *modem,
 	if (modem->pending != NULL)
 		return __ofono_error_busy(msg);
 
+	if (modem->modem_state != MODEM_STATE_ALIVE)
+		return __ofono_error_not_allowed(msg);
+
 	if (modem->online == online)
 		return dbus_message_new_method_return(msg);
 
@@ -913,7 +911,7 @@ static DBusMessage *set_property_online(struct ofono_modem *modem,
 
 	modem->pending = dbus_message_ref(msg);
 
-	set_radio_power(modem, online);
+	set_radio_power(modem, online, online ? online_cb : offline_cb);
 
 	return NULL;
 }
@@ -2794,7 +2792,7 @@ void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 
 		/* if radio state doesn't match user setting, sync it again */
 		if (modem->online)
-			set_radio_power(modem, TRUE);
+			set_radio_power(modem, TRUE, common_online_cb);
 		break;
 	case 1:
 		modem->radio_status = RADIO_STATUS_UNAVAILABLE;
@@ -2804,7 +2802,7 @@ void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 
 		/* if radio state doesn't match user setting, sync it again */
 		if (!modem->online)
-			set_radio_power(modem, FALSE);
+			set_radio_power(modem, FALSE, common_offline_cb);
 		break;
 	}
 
