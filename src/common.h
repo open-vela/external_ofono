@@ -189,6 +189,7 @@ enum phone_status {
 };
 
 enum radio_status {
+	RADIO_STATUS_UNKNOWN = -1,
 	RADIO_STATUS_UNAVAILABLE = 0,
 	RADIO_STATUS_ON = 1,
 	RADIO_STATUS_OFF = 2,
