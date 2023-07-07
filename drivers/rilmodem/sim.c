@@ -132,8 +132,7 @@ static gboolean parse_sim_io(GRil *ril, struct ril_msg *message,
 
 	*hex_response = parcel_r_string(&rilp);
 
-	g_ril_append_print_buf(ril, "(sw1=0x%.2X,sw2=0x%.2X,%s)",
-				*sw1, *sw2, *hex_response);
+	g_ril_append_print_buf(ril, "(sw1=0x%.2X,sw2=0x%.2X)", *sw1, *sw2);
 	g_ril_print_response(ril, message);
 
 	if (rilp.malformed) {
@@ -698,7 +697,7 @@ static void ril_imsi_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_init_parcel(message, &rilp);
 	imsi = parcel_r_string(&rilp);
 
-	g_ril_append_print_buf(sd->ril, "{%s}", imsi ? imsi : "NULL");
+	g_ril_append_print_buf(sd->ril, "{%.9s******}", imsi ? imsi : "NULL");
 	g_ril_print_response(sd->ril, message);
 
 	if (imsi == NULL)

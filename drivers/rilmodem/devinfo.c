@@ -150,7 +150,7 @@ static void query_serial_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_init_parcel(message, &rilp);
 	imei = parcel_r_string(&rilp);
 
-	g_ril_append_print_buf(ril, "{%s}", imei);
+	g_ril_append_print_buf(ril, "{%.9s******}", imei);
 	g_ril_print_response(ril, message);
 
 	CALLBACK_WITH_SUCCESS(cb, imei, cbd->data);
