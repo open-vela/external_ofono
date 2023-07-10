@@ -2330,7 +2330,7 @@ static int manager_conference(DBusMessage *msg,
 	ofono_debug("manager_conference %d", index);
 
 	for (int i = 0; i < index; i++) {
-		ofono_debug("manager_conference %s", dial_number[i]);
+		ofono_debug("manager_conference ***");
 		if (!valid_long_phone_number_format(dial_number[i]))
 			return -EINVAL;
 

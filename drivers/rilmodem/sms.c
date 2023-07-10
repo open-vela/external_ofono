@@ -79,7 +79,7 @@ static void ril_csca_set(struct ofono_sms *sms,
 	parcel_init(&rilp);
 	parcel_w_string(&rilp, number);
 
-	g_ril_append_print_buf(sd->ril, "(%s)", number);
+	g_ril_append_print_buf(sd->ril, "(***)");
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SET_SMSC_ADDRESS, &rilp,
 			ril_csca_set_cb, cbd, g_free) > 0)
@@ -125,8 +125,8 @@ static void ril_csca_query_cb(struct ril_msg *message, gpointer user_data)
 	strncpy(sca.number, number, OFONO_MAX_PHONE_NUMBER_LENGTH);
 	sca.number[OFONO_MAX_PHONE_NUMBER_LENGTH] = '\0';
 
-	g_ril_append_print_buf(sd->ril, "{type=%d,number=%s}",
-				sca.type, sca.number);
+	g_ril_append_print_buf(sd->ril, "{type=%d,number=***}",
+				sca.type);
 	g_ril_print_response(sd->ril, message);
 
 	g_free(temp_buf);
