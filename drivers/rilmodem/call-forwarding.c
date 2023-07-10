@@ -297,9 +297,8 @@ static void ril_registration(struct ofono_call_forwarding *cf, int type,
 	parcel_w_int32(&rilp, time);
 
 	g_ril_append_print_buf(fd->ril, "(action: 3, type: %d cls: %d "
-					"number type: %d number: %s time: %d)",
-					type, cls, number->type, number->number,
-					time);
+					"number type: %d number: *** time: %d)",
+					type, cls, number->type, time);
 
 	if (g_ril_send(fd->ril, RIL_REQUEST_SET_CALL_FORWARD,
 				&rilp, ril_set_forward_cb, cbd, g_free) > 0)

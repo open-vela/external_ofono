@@ -207,9 +207,9 @@ static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 		else
 			call->clip_validity = 2;
 
-		ofono_debug("[id=%d,status=%d,type=%d,number=%s,name=%s]",
+		ofono_debug("[id=%d,status=%d,type=%d,number=***,name=%s]",
 			call->id, call->status, call->type,
-			call->phone_number.number, call->name);
+			call->name);
 
 		calls = g_slist_insert_sorted(calls, call, call_compare);
 	}
@@ -712,9 +712,9 @@ static void ril_ss_notify(struct ril_msg *message, gpointer user_data)
 	ton = parcel_r_int32(&rilp);
 	tmp_number = parcel_r_string(&rilp);
 
-	g_ril_append_print_buf(vd->ril, "{%d,%d,%d,%d,%s}",
+	g_ril_append_print_buf(vd->ril, "{%d,%d,%d,%d,***}",
 				notif_type, code, index,
-				ton, tmp_number);
+				ton);
 	g_ril_print_unsol(vd->ril, message);
 
 	if (tmp_number != NULL) {

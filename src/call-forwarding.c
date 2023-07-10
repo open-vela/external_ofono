@@ -122,10 +122,10 @@ static void cf_cond_list_print(GSList *l)
 	for (; l ; l = l->next) {
 		cond = l->data;
 
-		ofono_debug("CF Condition status: %d, class: %d, number: %s,"
+		ofono_debug("CF Condition status: %d, class: %d, number: ***,"
 			" number_type: %d, time: %d",
-			cond->status, cond->cls, cond->phone_number.number,
-			cond->phone_number.type, cond->time);
+			cond->status, cond->cls, cond->phone_number.type,
+			cond->time);
 	}
 }
 
