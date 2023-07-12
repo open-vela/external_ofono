@@ -173,8 +173,8 @@ static void ril_call_barring_set(struct ofono_call_barring *cb,
 	parcel_w_string(&rilp, svcs_str);
 	parcel_w_string(&rilp, NULL);	/* AID (for FDN, not yet supported) */
 
-	g_ril_append_print_buf(bd->ril, "(%s,%s,%s,%s,(null))",
-				lock, enable ? "1" : "0", passwd, svcs_str);
+	g_ril_append_print_buf(bd->ril, "(%s,%s,***,%s,(null))",
+				lock, enable ? "1" : "0", svcs_str);
 
 	if (g_ril_send(bd->ril, RIL_REQUEST_SET_FACILITY_LOCK, &rilp,
 			ril_call_barring_set_cb, cbd, g_free) > 0)
@@ -226,8 +226,7 @@ static void ril_call_barring_set_passwd(struct ofono_call_barring *barr,
 	parcel_w_string(&rilp, old_passwd);
 	parcel_w_string(&rilp, new_passwd);
 
-	g_ril_append_print_buf(bd->ril, "(%s,%s,%s)",
-				lock, old_passwd, new_passwd);
+	g_ril_append_print_buf(bd->ril, "(%s,***,***)", lock);
 
 	if (g_ril_send(bd->ril, RIL_REQUEST_CHANGE_BARRING_PASSWORD, &rilp,
 			ril_call_barring_set_passwd_cb, cbd, g_free) > 0)
