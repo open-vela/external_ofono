@@ -1219,7 +1219,7 @@ static void ril_pin_send(struct ofono_sim *sim, const char *passwd,
 	parcel_w_string(&rilp, passwd);
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(%s,aid=%s)", passwd, sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(***,aid=%s)", sd->aid_str);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PIN, &rilp,
 			ril_enter_sim_pin_cb, cbd, g_free) > 0)
@@ -1244,7 +1244,7 @@ static void ril_pin2_send(struct ofono_sim *sim, const char *passwd,
 	parcel_w_string(&rilp, passwd);
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(pin2=%s,aid=%s)", passwd, sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(pin2=***,aid=%s)", sd->aid_str);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PIN2, &rilp,
 			ril_enter_sim_pin_cb, cbd, g_free) > 0)
@@ -1332,9 +1332,8 @@ static void ril_set_facility_lock(struct ofono_sim *sim,
 	parcel_w_string(&rilp, "0");		/* class */
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(%s,%d,%s,0,aid=%s)",
-				clck_cpwd_fac[passwd_type], enable, passwd,
-				sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(%s,%d,***,0,aid=%s)",
+				clck_cpwd_fac[passwd_type], enable, sd->aid_str);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SET_FACILITY_LOCK, &rilp,
 				ril_set_facility_lock_cb, cbd, g_free) > 0)
@@ -1366,8 +1365,8 @@ static void ril_set_fdn_lock(struct ofono_sim *sim,
 	parcel_w_string(&rilp, svcs_str);
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(enable=%d,passwd=%s,svcs_str=%s,aid=%s)",
-				enable, passwd, svcs_str, sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(enable=%d,passwd=***,svcs_str=%s,aid=%s)",
+				enable, svcs_str, sd->aid_str);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_SET_FACILITY_LOCK, &rilp,
 				ril_set_facility_lock_cb, cbd, g_free) > 0)
@@ -1425,8 +1424,7 @@ static void ril_pin_send_puk(struct ofono_sim *sim,
 	parcel_w_string(&rilp, passwd);
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(puk=%s,pin=%s,aid=%s)",
-				puk, passwd, sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(puk=***,pin=***,aid=%s)", sd->aid_str);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PUK, &rilp,
 			ril_enter_sim_puk_cb, cbd, g_free) > 0)
@@ -1484,8 +1482,7 @@ static void ril_pin2_send_puk2(struct ofono_sim *sim,
 	parcel_w_string(&rilp, passwd);
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(puk2=%s,pin2=%s,aid=%s)",
-				puk2, passwd, sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(puk2=***,pin2=***,aid=%s)", sd->aid_str);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_ENTER_SIM_PUK2, &rilp,
 			ril_enter_sim_puk2_cb, cbd, g_free) > 0)
@@ -1523,8 +1520,7 @@ static void ril_change_passwd(struct ofono_sim *sim,
 	parcel_w_string(&rilp, new_passwd);
 	parcel_w_string(&rilp, sd->aid_str);
 
-	g_ril_append_print_buf(sd->ril, "(old=%s,new=%s,aid=%s)",
-				old_passwd, new_passwd, sd->aid_str);
+	g_ril_append_print_buf(sd->ril, "(old=***,new=***,aid=%s)", sd->aid_str);
 
 	if (g_ril_send(sd->ril, request, &rilp, ril_enter_sim_pin_cb,
 			cbd, g_free) > 0)
