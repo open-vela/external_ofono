@@ -360,6 +360,7 @@ static void release_context(struct pri_context *ctx)
 	ctx->context_driver->inuse = FALSE;
 	ctx->context_driver = NULL;
 	ctx->active = FALSE;
+	ctx->status = CONTEXT_STATUS_DEACTIVATED;
 }
 
 static struct pri_context *gprs_context_by_path(struct ofono_gprs *gprs,
@@ -4047,6 +4048,8 @@ static void radio_online_watch_cb(struct ofono_modem *modem,
 						void *data)
 {
 	struct ofono_gprs *gprs = data;
+
+	ofono_debug("gprs - %s , online : %d", __func__, online);
 
 	if (!online) {
 		ofono_gprs_status_notify(gprs, NETWORK_REGISTRATION_STATUS_NOT_REGISTERED);
