@@ -100,6 +100,11 @@ Signals		PropertyChanged(string name, variant value)
 			This signal is to indicate OEM applications that
 			an unsolicited OEM message was received.
 
+		DeviceInfoChanged()
+
+			This signal indicates a changed value of
+			a series of device info.
+
 Properties	boolean Powered [readwrite]
 
 			Boolean representing the power state of the modem

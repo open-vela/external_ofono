@@ -1580,6 +1580,7 @@ static const GDBusSignalTable modem_signals[] = {
 	{ GDBUS_SIGNAL("ModemRestart", NULL) },
 	{ GDBUS_SIGNAL("OemHookIndication",
 			GDBUS_ARGS({ "response", "ay" })) },
+	{ GDBUS_SIGNAL("DeviceInfoChanged", NULL) },
 	{ }
 };
 
@@ -1817,6 +1818,21 @@ void ofono_modem_remove_interface(struct ofono_modem *modem,
 	modem->interface_update = g_idle_add(trigger_interface_update, modem);
 }
 
+void ofono_query_device_info_done(struct ofono_devinfo *info)
+{
+	struct ofono_modem *modem = __ofono_atom_get_modem(info->atom);
+	DBusConnection *conn = ofono_dbus_get_connection();
+	DBusMessage *signal;
+
+	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
+					"DeviceInfoChanged");
+
+	if (signal == NULL)
+		return;
+
+	g_dbus_send_message(conn, signal);
+}
+
 static void query_svn_cb(const struct ofono_error *error,
 				const char *svn, void *user)
 {
@@ -1825,12 +1841,15 @@ static void query_svn_cb(const struct ofono_error *error,
 	const char *path = __ofono_atom_get_path(info->atom);
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
-		return;
+		goto out;
 
 	info->svn = g_strdup(svn);
 
 	ofono_dbus_signal_property_changed(conn, path, OFONO_MODEM_INTERFACE,
 			"SoftwareVersionNumber", DBUS_TYPE_STRING, &info->svn);
+
+out:
+	ofono_query_device_info_done(info);
 }
 
 static void query_svn(struct ofono_devinfo *info)
