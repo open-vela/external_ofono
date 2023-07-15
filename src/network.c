@@ -157,7 +157,7 @@ static void registration_status_callback(const struct ofono_error *error,
 	struct ofono_netreg *netreg = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during registration status query");
+		ofono_error("Error during registration status query");
 		return;
 	}
 
@@ -1013,7 +1013,7 @@ static void append_operator_struct_list(struct ofono_netreg *netreg,
 			__ofono_atom_get_path(netreg->atom));
 
 	if (!dbus_connection_list_registered(conn, path, &children)) {
-		DBG("Unable to obtain registered NetworkOperator(s)");
+		ofono_warn("Unable to obtain registered NetworkOperator(s)");
 		return;
 	}
 
@@ -1053,7 +1053,7 @@ static void operator_list_callback(const struct ofono_error *error, int total,
 	DBusMessageIter array;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during operator list");
+		ofono_error("Error occurred during operator list");
 		__ofono_dbus_pending_reply(&netreg->pending,
 					__ofono_error_failed(netreg->pending));
 		return;
@@ -1292,14 +1292,14 @@ static void set_nitz_time(struct ofono_netreg *netreg,
 			info->mday, info->mon, info->year,
 			info->dst, info->utcoff);
 		if (error_code < 0) {
-			DBG("Error during set nitz time");
+			ofono_error("Error during set nitz time");
 			netreg->nitz_time = NULL;
 			return;
 		} else {
 			netreg->nitz_time = g_strdup(buf);
 		}
 	} else {
-		DBG("Error during set nitz time");
+		ofono_error("Error during set nitz time");
 		netreg->nitz_time = NULL;
 		return;
 	}
@@ -1422,7 +1422,7 @@ static void current_operator_callback(const struct ofono_error *error,
 	const char *path = __ofono_atom_get_path(netreg->atom);
 	GSList *op = NULL;
 
-	DBG("%p, %p", netreg, netreg->current_operator);
+	ofono_debug("%s, %p, %p", __func__, netreg, netreg->current_operator);
 
 	/*
 	 * Sometimes we try to query COPS right when we roam off the cell,
@@ -1434,7 +1434,7 @@ static void current_operator_callback(const struct ofono_error *error,
 		current = NULL;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during current operator");
+		ofono_error("Error during current operator");
 		return;
 	}
 
@@ -1519,7 +1519,7 @@ static void signal_strength_callback(const struct ofono_error *error,
 	struct ofono_netreg *netreg = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during signal strength query");
+		ofono_error("Error during signal strength query");
 		return;
 	}
 
@@ -1551,8 +1551,8 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 	if (netreg == NULL)
 		return;
 
-	DBG("%s status %d tech %d lac %d ci %d denial %d",
-	    __ofono_atom_get_path(netreg->atom), status, tech, lac, ci, denial);
+	ofono_debug("%s status %d tech %d lac %d ci %d denial %d",
+		__ofono_atom_get_path(netreg->atom), status, tech, lac, ci, denial);
 
 	if (netreg->status != status) {
 		struct ofono_modem *modem;
@@ -1610,10 +1610,10 @@ void ofono_netreg_time_notify(struct ofono_netreg *netreg,
 	if (info == NULL)
 		return;
 
-	DBG("net time %d-%02d-%02d %02d:%02d:%02d utcoff %d dst %d",
-	    info->year, info->mon, info->mday,
-	    info->hour, info->min, info->sec,
-	    info->utcoff, info->dst);
+	ofono_debug("net time %d-%02d-%02d %02d:%02d:%02d utcoff %d dst %d",
+		info->year, info->mon, info->mday,
+		info->hour, info->min, info->sec,
+		info->utcoff, info->dst);
 
 	set_nitz_time(netreg, info);
 
@@ -1679,7 +1679,7 @@ static void init_registration_status(const struct ofono_error *error,
 	struct ofono_netreg *netreg = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during registration status query");
+		ofono_error("Error during registration status query");
 		return;
 	}
 
@@ -2471,13 +2471,11 @@ static void radio_online_watch_cb(struct ofono_modem *modem,
 			netreg_emit_signal_strength_changed(netreg);
 		}
 
-		if (netreg->current_operator) {
-			netreg->current_operator->name[0] = '\0';
-			netreg->current_operator->mcc[0] = '\0';
-			netreg->current_operator->mnc[0] = '\0';
-			netreg->current_operator->status = -1;
-			netreg->current_operator->techs = -1;
-		}
+		/*
+		 * We don't free it here, because operator is registered as one dbus interface.
+		 * Instead just set it to NULL.
+		 */
+		netreg->current_operator = NULL;
 	}
 }
 
