@@ -523,8 +523,7 @@ static void dial(struct ofono_voicecall *vc,
 	parcel_w_int32(&rilp, 0);
 	parcel_w_int32(&rilp, 0);
 
-	g_ril_append_print_buf(vd->ril, "(%s,%d,0,0)",
-				phone_number_to_string(ph),
+	g_ril_append_print_buf(vd->ril, "(***,%d,0,0)",
 				clir);
 
 	/* Send request to RIL */
