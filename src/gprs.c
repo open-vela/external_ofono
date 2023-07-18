@@ -2588,6 +2588,115 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 	return NULL;
 }
 
+static DBusMessage *gprs_edit_context(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_gprs *gprs = data;
+	struct pri_context *ctx;
+	const char *typestr;
+	const char *name;
+	const char *apn;
+	const char *username;
+	const char *password;
+	int protocal;
+	int authtype;
+	const char *path;
+	enum ofono_gprs_context_type type;
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_STRING, &typestr,
+				DBUS_TYPE_STRING, &name,
+				DBUS_TYPE_STRING, &apn,
+				DBUS_TYPE_STRING, &username,
+				DBUS_TYPE_STRING, &password,
+				DBUS_TYPE_INT32, &protocal,
+				DBUS_TYPE_INT32, &authtype,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	if (path[0] == '\0')
+		return __ofono_error_invalid_format(msg);
+
+	if (gprs_context_string_to_type(typestr, &type) == FALSE)
+		return __ofono_error_invalid_format(msg);
+
+	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
+	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
+	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
+	if (name == NULL)
+		name = gprs_context_default_name(type);
+
+	if (name == NULL)
+		name = typestr;
+
+	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH)
+		return __ofono_error_invalid_format(msg);
+
+	ctx = gprs_context_by_path(gprs, path);
+	if (ctx == NULL)
+		return __ofono_error_not_found(msg);
+
+	/* This context is already being messed with */
+	if (ctx->pending)
+		return __ofono_error_busy(msg);
+
+	if (ctx->type != type) {
+		ctx->type = type;
+	}
+
+	if (g_strcmp0(ctx->name, name)) {
+		strcpy(ctx->name, name);
+	}
+
+	if (g_strcmp0(ctx->context.apn, apn)) {
+		strcpy(ctx->context.apn, apn);
+	}
+
+	if (g_strcmp0(ctx->context.username, username)) {
+		strcpy(ctx->context.username, username);
+	}
+
+	if (g_strcmp0(ctx->context.password, password)) {
+		strcpy(ctx->context.password, password);
+	}
+
+	if (ctx->context.proto != protocal) {
+		ctx->context.proto = protocal;
+	}
+
+	if (ctx->context.auth_method != authtype) {
+		ctx->context.auth_method = authtype;
+	}
+
+	if (gprs->settings) {
+		write_context_settings(gprs, ctx);
+		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
+	}
+
+	g_dbus_send_reply(conn, msg, DBUS_TYPE_OBJECT_PATH, &path,
+					DBUS_TYPE_INVALID);
+
+	if (ctx->status == CONTEXT_STATUS_ACTIVATED) {
+		struct ofono_gprs_context *gc;
+		gc = ctx->context_driver;
+
+		if (gc) {
+			gc->driver->deactivate_primary(
+				gc, ctx->context.cid, pri_deactivate_callback, ctx);
+			ctx->status = CONTEXT_STATUS_DEACTIVATING;
+		}
+	}
+
+	return NULL;
+}
+
 static void gprs_deactivate_for_all(const struct ofono_error *error,
 					void *data)
 {
@@ -2971,6 +3080,13 @@ static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_ASYNC_METHOD("RemoveContext",
 			GDBUS_ARGS({ "path", "o" }), NULL,
 			gprs_remove_context) },
+	{ GDBUS_ASYNC_METHOD("EditContext",
+			GDBUS_ARGS({ "path", "o" }, { "type", "s" },
+			{ "name", "s" }, { "apn", "s" },
+			{ "username", "s" }, { "password", "s" },
+			{ "protocol", "i" }, { "auth_method", "i" }),
+			GDBUS_ARGS({ "path", "o" }),
+			gprs_edit_context) },
 	{ GDBUS_ASYNC_METHOD("DeactivateAll", NULL, NULL,
 			gprs_deactivate_all) },
 	{ GDBUS_METHOD("GetContexts", NULL,
