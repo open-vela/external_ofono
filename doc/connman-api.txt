@@ -70,6 +70,18 @@ Methods		dict GetProperties()
 					 [service].Error.NotFound
 					 [service].Error.Failed
 
+		object EditContext(string type, string name, string apn,
+				string username, string password, int32 protocol, int32 auth_method)
+
+			Edits a primary context.  If the primary context
+			already activated, it will be reactivated.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.InvalidArguments
+					 [service].Error.InvalidFormat
+					 [service].Error.NotFound
+					 [service].Error.Failed
+
 		void ResetContexts()
 
 			Removes all contexts and re-provisions from the APN
