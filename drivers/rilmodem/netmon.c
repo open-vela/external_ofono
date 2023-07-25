@@ -34,6 +34,7 @@
 #include <ofono/log.h>
 #include <ofono/modem.h>
 #include <ofono/netmon.h>
+#include <ofono/netreg.h>
 
 #include "gril.h"
 
@@ -60,6 +61,12 @@
 /* size of RIL_CellInfoTdscdma */
 #define NETMON_RIL_CELLINFO_SIZE_TDSCDMA	24
 
+#define NETMON_RSRP_MIN			-140
+#define NETMON_RSRP_POOR		-125
+#define NETMON_RSRP_MODERATE		-115
+#define NETMON_RSRP_GOOD		-110
+#define NETMON_RSRP_GREAT		-102
+
 #define MSECS_RATE_INVALID	(0x7fffffff)
 #define SECS_TO_MSECS(x)	((x) * 1000)
 
@@ -79,6 +86,7 @@ static gboolean ril_delayed_register(gpointer user_data)
 static int process_cellinfo_list(struct ril_msg *message,
 					struct ofono_netmon *netmon, gpointer user_data)
 {
+	struct netmon_data *nmd = ofono_netmon_get_data(netmon);
 	struct cb_data *cbd = user_data;
 	ofono_netmon_cell_list_cb_t cb;
 	struct parcel rilp;
@@ -98,6 +106,7 @@ static int process_cellinfo_list(struct ril_msg *message,
 		return OFONO_ERROR_TYPE_FAILURE;
 	}
 
+	g_ril_print_unsol_no_args(nmd->ril, message);
 	g_ril_init_parcel(message, &rilp);
 
 	cell_info_cnt = parcel_r_int32(&rilp);
@@ -184,6 +193,24 @@ static int process_cellinfo_list(struct ril_msg *message,
 			list[i].snr = (list[i].snr >= -200 && list[i].snr <= 300) ? list[i].snr : -1;
 			list[i].cqi = (list[i].cqi >= 0 && list[i].cqi <= 15) ? list[i].cqi : -1;
 			list[i].tadv = (list[i].tadv >=0 && list[i].tadv <= 63) ? list[i].tadv : -1;
+
+			if (list[i].rsrp < NETMON_RSRP_MIN) {
+				list[i].level = SIGNAL_STRENGTH_UNKNOWN;
+			} else if (list[i].rsrp >= NETMON_RSRP_MIN
+				&& list[i].rsrp < NETMON_RSRP_POOR) {
+				list[i].level = SIGNAL_STRENGTH_POOR;
+			} else if (list[i].rsrp >= NETMON_RSRP_POOR
+				&& list[i].rsrp < NETMON_RSRP_MODERATE) {
+				list[i].level = SIGNAL_STRENGTH_MODERATE;
+			} else if (list[i].rsrp >= NETMON_RSRP_MODERATE
+				&& list[i].rsrp < NETMON_RSRP_GOOD) {
+				list[i].level = SIGNAL_STRENGTH_GOOD;
+			} else if (list[i].rsrp >= NETMON_RSRP_GOOD
+				&& list[i].rsrp < NETMON_RSRP_GREAT) {
+				list[i].level = SIGNAL_STRENGTH_GREATE;
+			} else if (list[i].rsrp >= NETMON_RSRP_GREAT) {
+				list[i].level = SIGNAL_STRENGTH_EXCELLENT;
+			}
 		}
 	}
 

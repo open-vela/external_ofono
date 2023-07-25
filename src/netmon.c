@@ -132,11 +132,10 @@ static void netmon_cell_info_dict_append(DBusMessageIter *dict,
 	if (cell->ecno >= 0)
 		ofono_dbus_dict_append(dict, "ReceivedEnergyRatio", DBUS_TYPE_BYTE, &cell->ecno);
 
-	if (cell->rsrq >= 0)
-		ofono_dbus_dict_append(dict, "ReferenceSignalReceivedQuality", DBUS_TYPE_BYTE, &cell->rsrq);
+	ofono_dbus_dict_append(dict, "ReferenceSignalReceivedQuality",
+				DBUS_TYPE_INT32, &cell->rsrq);
 
-	if (cell->rsrp >= 0)
-		ofono_dbus_dict_append(dict, "ReferenceSignalReceivedPower", DBUS_TYPE_BYTE, &cell->rsrp);
+	ofono_dbus_dict_append(dict, "ReferenceSignalReceivedPower", DBUS_TYPE_INT32, &cell->rsrp);
 
 	if (cell->earfcn >= 0)
 		ofono_dbus_dict_append(dict, "EARFCN", DBUS_TYPE_UINT16, &cell->earfcn);
@@ -154,6 +153,8 @@ static void netmon_cell_info_dict_append(DBusMessageIter *dict,
 		ofono_dbus_dict_append(dict, "TrackingAreaCode", DBUS_TYPE_UINT16, &cell->tac);
 
 	ofono_dbus_dict_append(dict, "SingalToNoiseRatio", DBUS_TYPE_INT32, &cell->snr);
+
+	ofono_dbus_dict_append(dict, "Level", DBUS_TYPE_INT32, &cell->level);
 
 	g_free(mcc);
 	g_free(mnc);
