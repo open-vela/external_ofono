@@ -396,6 +396,14 @@ static const GDBusSignalTable ims_signals[] = {
 	{ }
 };
 
+static void ims_radio_state_change(int state, void *data)
+{
+}
+
+static void ims_sim_state_change(int state, void *data)
+{
+}
+
 static void ims_atom_remove(struct ofono_atom *atom)
 {
 	struct ofono_ims *ims = __ofono_atom_get_data(atom);
@@ -427,6 +435,9 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 
 	ims->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_IMS,
 						ims_atom_remove, ims);
+
+	__ofono_atom_add_radio_state_watch(ims->atom, ims_radio_state_change);
+	__ofono_atom_add_sim_state_watch(ims->atom, ims_sim_state_change);
 
 	ims->reg_info = 0;
 	ims->ext_info = 0;

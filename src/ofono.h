@@ -210,6 +210,12 @@ gboolean __ofono_atom_get_registered(struct ofono_atom *atom);
 void __ofono_atom_setup_dispatcher(struct ofono_atom *atom,
 				void (*dispatch)(int command_id, void *data));
 
+void __ofono_atom_add_sim_state_watch(struct ofono_atom *atom,
+				void (*sim_state_change)(int sim_state, void *data));
+
+void __ofono_atom_add_radio_state_watch(struct ofono_atom *atom,
+				void (*radio_state_change)(int radio_state, void *data));
+
 unsigned int __ofono_modem_add_atom_watch(struct ofono_modem *modem,
 					enum ofono_atom_type type,
 					ofono_atom_watch_func notify,

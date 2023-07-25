@@ -702,6 +702,14 @@ static const GDBusSignalTable radio_signals[] = {
 	{ }
 };
 
+static void radio_state_change(int state, void *data)
+{
+}
+
+static void sim_state_change(int state, void *data)
+{
+}
+
 int ofono_radio_settings_driver_register(const struct ofono_radio_settings_driver *d)
 {
 	DBG("driver: %p, name: %s", d, d->name);
@@ -777,6 +785,9 @@ struct ofono_radio_settings *ofono_radio_settings_create(struct ofono_modem *mod
 
 	rs->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_RADIO_SETTINGS,
 						radio_settings_remove, rs);
+
+	__ofono_atom_add_radio_state_watch(rs->atom, radio_state_change);
+	__ofono_atom_add_sim_state_watch(rs->atom, sim_state_change);
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_radio_settings_driver *drv = l->data;
