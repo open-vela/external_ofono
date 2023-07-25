@@ -117,6 +117,8 @@ struct ofono_atom {
 	void (*destruct)(struct ofono_atom *atom);
 	void (*unregister)(struct ofono_atom *atom);
 	void (*dispatch)(int command_id, void *data);
+	void (*sim_state_change)(int sim_state, void *data);
+	void (*radio_state_change)(int radio_state, void *data);
 	void *data;
 	struct ofono_modem *modem;
 };
@@ -254,6 +256,8 @@ struct ofono_atom *__ofono_modem_add_atom(struct ofono_modem *modem,
 	atom->data = data;
 	atom->modem = modem;
 	atom->dispatch = NULL;
+	atom->radio_state_change = NULL;
+	atom->sim_state_change = NULL;
 
 	modem->atoms = g_slist_prepend(modem->atoms, atom);
 
@@ -309,6 +313,9 @@ static void radio_status_change(struct ofono_modem *modem,
 		modem->radio_status = new_status;
 
 	if (old_status != new_status) {
+		struct ofono_atom *atom;
+		GSList *l;
+
 		info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
 		if (info != NULL && new_status != RADIO_STATUS_UNAVAILABLE
 			&& old_status == RADIO_STATUS_UNAVAILABLE)
@@ -318,6 +325,14 @@ static void radio_status_change(struct ofono_modem *modem,
 					OFONO_MODEM_INTERFACE,
 					"RadioState",
 					DBUS_TYPE_UINT32, &modem->radio_status);
+
+
+		for (l = modem->atoms; l; l = l->next) {
+			atom = l->data;
+
+			if (atom != NULL && atom->radio_state_change != NULL)
+				atom->radio_state_change(new_status, atom);
+		}
 	}
 }
 
@@ -372,6 +387,18 @@ void __ofono_atom_setup_dispatcher(struct ofono_atom *atom,
 				void (*dispatch)(int command_id, void *data))
 {
 	atom->dispatch = dispatch;
+}
+
+void __ofono_atom_add_sim_state_watch(struct ofono_atom *atom,
+				void (*sim_state_change)(int sim_state, void *data))
+{
+	atom->sim_state_change = sim_state_change;
+}
+
+void __ofono_atom_add_radio_state_watch(struct ofono_atom *atom,
+				void (*radio_state_change)(int radio_state, void *data))
+{
+	atom->radio_state_change = radio_state_change;
 }
 
 unsigned int __ofono_modem_add_atom_watch(struct ofono_modem *modem,
@@ -872,7 +899,22 @@ static void modem_status_query_cb(const struct ofono_error *error,
 
 static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 {
+	struct ofono_atom *atom;
+	struct ofono_modem *modem;
+	GSList *l;
+
 	ofono_info("modem - %s, sim state = %d", __func__, new_state);
+
+	modem = user;
+	if (modem == NULL)
+		return;
+
+	for (l = modem->atoms; l; l = l->next) {
+		atom = l->data;
+
+		if (atom != NULL && atom->sim_state_change != NULL)
+			atom->sim_state_change(new_state, atom);
+	}
 }
 
 static DBusMessage *set_property_online(struct ofono_modem *modem,
