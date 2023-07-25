@@ -45,14 +45,15 @@ struct ofono_cell_info {
 	unsigned int rssi;
 	unsigned int rscp;
 	unsigned int ecno;
-	unsigned int rsrq;
-	unsigned int rsrp;
 	unsigned int earfcn;
 	unsigned int eband;
 	unsigned int cqi;
 	unsigned int tac;
+	int rsrq;
+	int rsrp;
 	int snr;
 	int type;
+	int level;
 	ofono_bool_t registered;
 };
 
