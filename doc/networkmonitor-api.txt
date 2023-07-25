@@ -151,16 +151,20 @@ byte ReceivedEnergyRatio [optional, umts]
         received power spectral density.  Valid range of values is 0-49.
         Refer to <ecno> in 27.007, Section 8.69 for more details.
 
-byte ReferenceSignalReceivedQuality [optional, lte]
+int32 ReferenceSignalReceivedQuality [optional, lte]
 
         Contains the Reference Signal Received Quality.  Valid range of
         values is 0-34. Refer to <rsrq> in 27.007, Section 8.69 for more
         details.
 
-byte ReferenceSignalReceivedPower [optional, lte]
+int32 ReferenceSignalReceivedPower [optional, lte]
 
         Contains the Reference Signal Received Power.  Valid range of values
         is 0-97. Refer to <rsrp> in 27.007, Section 8.69 for more details.
+
+int32 Level [optional, lte]
+
+        Contains the Signal Strength Level.
 
 uint16 EARFCN [optional, lte]
 
