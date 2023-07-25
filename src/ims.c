@@ -48,6 +48,7 @@ struct ofono_ims {
 	struct ofono_atom *atom;
 	DBusMessage *pending;
 	unsigned int radio_online_watch;
+	ofono_bool_t ims_supported;
 };
 
 static GSList *g_drivers = NULL;
@@ -188,7 +189,7 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info, int ext_info)
 	if (ims == NULL)
 		return;
 
-	DBG("%s reg_info:%d ext_info:%d", __ofono_atom_get_path(ims->atom),
+	ofono_debug("%s reg_info:%d ext_info:%d", __ofono_atom_get_path(ims->atom),
 						reg_info, ext_info);
 
 	if (ims->ext_info == ext_info && ims->reg_info == reg_info)
@@ -258,6 +259,27 @@ static DBusMessage *ofono_ims_send_register(DBusConnection *conn,
 	return NULL;
 }
 
+static void ims_config_cb(const struct ofono_error *error, void *data)
+{
+	ofono_debug("%s, error type = %d", __func__, error->type);
+}
+
+static void send_ims_config(struct ofono_ims *ims)
+{
+	const struct ofono_ims_driver *driver = ims->driver;
+
+	if (driver == NULL)
+		return;
+
+	if (driver->ims_register == NULL)
+		return;
+
+	if (ims->ims_supported)
+		driver->ims_register(ims, ims_config_cb, ims);
+	else
+		driver->ims_unregister(ims, ims_config_cb, ims);
+}
+
 static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
@@ -282,7 +304,7 @@ static void set_capability_cb(const struct ofono_error *error, void *data)
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during set capability");
+		ofono_error("Error occurred during set capability");
 		reply = __ofono_error_failed(ims->pending);
 		__ofono_dbus_pending_reply(&ims->pending, reply);
 		return;
@@ -408,6 +430,7 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 
 	ims->reg_info = 0;
 	ims->ext_info = 0;
+	ims->ims_supported = TRUE;
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_ims_driver *drv = l->data;
@@ -502,6 +525,9 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 
 	ofono_modem_add_interface(modem, OFONO_IMS_INTERFACE);
 	__ofono_atom_register(ims->atom, ims_atom_unregister);
+
+	/* In case ims config is mismatched between telephony and modem */
+	send_ims_config(ims);
 }
 
 static void registration_init_cb(const struct ofono_error *error,
