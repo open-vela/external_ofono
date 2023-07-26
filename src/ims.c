@@ -35,7 +35,11 @@
 #include "ofono.h"
 
 #include "common.h"
+#include "storage.h"
 
+#define SETTINGS_KEY "ims"
+#define SETTINGS_STORE "imssetting"
+#define SETTINGS_GROUP "Settings"
 #define VOICE_CAPABLE_FLAG 0x1
 #define SMS_CAPABLE_FLAG 0x4
 
@@ -48,10 +52,44 @@ struct ofono_ims {
 	struct ofono_atom *atom;
 	DBusMessage *pending;
 	unsigned int radio_online_watch;
-	ofono_bool_t ims_supported;
+	ofono_bool_t user_setting;
+	GKeyFile *settings;
+	enum ofono_sim_state sim_state;
 };
 
 static GSList *g_drivers = NULL;
+
+static void ims_load_settings(struct ofono_ims *ims)
+{
+	GError *error;
+
+	ims->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
+	if (ims->settings == NULL) {
+		ofono_warn("ims setting storage open failed");
+		ims->user_setting = TRUE;
+		return;
+	}
+
+	error = NULL;
+	ims->user_setting = g_key_file_get_boolean(ims->settings, SETTINGS_GROUP,
+					"ImsSwitcher", &error);
+	if (error) {
+		ofono_error("ims switcher storage read failed");
+
+		g_error_free(error);
+		ims->user_setting = TRUE;
+		g_key_file_set_boolean(ims->settings, SETTINGS_GROUP,
+						"ImsSwitcher", ims->user_setting);
+	}
+}
+
+static void ims_close_settings(struct ofono_ims *ims)
+{
+	if (ims->settings) {
+		storage_close(SETTINGS_KEY, SETTINGS_STORE, ims->settings, TRUE);
+		ims->settings = NULL;
+	}
+}
 
 static DBusMessage *ims_get_properties(DBusConnection *conn,
 					DBusMessage *msg, void *data)
@@ -256,6 +294,36 @@ static DBusMessage *ofono_ims_send_register(DBusConnection *conn,
 
 	ims->driver->ims_register(ims, register_cb, ims);
 
+	ims->user_setting = TRUE;
+	g_key_file_set_boolean(ims->settings, SETTINGS_GROUP,
+					"ImsSwitcher", ims->user_setting);
+
+	storage_sync(SETTINGS_KEY, SETTINGS_STORE, ims->settings);
+
+	return NULL;
+}
+
+static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
+						DBusMessage *msg, void *data)
+{
+	struct ofono_ims *ims = data;
+
+	if (ims->pending)
+		return __ofono_error_busy(msg);
+
+	if (ims->driver->ims_unregister == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	ims->pending = dbus_message_ref(msg);
+
+	ims->driver->ims_unregister(ims, register_cb, ims);
+
+	ims->user_setting = FALSE;
+	g_key_file_set_boolean(ims->settings, SETTINGS_GROUP,
+					"ImsSwitcher", ims->user_setting);
+
+	storage_sync(SETTINGS_KEY, SETTINGS_STORE, ims->settings);
+
 	return NULL;
 }
 
@@ -274,28 +342,10 @@ static void send_ims_config(struct ofono_ims *ims)
 	if (driver->ims_register == NULL)
 		return;
 
-	if (ims->ims_supported)
+	if (ims->user_setting)
 		driver->ims_register(ims, ims_config_cb, ims);
 	else
 		driver->ims_unregister(ims, ims_config_cb, ims);
-}
-
-static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
-						DBusMessage *msg, void *data)
-{
-	struct ofono_ims *ims = data;
-
-	if (ims->pending)
-		return __ofono_error_busy(msg);
-
-	if (ims->driver->ims_unregister == NULL)
-		return __ofono_error_not_implemented(msg);
-
-	ims->pending = dbus_message_ref(msg);
-
-	ims->driver->ims_unregister(ims, register_cb, ims);
-
-	return NULL;
 }
 
 static void set_capability_cb(const struct ofono_error *error, void *data)
@@ -402,6 +452,25 @@ static void ims_radio_state_change(int state, void *data)
 
 static void ims_sim_state_change(int state, void *data)
 {
+	struct ofono_atom *atom = data;
+	struct ofono_ims *ims = __ofono_atom_get_data(atom);
+
+	ofono_debug("%s , old state = %d, new state = %d", __func__, ims->sim_state, state);
+
+	if (ims->sim_state == state)
+		return;
+	ims->sim_state = state;
+
+	switch (state) {
+	case OFONO_SIM_STATE_NOT_PRESENT:
+	case OFONO_SIM_STATE_RESETTING:
+		ims_close_settings(ims);
+		break;
+	case OFONO_SIM_STATE_READY:
+		ims_load_settings(ims);
+		send_ims_config(ims);
+		break;
+	}
 }
 
 static void ims_atom_remove(struct ofono_atom *atom)
@@ -441,7 +510,8 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 
 	ims->reg_info = 0;
 	ims->ext_info = 0;
-	ims->ims_supported = TRUE;
+	ims->settings = NULL;
+	ims->sim_state = OFONO_SIM_STATE_NOT_PRESENT;
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_ims_driver *drv = l->data;
@@ -486,6 +556,8 @@ static void ims_atom_unregister(struct ofono_atom *atom)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem = __ofono_atom_get_modem(atom);
 	const char *path = __ofono_atom_get_path(atom);
+
+	ims_close_settings(ims);
 
 	__ofono_watchlist_free(ims->status_watches);
 	ims->status_watches = NULL;
@@ -536,9 +608,6 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 
 	ofono_modem_add_interface(modem, OFONO_IMS_INTERFACE);
 	__ofono_atom_register(ims->atom, ims_atom_unregister);
-
-	/* In case ims config is mismatched between telephony and modem */
-	send_ims_config(ims);
 }
 
 static void registration_init_cb(const struct ofono_error *error,
