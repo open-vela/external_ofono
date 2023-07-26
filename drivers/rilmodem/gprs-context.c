@@ -111,6 +111,10 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 	/* Version */
 	parcel_r_int32(&rilp);
 	num_calls = parcel_r_int32(&rilp);
+	ofono_debug("%s, num_calls = %d", __func__, num_calls);
+
+	if (num_calls <= 0)
+		goto data_lost;
 
 	for (i = 0; i < num_calls; i++) {
 		parcel_r_int32(&rilp);			/* status */
@@ -125,24 +129,22 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 		parcel_skip_string(&rilp);		/* pcscf */
 		parcel_r_int32(&rilp);			/* mtu */
 
+		ofono_debug("[cid=%d,active=%d]", cid, active);
+
 		/* malformed check */
 		if (rilp.malformed) {
 			ofono_error("%s: malformed parcel received", __func__);
 			return;
 		}
 
-		if (cid != gcd->active_rild_cid)
-			continue;
-
-		if (active != 0)
+		if (cid == gcd->active_rild_cid)
 			return;
-
-		ofono_debug("call !active; notify disconnect: %d", cid);
-
-		ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
-		set_context_disconnected(gcd);
-		return;
 	}
+
+data_lost:
+	ofono_debug("%s , cid - %d is lost", __func__, cid);
+	ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
+	set_context_disconnected(gcd);
 }
 
 static int gprs_context_set_dns_servers(struct ofono_gprs_context *gc,

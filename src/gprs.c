@@ -3178,6 +3178,8 @@ void ofono_gprs_context_deactivated(struct ofono_gprs_context *gc,
 					OFONO_CONNECTION_CONTEXT_INTERFACE,
 					"Active", DBUS_TYPE_BOOLEAN, &value);
 	}
+
+	try_activate_contexts(gprs);
 }
 
 int ofono_gprs_context_driver_register(
