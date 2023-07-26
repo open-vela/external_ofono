@@ -72,14 +72,14 @@ static void ims_load_settings(struct ofono_ims *ims)
 
 	error = NULL;
 	ims->user_setting = g_key_file_get_boolean(ims->settings, SETTINGS_GROUP,
-					"ImsSwitcher", &error);
+					"ImsOn", &error);
 	if (error) {
 		ofono_error("ims switcher storage read failed");
 
 		g_error_free(error);
 		ims->user_setting = TRUE;
 		g_key_file_set_boolean(ims->settings, SETTINGS_GROUP,
-						"ImsSwitcher", ims->user_setting);
+						"ImsOn", ims->user_setting);
 	}
 }
 
@@ -296,7 +296,7 @@ static DBusMessage *ofono_ims_send_register(DBusConnection *conn,
 
 	ims->user_setting = TRUE;
 	g_key_file_set_boolean(ims->settings, SETTINGS_GROUP,
-					"ImsSwitcher", ims->user_setting);
+					"ImsOn", ims->user_setting);
 
 	storage_sync(SETTINGS_KEY, SETTINGS_STORE, ims->settings);
 
@@ -320,7 +320,7 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 
 	ims->user_setting = FALSE;
 	g_key_file_set_boolean(ims->settings, SETTINGS_GROUP,
-					"ImsSwitcher", ims->user_setting);
+					"ImsOn", ims->user_setting);
 
 	storage_sync(SETTINGS_KEY, SETTINGS_STORE, ims->settings);
 
