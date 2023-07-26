@@ -649,15 +649,14 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 
 		g_ril_append_print_buf(gcd->ril, "(%d,%s,%s,%s,%s,%d,%s,%u)",
 				tech, profile, ctx->apn,
-				auth_type == RIL_AUTH_NONE ? "" : ctx->username,
-				auth_type == RIL_AUTH_NONE ? "" : ctx->password,
+				auth_type == RIL_AUTH_NONE ? "" : "***",
+				auth_type == RIL_AUTH_NONE ? "" : "***",
 				auth_type,
 				ril_util_gprs_proto_to_ril_string(ctx->proto),
 				ctx->cid);
 	} else
-		g_ril_append_print_buf(gcd->ril, "(%d,%s,%s,%s,%s,%d,%s)",
-				tech, profile, ctx->apn, ctx->username,
-				ctx->password, auth_type,
+		g_ril_append_print_buf(gcd->ril, "(%d,%s,%s,***,***,%d,%s)",
+				tech, profile, ctx->apn, auth_type,
 				ril_util_gprs_proto_to_ril_string(ctx->proto));
 
 	if (g_ril_send(gcd->ril, RIL_REQUEST_SETUP_DATA_CALL, &rilp,
