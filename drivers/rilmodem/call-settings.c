@@ -128,7 +128,7 @@ static void ril_cw_query_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_append_print_buf(sd->ril, "{%d,0x%x}", enabled, cls);
 	g_ril_print_response(sd->ril, message);
 
-	CALLBACK_WITH_SUCCESS(cb, enabled, cbd->data);
+	CALLBACK_WITH_SUCCESS(cb, cls, cbd->data);
 	return;
 
 error:

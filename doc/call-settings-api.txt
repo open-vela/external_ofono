@@ -38,6 +38,23 @@ Methods		dict GetProperties()
 					 [service].Error.NotImplemented
 					 [service].Error.Failed
 
+		void SetClir(string status)
+
+			Sets CallingLineRestriction status.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.InvalidArguments
+					 [service].Error.Failed
+
+		int32 GetClir()
+
+			Gets CallingLineRestriction status.
+
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.NotImplemented
+					 [service].Error.Failed
+
 Signals		PropertyChanged(string property, variant value)
 
 			Signal is emitted whenever a property has changed.

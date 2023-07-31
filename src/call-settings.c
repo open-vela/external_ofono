@@ -114,6 +114,18 @@ struct ofono_call_settings {
 	struct ofono_atom *atom;
 };
 
+static int clir_status_from_string(const char *status)
+{
+	if (!strcmp(status, "default"))
+		return CLIR_STATUS_NOT_PROVISIONED;
+	else if (!strcmp(status, "enabled"))
+		return CLIR_STATUS_PROVISIONED_PERMANENT;
+	else if (!strcmp(status, "disabled"))
+		return CLIR_STATUS_UNKNOWN;
+
+	return -1;
+}
+
 static const char *clip_status_to_string(int status)
 {
 	switch (status) {
@@ -1334,12 +1346,32 @@ static DBusMessage *cs_set_property(DBusConnection *conn, DBusMessage *msg,
 	return __ofono_error_invalid_args(msg);
 }
 
+static void set_call_waiting_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occurred during setting call waiting !");
+
+		__ofono_dbus_pending_reply(&cs->pending,
+					__ofono_error_failed(cs->pending));
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(cs->pending);
+
+	__ofono_dbus_pending_reply(&cs->pending, reply);
+}
+
 static void get_call_waiting_cb(const struct ofono_error *error,
 				int status, void *data)
 {
 	struct ofono_call_settings *cs = data;
 	DBusMessageIter iter;
 	DBusMessage *reply;
+	int i, value = 0;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Error occurs during get call waiting status !");
@@ -1353,15 +1385,20 @@ static void get_call_waiting_cb(const struct ofono_error *error,
 	}
 
 	if (cs->pending) {
+		for (i = 1; i <= BEARER_CLASS_PAD; i = i << 1) {
+			if (!(BEARER_CLASS_VOICE & i))
+				continue;
+
+			value = status & i ? 1 : 0;
+		}
+
 		reply = dbus_message_new_method_return(cs->pending);
 
 		dbus_message_iter_init_append(reply, &iter);
-		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &value);
 
 		__ofono_dbus_pending_reply(&cs->pending, reply);
 	}
-
-	set_cw(cs, status, BEARER_CLASS_VOICE);
 }
 
 static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
@@ -1370,7 +1407,7 @@ static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
 	struct ofono_call_settings *cs = data;
 	int enable;
 
-	if (cs->driver->cw_set == NULL)
+	if (cs->driver == NULL || cs->driver->cw_set == NULL)
 		return __ofono_error_not_implemented(msg);
 
 	if (cs->pending)
@@ -1383,7 +1420,7 @@ static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
 
 	cs->pending = dbus_message_ref(msg);
 
-	cs->driver->cw_set(cs, enable, BEARER_CLASS_VOICE, cw_set_callback, cs);
+	cs->driver->cw_set(cs, enable, BEARER_CLASS_VOICE, set_call_waiting_cb, cs);
 
 	return NULL;
 
@@ -1394,7 +1431,7 @@ static DBusMessage *cs_get_call_waiting(DBusConnection *conn,
 {
 	struct ofono_call_settings *cs = data;
 
-	if (cs->driver->cw_query == NULL)
+	if (cs->driver == NULL || cs->driver->cw_query == NULL)
 		return __ofono_error_not_implemented(msg);
 
 	if (cs->pending)
@@ -1407,6 +1444,95 @@ static DBusMessage *cs_get_call_waiting(DBusConnection *conn,
 	return NULL;
 }
 
+static void set_clir_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occurred during setting clir !");
+
+		__ofono_dbus_pending_reply(&cs->pending,
+					__ofono_error_failed(cs->pending));
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(cs->pending);
+
+	__ofono_dbus_pending_reply(&cs->pending, reply);
+}
+
+static void get_clir_cb(const struct ofono_error *error,
+			int override, int network, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	DBusMessageIter iter;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occurred during setting clir !");
+
+		__ofono_dbus_pending_reply(&cs->pending,
+					__ofono_error_failed(cs->pending));
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(cs->pending);
+
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &override);
+
+	__ofono_dbus_pending_reply(&cs->pending, reply);
+}
+
+static DBusMessage *cs_set_clir(DBusConnection *conn,
+				DBusMessage *msg, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	char *status;
+	int clir = -1;
+
+	if (cs->driver == NULL || cs->driver->clir_set == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cs->pending)
+		return __ofono_error_busy(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_STRING, &status,
+				DBUS_TYPE_INVALID) == FALSE)
+		return __ofono_error_invalid_args(msg);
+
+	clir = clir_status_from_string(status);
+	if (clir == -1)
+		return __ofono_error_invalid_format(msg);
+
+	cs->pending = dbus_message_ref(msg);
+
+	cs->driver->clir_set(cs, clir, set_clir_cb, cs);
+
+	return NULL;
+}
+
+static DBusMessage *cs_get_clir(DBusConnection *conn,
+				DBusMessage *msg, void *data)
+{
+	struct ofono_call_settings *cs = data;
+
+	if (cs->driver == NULL || cs->driver->clir_query == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (cs->pending)
+		return __ofono_error_busy(msg);
+
+	cs->pending = dbus_message_ref(msg);
+
+	cs->driver->clir_query(cs, get_clir_cb, cs);
+
+	return NULL;
+}
 
 static const GDBusMethodTable cs_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetProperties",
@@ -1421,6 +1547,12 @@ static const GDBusMethodTable cs_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetCallWaiting", NULL,
 			GDBUS_ARGS({ "status", "i" }),
 			cs_get_call_waiting) },
+	{ GDBUS_ASYNC_METHOD("SetClir",
+			GDBUS_ARGS({ "status", "s" }), NULL,
+			cs_set_clir) },
+	{ GDBUS_ASYNC_METHOD("GetClir", NULL,
+			GDBUS_ARGS({ "status", "i" }),
+			cs_get_clir) },
 	{ }
 };
 
