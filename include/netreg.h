@@ -132,6 +132,7 @@ int ofono_netreg_get_status(struct ofono_netreg *netreg);
 int ofono_netreg_get_technology(struct ofono_netreg *netreg);
 const char *ofono_netreg_get_mcc(struct ofono_netreg *netreg);
 const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg);
+int ofono_netreg_get_singal_strength_level(struct ofono_netreg *netreg);
 
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 		int rssi, int rsrp, int rsrq, int rssnr, int cqi);
