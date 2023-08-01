@@ -39,20 +39,22 @@ Methods		dict GetProperties()
 		object SendMessage(string to, string text)
 
 			Send the message in text to the number in to.  If the
-			message could be queued successfully, this method
+			message could be sent successfully, this method
 			returns an object path to the created Message object.
 
-			Possible Errors: [service].Error.InvalidArguments
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.InvalidArguments
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 
 		object SendDataMessage(string to, uint32 port, string text)
 
 			Send the message in data to the address in to & port.
-			If the message could be queued successfully, this method
+			If the messagecould be sent successfully, this method
 			returns an object path to the created Message object.
 
-			Possible Errors: [service].Error.InvalidArguments
+			Possible Errors: [service].Error.InProgress
+					 [service].Error.InvalidArguments
 					 [service].Error.InvalidFormat
 					 [service].Error.Failed
 

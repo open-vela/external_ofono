@@ -1942,6 +1942,14 @@ const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg)
 	return netreg->current_operator->mnc;
 }
 
+int ofono_netreg_get_singal_strength_level(struct ofono_netreg *netreg)
+{
+	if (netreg == NULL || netreg->signal_strength_data == NULL)
+		return SIGNAL_STRENGTH_UNKNOWN;
+
+	return netreg->signal_strength_data->level;
+}
+
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 	int signal_strength, int rsrp, int rsrq, int rssnr, int cqi)
 {

@@ -47,10 +47,13 @@
 #define SETTINGS_STORE "sms"
 #define SETTINGS_GROUP "Settings"
 
-#define TXQ_MAX_RETRIES 4
+#define TXQ_MAX_RETRIES 3
 #define NETWORK_TIMEOUT 332
 
 static gboolean tx_next(gpointer user_data);
+static void message_sent_cb(struct ofono_sms *sms,
+			const struct ofono_uuid *uuid,
+			const struct ofono_error *error, void *data);
 
 static GSList *g_drivers = NULL;
 
@@ -255,6 +258,22 @@ static unsigned int add_sms_handler(struct ofono_watchlist *watchlist,
 
 	return __ofono_watchlist_add_item(watchlist,
 				(struct ofono_watchlist_item *) handler);
+}
+
+static gboolean sms_ims_in_service(struct ofono_sms *sms)
+{
+	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
+	struct ofono_ims *ims = __ofono_atom_find(OFONO_ATOM_TYPE_IMS, modem);
+
+	return ofono_ims_get_reg_info(ims);
+}
+
+static gboolean sms_in_good_coverage(struct ofono_sms *sms)
+{
+	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
+	struct ofono_netreg *netreg = __ofono_atom_find(OFONO_ATOM_TYPE_NETREG, modem);
+
+	return ofono_netreg_get_singal_strength_level(netreg) >= SIGNAL_STRENGTH_GOOD;
 }
 
 unsigned int __ofono_sms_text_watch_add(struct ofono_sms *sms,
@@ -718,7 +737,7 @@ static void tx_finished(const struct ofono_error *error, int mr, void *data)
 	gboolean ok = error->type == OFONO_ERROR_TYPE_NO_ERROR;
 	enum message_state tx_state;
 
-	DBG("tx_finished %p", entry);
+	ofono_debug("tx_finished %p", entry);
 
 	sms->flags &= ~MESSAGE_MANAGER_FLAG_TXQ_ACTIVE;
 
@@ -736,17 +755,23 @@ static void tx_finished(const struct ofono_error *error, int mr, void *data)
 		if (!(entry->flags & OFONO_SMS_SUBMIT_FLAG_RETRY))
 			goto next_q;
 
+		/* Retry when the current signal is good and ims registration is successful */
+		if (!sms_in_good_coverage(sms) || !sms_ims_in_service(sms)) {
+			ofono_debug("network status is not good, giving up retrying ! \n");
+			goto next_q;
+		}
+
 		entry->retry += 1;
 
 		if (entry->retry < TXQ_MAX_RETRIES) {
-			DBG("Sending failed, retry in %d secs",
-					entry->retry * 5);
-			sms->tx_source = g_timeout_add_seconds(entry->retry * 5,
+			ofono_debug("Sending failed, retry in %d secs",
+					entry->retry * 2);
+			sms->tx_source = g_timeout_add_seconds(entry->retry * 2,
 								tx_next, sms);
 			return;
 		}
 
-		DBG("Max retries reached, giving up");
+		ofono_debug("Max retries reached, giving up");
 		goto next_q;
 	}
 
@@ -777,9 +802,11 @@ next_q:
 					tx_state);
 
 	if (g_queue_peek_head(sms->txq)) {
-		DBG("Scheduling next");
+		ofono_debug("Scheduling next");
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
 	}
+
+	message_sent_cb(sms, &entry->uuid, error, sms->pending);
 }
 
 static void tx_write_to_sim_finish(const struct ofono_error *error, void *data)
@@ -794,7 +821,7 @@ static gboolean tx_next(gpointer user_data)
 	struct tx_queue_entry *entry = g_queue_peek_head(sms->txq);
 	struct pending_pdu *pdu = &entry->pdus[entry->cur_pdu];
 
-	DBG("tx_next: %p", entry);
+	ofono_debug("tx_next: %p", entry);
 
 	sms->tx_source = 0;
 
@@ -992,6 +1019,30 @@ static void message_queued(struct ofono_sms *sms,
 					DBUS_TYPE_INVALID);
 }
 
+static void message_sent_cb(struct ofono_sms *sms,
+				const struct ofono_uuid *uuid,
+				const struct ofono_error *error, void *data)
+{
+	DBusMessage *reply;
+	const char *path;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occured during sending message !");
+		__ofono_dbus_pending_reply(&sms->pending,
+					__ofono_error_failed(sms->pending));
+		return;
+	}
+
+	path = __ofono_sms_message_path_from_uuid(sms, uuid);
+
+	reply = dbus_message_new_method_return(sms->pending);
+
+	dbus_message_append_args(reply, DBUS_TYPE_OBJECT_PATH, &path,
+					DBUS_TYPE_INVALID);
+
+	__ofono_dbus_pending_reply(&sms->pending, reply);
+}
+
 /*
  * Pre-process a SMS text message and deliver it [D-Bus SendMessage()]
  *
@@ -1018,6 +1069,9 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 	int err;
 	struct ofono_uuid uuid;
 
+	if (sms->pending)
+		return __ofono_error_busy(msg);
+
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
 					DBUS_TYPE_STRING, &text,
 					DBUS_TYPE_INVALID))
@@ -1041,7 +1095,7 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 		flags |= OFONO_SMS_SUBMIT_FLAG_REQUEST_SR;
 
 	err = __ofono_sms_txq_submit(sms, msg_list, flags, &uuid,
-					message_queued, msg);
+					NULL, msg);
 
 	g_slist_free_full(msg_list, g_free);
 
@@ -1080,6 +1134,9 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	int err;
 	struct ofono_uuid uuid;
 
+	if (sms->pending)
+		return __ofono_error_busy(msg);
+
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
 					DBUS_TYPE_UINT32, &port,
 					DBUS_TYPE_STRING, &text,
@@ -1106,7 +1163,7 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 		flags |= OFONO_SMS_SUBMIT_FLAG_REQUEST_SR;
 
 	err = __ofono_sms_txq_submit(sms, msg_list, flags, &uuid,
-					message_queued, msg);
+					NULL, msg);
 
 	g_slist_free_full(msg_list, g_free);
 
@@ -2423,6 +2480,7 @@ int __ofono_sms_txq_submit(struct ofono_sms *sms, GSList *list,
 {
 	struct message *m = NULL;
 	struct tx_queue_entry *entry;
+	DBusMessage *msg = data;
 
 	entry = tx_queue_entry_new(list, flags);
 	if (entry == NULL)
@@ -2452,6 +2510,8 @@ int __ofono_sms_txq_submit(struct ofono_sms *sms, GSList *list,
 
 	g_queue_push_tail(sms->txq, entry);
 
+	sms->pending = dbus_message_ref(msg);
+
 	if (g_queue_get_length(sms->txq) == 1)
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
 
@@ -2474,9 +2534,6 @@ int __ofono_sms_txq_submit(struct ofono_sms *sms, GSList *list,
 						pdu->pdu_len, pdu->tpdu_len);
 		}
 	}
-
-	if (cb)
-		cb(sms, &entry->uuid, data);
 
 	if (m && (flags & OFONO_SMS_SUBMIT_FLAG_EXPOSE_DBUS))
 		message_emit_added(m, OFONO_MESSAGE_MANAGER_INTERFACE);
