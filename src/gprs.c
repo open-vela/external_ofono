@@ -3961,6 +3961,8 @@ static void gprs_set_data_profile(struct ofono_gprs *gprs)
 static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 {
 	struct ofono_gprs *gprs = user;
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path;
 
 	if (gprs->sim == NULL)
 		return;
@@ -3981,6 +3983,11 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 		gprs_load_settings(gprs, ofono_sim_get_imsi(gprs->sim));
 		ofono_sim_add_spn_watch(gprs->sim, &gprs->spn_watch,
 						spn_read_cb, gprs, NULL);
+
+		path = __ofono_atom_get_path(gprs->atom);
+		ofono_dbus_signal_property_changed(conn, path,
+						OFONO_CONNECTION_MANAGER_INTERFACE,
+						"DataOn", DBUS_TYPE_BOOLEAN, &gprs->data_on);
 		break;
 	case OFONO_SIM_STATE_LOCKED_OUT:
 		break;
