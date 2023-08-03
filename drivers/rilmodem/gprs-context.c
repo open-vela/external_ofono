@@ -142,7 +142,7 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 	}
 
 data_lost:
-	ofono_debug("%s , cid - %d is lost", __func__, cid);
+	ofono_debug("%s , cid - %d is lost", __func__, gcd->active_rild_cid);
 	ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
 	set_context_disconnected(gcd);
 }
