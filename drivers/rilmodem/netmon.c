@@ -39,6 +39,7 @@
 #include "gril.h"
 
 #include "rilmodem.h"
+#include "common.h"
 
 /*
  * Defined below are copy of
@@ -60,12 +61,6 @@
 #define NETMON_RIL_CELLINFO_SIZE_UMTS		28
 /* size of RIL_CellInfoTdscdma */
 #define NETMON_RIL_CELLINFO_SIZE_TDSCDMA	24
-
-#define NETMON_RSRP_MIN			-140
-#define NETMON_RSRP_POOR		-125
-#define NETMON_RSRP_MODERATE		-115
-#define NETMON_RSRP_GOOD		-110
-#define NETMON_RSRP_GREAT		-102
 
 #define MSECS_RATE_INVALID	(0x7fffffff)
 #define SECS_TO_MSECS(x)	((x) * 1000)
@@ -194,23 +189,7 @@ static int process_cellinfo_list(struct ril_msg *message,
 			list[i].cqi = (list[i].cqi >= 0 && list[i].cqi <= 15) ? list[i].cqi : -1;
 			list[i].tadv = (list[i].tadv >=0 && list[i].tadv <= 63) ? list[i].tadv : -1;
 
-			if (list[i].rsrp < NETMON_RSRP_MIN) {
-				list[i].level = SIGNAL_STRENGTH_UNKNOWN;
-			} else if (list[i].rsrp >= NETMON_RSRP_MIN
-				&& list[i].rsrp < NETMON_RSRP_POOR) {
-				list[i].level = SIGNAL_STRENGTH_POOR;
-			} else if (list[i].rsrp >= NETMON_RSRP_POOR
-				&& list[i].rsrp < NETMON_RSRP_MODERATE) {
-				list[i].level = SIGNAL_STRENGTH_MODERATE;
-			} else if (list[i].rsrp >= NETMON_RSRP_MODERATE
-				&& list[i].rsrp < NETMON_RSRP_GOOD) {
-				list[i].level = SIGNAL_STRENGTH_GOOD;
-			} else if (list[i].rsrp >= NETMON_RSRP_GOOD
-				&& list[i].rsrp < NETMON_RSRP_GREAT) {
-				list[i].level = SIGNAL_STRENGTH_GREATE;
-			} else if (list[i].rsrp >= NETMON_RSRP_GREAT) {
-				list[i].level = SIGNAL_STRENGTH_EXCELLENT;
-			}
+			list[i].level = get_signal_level_from_rsrp(list[i].rsrp);
 		}
 	}
 

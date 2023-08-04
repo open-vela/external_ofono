@@ -241,3 +241,4 @@ gboolean gprs_auth_method_from_string(const char *str,
 int in_range_or_unavailable(int value, int range_min, int range_max);
 int get_rssi_dbm_from_asu(int rssi_asu);
 int convert_rssnr_unit_from_ten_db_to_db(int rssnr);
+int get_signal_level_from_rsrp(int rsrp);
