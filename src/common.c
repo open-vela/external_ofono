@@ -35,6 +35,9 @@
 #include "common.h"
 #include "util.h"
 
+static const int five_bar_rsrp_thresholds[] = {-140, -125, -115, -110, -102};
+static const int default_rsrp_thresholds[] = {-115, -105, -95, -85};
+
 struct error_entry {
 	int error;
 	const char *str;
@@ -872,3 +875,26 @@ int get_rssi_dbm_from_asu(int rssi_asu) {
 int convert_rssnr_unit_from_ten_db_to_db(int rssnr) {
 	return (int) floor((float) rssnr / 10);
 }
+
+int get_signal_level_from_rsrp(int rsrp)
+{
+	const int *threshold = NULL;
+	int length, level;
+	const char *support_env;
+
+	// Check for 5-level signal support
+	support_env = getenv("OFONO_FIVE_SIGNAL_LEVEL_SUPPORT");
+	if (support_env != NULL && strcmp(support_env, "1") == 0) {
+		threshold = five_bar_rsrp_thresholds;
+		length = sizeof(five_bar_rsrp_thresholds) / sizeof(int);
+	} else {
+		threshold = default_rsrp_thresholds;
+		length = sizeof(default_rsrp_thresholds) / sizeof(int);
+	}
+
+	level = length;
+	while (level > 0 && rsrp < threshold[level - 1]) level--;
+
+	return level;
+}
+

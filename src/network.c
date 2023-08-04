@@ -1945,7 +1945,6 @@ const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg)
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 	int signal_strength, int rsrp, int rsrq, int rssnr, int cqi)
 {
-	int level = SIGNAL_STRENGTH_UNKNOWN;
 	int new_rssi, new_rsrp, new_rsrq, new_rssnr, new_cqi;
 
 	if (netreg->signal_strength_data == NULL)
@@ -1966,21 +1965,7 @@ void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 	netreg->signal_strength_data->rssnr = new_rssnr;
 	netreg->signal_strength_data->cqi = new_cqi;
 
-	if (rsrp < -140) {
-		level = SIGNAL_STRENGTH_UNKNOWN;
-	} else if (rsrp >= -140 && rsrp < -125) {
-		level = SIGNAL_STRENGTH_POOR;
-	} else if (rsrp >= -125 && rsrp < -115) {
-		level = SIGNAL_STRENGTH_MODERATE;
-	} else if (rsrp >= -115 && rsrp < -110) {
-		level = SIGNAL_STRENGTH_GOOD;
-	} else if (rsrp >= -110 && rsrp < -102) {
-		level = SIGNAL_STRENGTH_GREATE;
-	} else if (rsrp >= -102)  {
-		level = SIGNAL_STRENGTH_EXCELLENT;
-	}
-
-	netreg->signal_strength_data->level = level;
+	netreg->signal_strength_data->level = get_signal_level_from_rsrp(new_rsrp);
 	ofono_netreg_strength_notify(netreg, netreg->signal_strength);
 }
 
