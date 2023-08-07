@@ -78,6 +78,7 @@ enum ofono_sim_state {
 	OFONO_SIM_STATE_LOCKED_OUT,
 	OFONO_SIM_STATE_READY,
 	OFONO_SIM_STATE_RESETTING,
+	OFONO_SIM_STATE_ERROR,
 };
 
 enum ofono_sim_uicc_app_state {
@@ -323,6 +324,8 @@ void ofono_sim_initialized_notify(struct ofono_sim *sim);
 void ofono_sim_refresh_notify(struct ofono_sim *sim,
 		enum ofono_sim_refresh_response response,
 		int fileid, const char *aid_str);
+
+void ofono_sim_error_notify(struct ofono_sim *sim);
 
 struct ofono_sim_context *ofono_sim_context_create(struct ofono_sim *sim);
 

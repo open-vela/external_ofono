@@ -315,3 +315,4 @@ Properties	boolean Present [readonly]
 				 2 - OFONO_SIM_STATE_LOCKED_OUT
 				 3 - OFONO_SIM_STATE_READY
 				 4 - OFONO_SIM_STATE_RESETTING
+				 5 - OFONO_SIM_STATE_ERROR

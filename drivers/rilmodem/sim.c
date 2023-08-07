@@ -795,6 +795,8 @@ static void sim_status_cb(struct ril_msg *message, gpointer user_data)
 		ofono_sim_inserted_notify(sim, FALSE);
 		return;
 	case RIL_CARDSTATE_ERROR:
+		ofono_sim_error_notify(sim);
+		return;
 	case RIL_CARDSTATE_RESTRICTED:
 	default:
 		ofono_error("%s: bad SIM state (%u)", __func__, card_state);
