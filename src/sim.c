@@ -3509,6 +3509,42 @@ void ofono_sim_inserted_notify(struct ofono_sim *sim, ofono_bool_t inserted)
 	}
 }
 
+void ofono_sim_error_notify(struct ofono_sim *sim)
+{
+	if (sim->state == OFONO_SIM_STATE_ERROR)
+		return;
+
+	sim->state = OFONO_SIM_STATE_ERROR;
+	if (!__ofono_atom_get_registered(sim->atom))
+		return;
+
+	sim_inserted_update(sim);
+	call_state_watches(sim);
+
+	switch (sim->pin_type) {
+	case OFONO_SIM_PASSWORD_SIM_PIN:
+	case OFONO_SIM_PASSWORD_SIM_PUK:
+	case OFONO_SIM_PASSWORD_SIM_PIN2:
+	case OFONO_SIM_PASSWORD_SIM_PUK2:
+		sim->pin_type = OFONO_SIM_PASSWORD_NONE;
+		break;
+	default:
+		break;
+	}
+
+	sim->locked_pins[OFONO_SIM_PASSWORD_SIM_PIN] = FALSE;
+	sim->locked_pins[OFONO_SIM_PASSWORD_SIM_PIN2] = FALSE;
+
+	sim->pin_retries[OFONO_SIM_PASSWORD_SIM_PIN] = -1;
+	sim->pin_retries[OFONO_SIM_PASSWORD_SIM_PUK] = -1;
+	sim->pin_retries[OFONO_SIM_PASSWORD_SIM_PIN2] = -1;
+	sim->pin_retries[OFONO_SIM_PASSWORD_SIM_PUK2] = -1;
+
+	pin_cache_remove(sim->iccid);
+
+	sim_free_state(sim);
+}
+
 void ofono_sim_initialized_notify(struct ofono_sim *sim)
 {
 	if (sim->state != OFONO_SIM_STATE_INSERTED &&

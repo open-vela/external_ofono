@@ -1062,6 +1062,7 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 	switch (new_state) {
 	case OFONO_SIM_STATE_NOT_PRESENT:
 	case OFONO_SIM_STATE_RESETTING:
+	case OFONO_SIM_STATE_ERROR:
 		if (mw->sim_context) {
 			if (mw->sim_efmwis_watch) {
 				ofono_sim_remove_file_watch(mw->sim_context, mw->sim_efmwis_watch);
