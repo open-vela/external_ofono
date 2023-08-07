@@ -36,7 +36,7 @@
 #include "util.h"
 
 static const int five_bar_rsrp_thresholds[] = {-140, -125, -115, -110, -102};
-static const int default_rsrp_thresholds[] = {-115, -105, -95, -85};
+static const int default_rsrp_thresholds[] = {-128, -118, -108, -98};
 
 struct error_entry {
 	int error;
