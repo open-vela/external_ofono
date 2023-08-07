@@ -464,6 +464,7 @@ static void ims_sim_state_change(int state, void *data)
 	switch (state) {
 	case OFONO_SIM_STATE_NOT_PRESENT:
 	case OFONO_SIM_STATE_RESETTING:
+	case OFONO_SIM_STATE_ERROR:
 		ims_close_settings(ims);
 		break;
 	case OFONO_SIM_STATE_READY:

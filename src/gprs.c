@@ -4090,6 +4090,7 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 		break;
 	case OFONO_SIM_STATE_NOT_PRESENT:
 	case OFONO_SIM_STATE_RESETTING:
+	case OFONO_SIM_STATE_ERROR:
 		if (gprs->spn_watch) {
 			ofono_sim_remove_spn_watch(gprs->sim, &gprs->spn_watch);
 			gprs->spn_watch = 0;
