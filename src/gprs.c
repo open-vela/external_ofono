@@ -4236,3 +4236,8 @@ void *ofono_gprs_get_data(struct ofono_gprs *gprs)
 {
 	return gprs->driver_data;
 }
+
+int ofono_gprs_get_status(struct ofono_gprs *gprs)
+{
+	return gprs->status;
+}
