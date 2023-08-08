@@ -74,6 +74,8 @@ gchar *ril_util_get_netmask(const char *address);
 
 void ril_util_build_deactivate_data_call(GRil *gril, struct parcel *rilp,
 						int cid, unsigned int reason);
+void ril_util_build_activate_data_call(GRil *gril, struct parcel *rilp,
+						struct retry_context *retry_ctx);
 
 struct cb_data {
 	void *cb;

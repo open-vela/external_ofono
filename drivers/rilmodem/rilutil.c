@@ -77,6 +77,36 @@ gchar *ril_util_get_netmask(const gchar *address)
 	return NULL;
 }
 
+void ril_util_build_activate_data_call(GRil *gril, struct parcel *rilp,
+						struct retry_context *retry_ctx)
+{
+	char *tech_str = NULL;
+	char *auth_type_str = NULL;
+	char *cid_str = NULL;
+
+	tech_str = g_strdup_printf("%d", retry_ctx->tech);
+	auth_type_str = g_strdup_printf("%d", retry_ctx->auth_type);
+
+	parcel_init(rilp);
+	parcel_w_int32(rilp, retry_ctx->num_param);
+	parcel_w_string(rilp, tech_str);
+	parcel_w_string(rilp, retry_ctx->profile);
+	parcel_w_string(rilp, retry_ctx->apn);
+	parcel_w_string(rilp, retry_ctx->username);
+	parcel_w_string(rilp, retry_ctx->password);
+	parcel_w_string(rilp, auth_type_str);
+	parcel_w_string(rilp, retry_ctx->proto);
+
+	if (g_ril_vendor(gril) == OFONO_RIL_VENDOR_MTK) {
+		cid_str = g_strdup_printf("%" PRIu32, retry_ctx->cid);
+		parcel_w_string(rilp, cid_str);
+	}
+
+	g_free(tech_str);
+	g_free(auth_type_str);
+	g_free(cid_str);
+}
+
 void ril_util_build_deactivate_data_call(GRil *gril, struct parcel *rilp,
 						int cid, unsigned int reason)
 {
