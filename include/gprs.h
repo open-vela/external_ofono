@@ -91,6 +91,8 @@ void ofono_gprs_add_context(struct ofono_gprs *gprs,
 void ofono_gprs_cid_activated(struct ofono_gprs  *gprs, unsigned int cid,
 				const char *apn);
 
+int ofono_gprs_get_status(struct ofono_gprs *gprs);
+
 #ifdef __cplusplus
 }
 #endif
