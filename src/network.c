@@ -176,6 +176,14 @@ static void init_register(const struct ofono_error *error, void *data)
 					registration_status_callback, netreg);
 }
 
+static int get_gprs_netreg_status(struct ofono_netreg *netreg)
+{
+	struct ofono_modem *modem = __ofono_atom_get_modem(netreg->atom);
+	struct ofono_gprs *gprs = __ofono_atom_find(OFONO_ATOM_TYPE_GPRS, modem);
+
+	return ofono_gprs_get_status(gprs);
+}
+
 static void enforce_auto_only(struct ofono_netreg *netreg)
 {
 	if (netreg->mode != NETWORK_REGISTRATION_MODE_MANUAL)
@@ -1736,11 +1744,13 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 	 * Theoretically we can get signal strength even when not registered
 	 * to any network.  However, what do we do with it in that case?
 	 */
-	if (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
-			netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING)
+	if (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED
+		&& netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING
+		&& get_gprs_netreg_status(netreg) != NETWORK_REGISTRATION_STATUS_REGISTERED
+		&& get_gprs_netreg_status(netreg) != NETWORK_REGISTRATION_STATUS_ROAMING)
 		return;
 
-	DBG("strength %d", strength);
+	ofono_debug("strength %d", strength);
 
 	netreg->signal_strength = strength;
 
