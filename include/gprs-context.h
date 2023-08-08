@@ -53,6 +53,18 @@ struct ofono_gprs_primary_context {
 	enum ofono_gprs_auth_method auth_method;
 };
 
+struct retry_context {
+	int num_param;
+	int tech;
+	char *profile;
+	char *apn;
+	char *username;
+	char *password;
+	int auth_type;
+	char *proto;
+	uint32_t cid;
+};
+
 typedef void (*ofono_gprs_context_cb_t)(const struct ofono_error *error,
 					void *data);
 
