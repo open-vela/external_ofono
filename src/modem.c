@@ -874,9 +874,6 @@ static void modem_status_query_cb(const struct ofono_error *error,
 
 		/* likely, some modems don't support modem state query */
 		modem_change_state(modem, MODEM_STATE_ALIVE);
-		set_radio_power(modem, modem->online,
-				modem->online ? common_online_cb : common_offline_cb);
-
 		return;
 	}
 
@@ -890,7 +887,25 @@ static void modem_status_query_cb(const struct ofono_error *error,
 	}
 
 	modem_change_state(modem, status ? MODEM_STATE_ALIVE : MODEM_STATE_AWARE);
+}
 
+static void initial_status_query_cb(const struct ofono_error *error,
+						int status, void *data)
+{
+	struct ofono_modem *modem = data;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occurs when querying modem status.");
+
+		/* likely, some modems don't support modem state query */
+		modem_change_state(modem, MODEM_STATE_ALIVE);
+		set_radio_power(modem, modem->online,
+				modem->online ? common_online_cb : common_offline_cb);
+
+		return;
+	}
+
+	modem_change_state(modem, status ? MODEM_STATE_ALIVE : MODEM_STATE_AWARE);
 	if (status) {
 		set_radio_power(modem, modem->online,
 				modem->online ? common_online_cb : common_offline_cb);
@@ -1677,7 +1692,7 @@ void ofono_modem_set_powered(struct ofono_modem *modem, ofono_bool_t powered)
 	if (powered) {
 		if (modem->driver->query_modem_status != NULL) {
 			/* for rilmodem, query modem status once RIL connected */
-			modem->driver->query_modem_status(modem, modem_status_query_cb, modem);
+			modem->driver->query_modem_status(modem, initial_status_query_cb, modem);
 		} else {
 			/* for atmodem, set modem state as alive directly */
 			modem_change_state(modem, MODEM_STATE_ALIVE);
