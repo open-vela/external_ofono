@@ -267,4 +267,3 @@ Properties	boolean Powered [readwrite]
 			0 - RADIO_STATUS_UNAVAILABLE
 			1 - RADIO_STATUS_ON
 			2 - RADIO_STATUS_OFF
-			3 - RADIO_STATUS_EMERGENCY_ONLY

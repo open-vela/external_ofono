@@ -305,8 +305,6 @@ static void radio_status_change(struct ofono_modem *modem,
 	if (modem->powered == FALSE
 		|| modem->modem_state < MODEM_STATE_ALIVE) {
 		new_status = RADIO_STATUS_UNAVAILABLE;
-	} else if (modem->emergency == TRUE) {
-		new_status = RADIO_STATUS_EMERGENCY_ONLY;
 	}
 
 	if (new_status != modem->radio_status)
@@ -872,8 +870,6 @@ static void modem_status_query_cb(const struct ofono_error *error,
 			__ofono_dbus_pending_reply(&modem->pending, reply);
 		}
 
-		/* likely, some modems don't support modem state query */
-		modem_change_state(modem, MODEM_STATE_ALIVE);
 		return;
 	}
 
@@ -2818,7 +2814,6 @@ void __ofono_modem_inc_emergency_mode(struct ofono_modem *modem)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t emergency = TRUE;
-	enum radio_status old_radio_status = modem->radio_status;
 
 	if (++modem->emergency > 1)
 		return;
@@ -2827,16 +2822,12 @@ void __ofono_modem_inc_emergency_mode(struct ofono_modem *modem)
 						OFONO_MODEM_INTERFACE,
 						"Emergency", DBUS_TYPE_BOOLEAN,
 						&emergency);
-
-	modem->radio_status = RADIO_STATUS_EMERGENCY_ONLY;
-	radio_status_change(modem, old_radio_status, RADIO_STATUS_EMERGENCY_ONLY);
 }
 
 void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t emergency = FALSE;
-	enum radio_status old_radio_status = modem->radio_status;
 
 	if (modem->emergency == 0) {
 		ofono_error("emergency mode is already deactivated!!!");
@@ -2850,9 +2841,6 @@ void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 						OFONO_MODEM_INTERFACE,
 						"Emergency", DBUS_TYPE_BOOLEAN,
 						&emergency);
-
-	modem->radio_status = RADIO_STATUS_EMERGENCY_ONLY;
-	radio_status_change(modem, old_radio_status, RADIO_STATUS_EMERGENCY_ONLY);
 
 out:
 	modem->emergency--;
