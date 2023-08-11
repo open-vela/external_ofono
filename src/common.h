@@ -193,7 +193,6 @@ enum radio_status {
 	RADIO_STATUS_UNAVAILABLE = 0,
 	RADIO_STATUS_ON = 1,
 	RADIO_STATUS_OFF = 2,
-	RADIO_STATUS_EMERGENCY_ONLY = 3,
 };
 
 const char *telephony_error_to_str(const struct ofono_error *error);
