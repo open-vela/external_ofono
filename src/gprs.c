@@ -2683,14 +2683,15 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 	g_dbus_send_reply(conn, msg, DBUS_TYPE_OBJECT_PATH, &path,
 					DBUS_TYPE_INVALID);
 
-	if (ctx->status == CONTEXT_STATUS_ACTIVATED) {
+	if (ctx->status == CONTEXT_STATUS_ACTIVATED
+		|| ctx->status == CONTEXT_STATUS_ACTIVATING) {
 		struct ofono_gprs_context *gc;
 		gc = ctx->context_driver;
 
 		if (gc) {
+			ctx->status = CONTEXT_STATUS_DEACTIVATING;
 			gc->driver->deactivate_primary(
 				gc, ctx->context.cid, pri_deactivate_callback, ctx);
-			ctx->status = CONTEXT_STATUS_DEACTIVATING;
 		}
 	}
 

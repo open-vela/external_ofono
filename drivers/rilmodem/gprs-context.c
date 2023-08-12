@@ -79,6 +79,7 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 						void *data);
 static void ril_deactivate_data_call_cb(struct ril_msg *message,
 					gpointer user_data);
+static gboolean ril_gprs_context_abort_activate_retry(struct ofono_gprs_context *gc);
 static gboolean retry_activate(gpointer user_data);
 static gboolean need_retry(unsigned int status);
 
@@ -861,6 +862,17 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
 	struct cb_data *cbd = NULL;
 	struct parcel rilp;
+
+	if (gcd->retry_act_id > 0) {
+		ofono_info("Abort active retries..., timer_id: %u\n", gcd->retry_act_id);
+		ril_gprs_context_abort_activate_retry(gc);
+
+		if (cb) {
+			CALLBACK_WITH_SUCCESS(cb, data);
+		}
+
+		return;
+	}
 
 	ofono_debug("*gc: %p cid: %d active_rild_cid: %d", gc, id,
 		gcd->active_rild_cid);
