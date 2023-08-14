@@ -1140,6 +1140,17 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 		return;
 	}
 
+	ctx = gprs_context_by_type(gprs, apn_type);
+	if (ctx && ctx->status == CONTEXT_STATUS_RETRYING) {
+		gc = ctx->context_driver;
+		if (gc) {
+			gc->driver->deactivate_primary(
+				gc, ctx->context.cid, pri_deactivate_callback, ctx);
+		}
+
+		return;
+	}
+
 	ctx = gprs_active_context_by_type(gprs, apn_type);
 	if (ctx == NULL) {
 		ofono_warn("no active apn context (%s)", apn_typestr);
@@ -2684,7 +2695,7 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 					DBUS_TYPE_INVALID);
 
 	if (ctx->status == CONTEXT_STATUS_ACTIVATED
-		|| ctx->status == CONTEXT_STATUS_ACTIVATING) {
+		|| ctx->status == CONTEXT_STATUS_RETRYING) {
 		struct ofono_gprs_context *gc;
 		gc = ctx->context_driver;
 
@@ -4242,4 +4253,13 @@ void *ofono_gprs_get_data(struct ofono_gprs *gprs)
 int ofono_gprs_get_status(struct ofono_gprs *gprs)
 {
 	return gprs->status;
+}
+
+void ofono_gprs_set_context_status(struct ofono_gprs_context *gc, int status)
+{
+	struct ofono_gprs *gprs = gc->gprs;
+	struct pri_context *ctx = gprs_context_by_type(gprs, gc->type);
+
+	if (ctx)
+		ctx->status = status;
 }

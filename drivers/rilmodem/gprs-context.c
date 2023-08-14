@@ -40,6 +40,7 @@
 #include <gril/gril.h>
 
 #include "ofono.h"
+#include "common.h"
 
 #include "rilmodem.h"
 
@@ -415,6 +416,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 
 	if (status != PDP_FAIL_NONE) {
 		if (need_retry(status) && gcd->act_retries < NUM_ACTIVATION_RETRIES) {
+			ofono_gprs_set_context_status(gc, CONTEXT_STATUS_RETRYING);
 			gcd->act_retries += 1;
 			gcd->active_retry_cbd = cb_data_new(cb, cbd->data, gc);
 			gcd->retry_act_id = g_timeout_add_seconds(
