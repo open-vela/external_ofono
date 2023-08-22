@@ -33,6 +33,7 @@
 #include <ofono/types.h>
 #include <ofono/gprs-context.h>
 #include "common.h"
+#include "ofono.h"
 #include "util.h"
 
 static const int five_bar_rsrp_thresholds[] = {-140, -125, -115, -110, -102};
@@ -894,6 +895,9 @@ int get_signal_level_from_rsrp(int rsrp)
 
 	level = length;
 	while (level > 0 && rsrp < threshold[level - 1]) level--;
+
+	ofono_info("update signal level. length = %d, rsrp = %d, level = %d",
+				length, rsrp, level);
 
 	return level;
 }
