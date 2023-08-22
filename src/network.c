@@ -1737,9 +1737,6 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem;
 
-	if (netreg->signal_strength == strength)
-		return;
-
 	/*
 	 * Theoretically we can get signal strength even when not registered
 	 * to any network.  However, what do we do with it in that case?
@@ -1750,28 +1747,30 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 		&& get_gprs_netreg_status(netreg) != NETWORK_REGISTRATION_STATUS_ROAMING)
 		return;
 
-	ofono_debug("strength %d", strength);
-
-	netreg->signal_strength = strength;
-
-	if (strength != -1) {
-		const char *path = __ofono_atom_get_path(netreg->atom);
-		unsigned char strength_byte = netreg->signal_strength;
-
-		ofono_dbus_signal_property_changed(conn, path,
-					OFONO_NETWORK_REGISTRATION_INTERFACE,
-					"Strength", DBUS_TYPE_BYTE,
-					&strength_byte);
-	}
-
 	if (netreg->signal_strength_data)
 		netreg_emit_signal_strength_changed(netreg);
 
-	modem = __ofono_atom_get_modem(netreg->atom);
-	__ofono_modem_foreach_registered_atom(modem,
-				OFONO_ATOM_TYPE_EMULATOR_HFP,
-				notify_emulator_strength,
-				GINT_TO_POINTER(netreg->signal_strength));
+	if (netreg->signal_strength != strength) {
+		ofono_info("strength %d", strength);
+
+		netreg->signal_strength = strength;
+
+		if (strength != -1) {
+			const char *path = __ofono_atom_get_path(netreg->atom);
+			unsigned char strength_byte = netreg->signal_strength;
+
+			ofono_dbus_signal_property_changed(conn, path,
+						OFONO_NETWORK_REGISTRATION_INTERFACE,
+						"Strength", DBUS_TYPE_BYTE,
+						&strength_byte);
+		}
+
+		modem = __ofono_atom_get_modem(netreg->atom);
+		__ofono_modem_foreach_registered_atom(modem,
+					OFONO_ATOM_TYPE_EMULATOR_HFP,
+					notify_emulator_strength,
+					GINT_TO_POINTER(netreg->signal_strength));
+	}
 }
 
 static void sim_opl_read_cb(int ok, int length, int record,
@@ -1984,7 +1983,6 @@ void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 	netreg->signal_strength_data->cqi = new_cqi;
 
 	netreg->signal_strength_data->level = get_signal_level_from_rsrp(new_rsrp);
-	ofono_netreg_strength_notify(netreg, netreg->signal_strength);
 }
 
 int ofono_netreg_driver_register(const struct ofono_netreg_driver *d)
