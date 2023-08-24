@@ -55,9 +55,49 @@ struct ofono_ims {
 	ofono_bool_t user_setting;
 	GKeyFile *settings;
 	enum ofono_sim_state sim_state;
+	char ph_number[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
 };
 
 static GSList *g_drivers = NULL;
+
+static void extract_number_from_uris(const char *uri, char *ph_number)
+{
+	const char *ssp_start = NULL;
+	const char *ssp_end = NULL;
+	int ssp_length;
+
+	if (uri == NULL) {
+		ofono_error("uri is null, return! \n");
+		return;
+	}
+
+	if (strstr(uri, "tel") == NULL && strstr(uri, "sip") == NULL) {
+		ofono_error("invaild uri, return! \n");
+		return;
+	}
+
+	/* ssp: SchemeSpecificPart */
+	ssp_start = strchr(uri, '+');
+	if (ssp_start == NULL) {
+		ofono_error("uri does not contain a phone number! \n");
+		return;
+	}
+
+	ssp_end = strchr(ssp_start, '@');
+	if (ssp_end == NULL) {
+		ssp_end = strchr(ssp_start, '\0');
+	}
+
+	ssp_length = ssp_end - ssp_start;
+	if (ssp_length > 0 && ssp_length <= OFONO_MAX_PHONE_NUMBER_LENGTH) {
+		strncpy(ph_number, ssp_start, ssp_length);
+		ph_number[ssp_length] = '\0';
+	} else {
+		ofono_error("extract phone number from uri failed !");
+	}
+
+	return;
+}
 
 static void ims_load_settings(struct ofono_ims *ims)
 {
@@ -121,6 +161,11 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 		value = ims->ext_info & SMS_CAPABLE_FLAG ? TRUE : FALSE;
 		ofono_dbus_dict_append(&dict, "SmsCapable",
 					DBUS_TYPE_BOOLEAN, &value);
+	}
+
+	if (ims->ph_number) {
+		const char *ph_number = ims->ph_number;
+		ofono_dbus_dict_append(&dict, "SubscriberUriNumber", DBUS_TYPE_STRING, &ph_number);
 	}
 
 	dbus_message_iter_close_container(&iter, &dict);
@@ -219,7 +264,8 @@ static void notify_status_watches(struct ofono_ims *ims)
 	}
 }
 
-void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info, int ext_info)
+void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
+				int ext_info, char *subscriber_uri)
 {
 	dbus_bool_t new_reg_info;
 	dbus_bool_t new_voice_capable, new_sms_capable;
@@ -235,6 +281,8 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info, int ext_info)
 
 	new_reg_info = reg_info ? TRUE : FALSE;
 	ims_set_registered(ims, new_reg_info);
+
+	extract_number_from_uris(subscriber_uri, ims->ph_number);
 
 	if (ext_info < 0)
 		goto skip;
@@ -254,11 +302,11 @@ skip:
 
 static void registration_status_cb(const struct ofono_error *error,
 						int reg_info, int ext_info,
-						void *data)
+						char *subscriber_uri, void *data)
 {
 	struct ofono_ims *ims = data;
 
-	ofono_ims_status_notify(ims, reg_info, ext_info);
+	ofono_ims_status_notify(ims, reg_info, ext_info, subscriber_uri);
 }
 
 static void register_cb(const struct ofono_error *error, void *data)
@@ -613,13 +661,15 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 
 static void registration_init_cb(const struct ofono_error *error,
 						int reg_info, int ext_info,
-						void *data)
+						char *subscriber_uri, void *data)
 {
 	struct ofono_ims *ims = data;
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
 		ims->reg_info = reg_info;
 		ims->ext_info = ext_info;
+
+		extract_number_from_uris(subscriber_uri, ims->ph_number);
 	}
 
 	ofono_ims_finish_register(ims);

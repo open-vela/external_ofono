@@ -34,7 +34,7 @@ typedef void (*ofono_ims_register_cb_t)(const struct ofono_error *error,
 						void *data);
 typedef void (*ofono_ims_status_cb_t)(const struct ofono_error *error,
 						int reg_info, int ext_info,
-						void *data);
+						char *subscriber_uri, void *data);
 
 struct ofono_ims_driver {
 	const char *name;
@@ -51,7 +51,7 @@ struct ofono_ims_driver {
 };
 
 void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
-							int ext_info);
+			int ext_info, char *subscriber_uri);
 
 int ofono_ims_driver_register(const struct ofono_ims_driver *d);
 void ofono_ims_driver_unregister(const struct ofono_ims_driver *d);

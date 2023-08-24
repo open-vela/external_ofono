@@ -54,7 +54,7 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 	struct ofono_error error;
 	int reg_info = 0;
 	int ext_info = 0;
-	int num;
+	char* subscriber_uri = NULL;
 	struct parcel rilp;
 
 	if(cb == NULL)
@@ -64,24 +64,19 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 
 	g_ril_init_parcel(message, &rilp);
 
-	if (rilp.size < sizeof(int32_t))
+	if (rilp.size < 2 * sizeof(int32_t))
 		goto error;
 
-	num = parcel_r_int32(&rilp);
-	if(num > 0) {
-		reg_info = parcel_r_int32(&rilp);
-		ext_info = parcel_r_int32(&rilp);
-		decode_ril_error(&error, "OK");
-	}else {
-		decode_ril_error(&error, "FAIL");
-	}
+	reg_info = parcel_r_int32(&rilp);
+	ext_info = parcel_r_int32(&rilp);
+	subscriber_uri = parcel_r_string(&rilp);
 
 	ofono_debug("ril_registration_status_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
-	cb(&error, reg_info, ext_info, cbd->data);
+	cb(&error, reg_info, ext_info, subscriber_uri, cbd->data);
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, 0, 0, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, 0, 0, NULL, cbd->data);
 }
 
 static void ril_ims_registration_status(struct ofono_ims *ims,
@@ -94,7 +89,7 @@ static void ril_ims_registration_status(struct ofono_ims *ims,
 			ril_registration_status_cb, cbd, g_free) == 0) {
 		g_free(cbd);
 
-		CALLBACK_WITH_FAILURE(cb, 0, 0, data);
+		CALLBACK_WITH_FAILURE(cb, 0, 0, NULL, data);
 	}
 }
 
@@ -122,7 +117,7 @@ static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
 	struct ril_ims_data *rid = ofono_ims_get_data(ims);
 	int reg_info = 0;
 	int ext_info = 0;
-	int num;
+	char *subscriber_uri = NULL;
 	struct parcel rilp;
 
 	if (message->error != RIL_E_SUCCESS &&
@@ -136,18 +131,16 @@ static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
 
 	g_ril_init_parcel(message, &rilp);
 
-	if (rilp.size < sizeof(int32_t))
+	if (rilp.size < 2 * sizeof(int32_t))
 		goto result;
 
-	num = parcel_r_int32(&rilp);
-	if(num > 0) {
-		reg_info = parcel_r_int32(&rilp);
-		ext_info = parcel_r_int32(&rilp);
-	}
+	reg_info = parcel_r_int32(&rilp);
+	ext_info = parcel_r_int32(&rilp);
+	subscriber_uri = parcel_r_string(&rilp);
 
 result:
 	ofono_debug("ims_state_change_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
-	ofono_ims_status_notify(ims, reg_info, ext_info);
+	ofono_ims_status_notify(ims, reg_info, ext_info, subscriber_uri);
 }
 
 static void get_ims_registration_state(struct ofono_ims *ims) {
