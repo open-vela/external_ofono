@@ -91,6 +91,7 @@ static int process_cellinfo_list(struct ril_msg *message,
 	int registered;
 	int mcc, mnc;
 	int i;
+	int position = 0;
 
 	if (message->error != RIL_E_SUCCESS) {
 		if (cbd) {
@@ -101,10 +102,13 @@ static int process_cellinfo_list(struct ril_msg *message,
 		return OFONO_ERROR_TYPE_FAILURE;
 	}
 
-	g_ril_print_unsol_no_args(nmd->ril, message);
 	g_ril_init_parcel(message, &rilp);
 
 	cell_info_cnt = parcel_r_int32(&rilp);
+
+	if (position >= 0)
+		position += g_ril_append_print_buf_with_offset(
+			nmd->ril, position, "cell_info_cnt = %d ", cell_info_cnt);
 
 	list = g_new0(struct ofono_cell_info, cell_info_cnt);
 	if (list == NULL) {
@@ -146,6 +150,12 @@ static int process_cellinfo_list(struct ril_msg *message,
 		else
 			strcpy(list[i].mnc, "");
 
+		if (position >= 0)
+			position += g_ril_append_print_buf_with_offset(
+				nmd->ril, position,
+				"{type = %d, registered = %d, mcc = %s, mnc = %s, ",
+				list[i].type, list[i].registered, list[i].mcc, list[i].mnc);
+
 		if (cell_type == NETMON_RIL_CELLINFO_TYPE_GSM) {
 			list[i].lac = parcel_r_int32(&rilp);
 			list[i].ci= parcel_r_int32(&rilp);
@@ -156,6 +166,13 @@ static int process_cellinfo_list(struct ril_msg *message,
 			list[i].ci= (list[i].ci>= 0 && list[i].ci<= 65535) ? list[i].ci: -1;
 			list[i].rssi = (list[i].rssi >= 0 && list[i].rssi <= 31) ? list[i].rssi : -1;
 			list[i].ber = (list[i].ber >= 0 && list[i].ber <= 7) ? list[i].ber : -1;
+
+			if (position >= 0)
+				position += g_ril_append_print_buf_with_offset(
+					nmd->ril, position,
+					"lac = %d, ci = %d, rssi = %d, ber = %d} ",
+					list[i].lac, list[i].ci, list[i].rssi, list[i].ber);
+
 		} else if (cell_type == NETMON_RIL_CELLINFO_TYPE_UMTS) {
 			list[i].lac = parcel_r_int32(&rilp);
 			list[i].ci= parcel_r_int32(&rilp);
@@ -168,6 +185,14 @@ static int process_cellinfo_list(struct ril_msg *message,
 			list[i].psc = (list[i].psc >= 0 && list[i].psc <= 511) ? list[i].psc : -1;
 			list[i].rssi = (list[i].rssi >= 0 && list[i].rssi <= 31) ? list[i].rssi : -1;
 			list[i].ber = (list[i].ber >= 0 && list[i].ber <= 7) ? list[i].ber : -1;
+
+			if (position >= 0)
+				position += g_ril_append_print_buf_with_offset(
+					nmd->ril, position,
+					"lac = %d, ci = %d, psc = %d, rssi = %d, ber = %d} ",
+					list[i].lac, list[i].ci, list[i].psc,
+					list[i].rssi, list[i].ber);
+
 		} else if (cell_type == NETMON_RIL_CELLINFO_TYPE_LTE) {
 			list[i].ci =  parcel_r_int32(&rilp);
 			list[i].pci = parcel_r_int32(&rilp);
@@ -190,8 +215,25 @@ static int process_cellinfo_list(struct ril_msg *message,
 			list[i].tadv = (list[i].tadv >=0 && list[i].tadv <= 63) ? list[i].tadv : -1;
 
 			list[i].level = get_signal_level_from_rsrp(list[i].rsrp);
+
+			if (position >= 0)
+				position += g_ril_append_print_buf_with_offset(
+					nmd->ril, position,
+					"ci = %d, pci = %d, tac = %d, "
+					"rssi = %d, rsrp = %d, rsrq = %d, "
+					"snr = %d, cqi = %d, tadv = %d, "
+					"level = %d} ",
+					list[i].ci, list[i].pci, list[i].tac,
+					list[i].rssi, list[i].rsrp, list[i].rsrq,
+					list[i].snr, list[i].cqi, list[i].tadv,
+					list[i].level);
 		}
 	}
+
+	if (message->unsolicited)
+		g_ril_print_unsol(nmd->ril, message);
+	else
+		g_ril_print_response(nmd->ril, message);
 
 	if (cbd) {
 		cb = cbd->cb;
