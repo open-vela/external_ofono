@@ -70,3 +70,7 @@ Properties	boolean Registered [readonly]
 		boolean SmsCapable [readonly, optional]
 
 			Boolean representing whether SMS-over-IMS is available.
+
+		string SubscriberUriNumber [readonly]
+			Phone number of the current subscriber given by
+			the IMS implementation.
