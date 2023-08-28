@@ -139,6 +139,7 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 	DBusMessageIter iter;
 	DBusMessageIter dict;
 	dbus_bool_t value;
+	const char *ph_number;
 
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL)
@@ -163,10 +164,8 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 					DBUS_TYPE_BOOLEAN, &value);
 	}
 
-	if (ims->ph_number) {
-		const char *ph_number = ims->ph_number;
-		ofono_dbus_dict_append(&dict, "SubscriberUriNumber", DBUS_TYPE_STRING, &ph_number);
-	}
+	ph_number = ims->ph_number;
+	ofono_dbus_dict_append(&dict, "SubscriberUriNumber", DBUS_TYPE_STRING, &ph_number);
 
 	dbus_message_iter_close_container(&iter, &dict);
 
