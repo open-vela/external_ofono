@@ -122,7 +122,8 @@ static int parse_signal_strength(GRil *gril, const struct ril_msg *message,
 {
 	struct ofono_netreg *netreg = user_data;
 	struct parcel rilp;
-	int gw_sigstr, gw_signal, cdma_dbm, evdo_dbm;
+	struct ofono_signal_strength *signal_strength;
+	int gw_sigstr, gw_signal, gw_ber, cdma_dbm, evdo_dbm;
 	int lte_sigstr = -1, lte_rsrp = -1, lte_rssnr = -1, lte_rsrq = -1, lte_cqi = -1;
 	int lte_signal;
 	int signal;
@@ -133,7 +134,7 @@ static int parse_signal_strength(GRil *gril, const struct ril_msg *message,
 	/* GW_SignalStrength */
 	gw_sigstr = parcel_r_int32(&rilp);
 	gw_signal = get_gsm_strength(gw_sigstr);
-	parcel_r_int32(&rilp); /* bitErrorRate */
+	gw_ber = parcel_r_int32(&rilp); /* bitErrorRate */
 
 	/*
 	 * CDMA/EVDO values are not processed as CDMA is not supported
@@ -161,8 +162,6 @@ static int parse_signal_strength(GRil *gril, const struct ril_msg *message,
 		lte_signal = -1;
 	}
 
-	ofono_netreg_set_signal_strength(netreg, lte_sigstr, lte_rsrp, lte_rsrq, lte_rssnr, lte_cqi);
-
 	g_ril_append_print_buf(gril,
 				"{gw: %d, cdma: %d, evdo: %d, lte: %d %d %d %d %d}",
 				gw_sigstr, cdma_dbm, evdo_dbm, lte_sigstr,
@@ -172,6 +171,40 @@ static int parse_signal_strength(GRil *gril, const struct ril_msg *message,
 		g_ril_print_unsol(gril, message);
 	else
 		g_ril_print_response(gril, message);
+
+	signal_strength = g_new0(struct ofono_signal_strength, 1);
+	if (signal_strength) {
+		if (ril_tech == RADIO_TECH_UMTS) {
+			signal_strength->gw_signal_strength =
+				g_new0(struct ofono_gw_signal_strength, 1);
+
+			/* RIL_GW_SignalStrength */
+			if (signal_strength->gw_signal_strength) {
+				signal_strength->gw_signal_strength->strength = gw_sigstr;
+				signal_strength->gw_signal_strength->ber = gw_ber;
+
+				ofono_netreg_set_signal_strength(netreg, ril_tech, signal_strength);
+				g_free(signal_strength->gw_signal_strength);
+			}
+		} else if (ril_tech == RADIO_TECH_LTE) {
+			signal_strength->lte_signal_strength =
+				g_new0(struct ofono_lte_signal_strength, 1);
+
+			/* RIL_LTE_SignalStrength */
+			if (signal_strength->lte_signal_strength) {
+				signal_strength->lte_signal_strength->strength = lte_sigstr;
+				signal_strength->lte_signal_strength->rsrp = lte_rsrp;
+				signal_strength->lte_signal_strength->rsrq = lte_rsrq;
+				signal_strength->lte_signal_strength->rssnr = lte_rssnr;
+				signal_strength->lte_signal_strength->cqi = lte_cqi;
+
+				ofono_netreg_set_signal_strength(netreg, ril_tech, signal_strength);
+				g_free(signal_strength->lte_signal_strength);
+			}
+		}
+
+		g_free(signal_strength);
+	}
 
 	/* Return the first valid one */
 	if (gw_signal != -1 && lte_signal != -1)
