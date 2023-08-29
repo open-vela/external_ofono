@@ -42,6 +42,7 @@ struct ofono_cell_info {
 	unsigned int tadv;
 	unsigned int psc;
 	unsigned int ber;
+	unsigned int strength;
 	unsigned int rssi;
 	unsigned int rscp;
 	unsigned int ecno;

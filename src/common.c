@@ -38,6 +38,7 @@
 
 static const int five_bar_rsrp_thresholds[] = {-140, -125, -115, -110, -102};
 static const int default_rsrp_thresholds[] = {-128, -118, -108, -98};
+static const int default_rssi_thresholds[] = {-113, -107, -101, -95};
 
 struct error_entry {
 	int error;
@@ -883,6 +884,10 @@ int get_signal_level_from_rsrp(int rsrp)
 	int length, level;
 	const char *support_env;
 
+	rsrp = in_range_or_unavailable(rsrp, -140, -43);
+	if (rsrp == INT_MAX)
+		return SIGNAL_STRENGTH_UNKNOWN;
+
 	// Check for 5-level signal support
 	support_env = getenv("OFONO_FIVE_SIGNAL_LEVEL_SUPPORT");
 	if (support_env != NULL && strcmp(support_env, "1") == 0) {
@@ -896,8 +901,29 @@ int get_signal_level_from_rsrp(int rsrp)
 	level = length;
 	while (level > 0 && rsrp < threshold[level - 1]) level--;
 
-	ofono_info("update signal level. length = %d, rsrp = %d, level = %d",
+	ofono_info("update signal level from rsrp, length = %d, rsrp = %d, level = %d",
 				length, rsrp, level);
+
+	return level;
+}
+
+int get_signal_level_from_rssi(int rssi)
+{
+	const int *threshold = NULL;
+	int length, level;
+
+	rssi = in_range_or_unavailable(rssi, -113, -51);
+	if (rssi == INT_MAX)
+		return SIGNAL_STRENGTH_UNKNOWN;
+
+	threshold = default_rssi_thresholds;
+	length = sizeof(default_rssi_thresholds) / sizeof(int);
+
+	level = length;
+	while (level > 0 && rssi < threshold[level - 1]) level--;
+
+	ofono_info("update signal level from rssi, length = %d, rssi = %d, level = %d",
+				length, rssi, level);
 
 	return level;
 }

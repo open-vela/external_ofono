@@ -37,6 +37,7 @@
 #include "util.h"
 #include "storage.h"
 #include "missing.h"
+#include "gril/ril_constants.h"
 
 #define SETTINGS_STORE "netreg"
 #define SETTINGS_GROUP "Settings"
@@ -67,6 +68,7 @@ struct ofono_netreg {
 	DBusMessage *pending;
 	int signal_strength;
 	struct ofono_signal_strength *signal_strength_data;
+	ofono_bool_t signal_strength_changed;
 	struct sim_spdi *spdi;
 	struct sim_eons *eons;
 	struct ofono_sim *sim;
@@ -794,6 +796,32 @@ static gboolean update_operator_list(struct ofono_netreg *netreg, int total,
 	return changed;
 }
 
+static void gw_signal_strength_dict_append(DBusMessageIter *dict,
+	const struct ofono_gw_signal_strength *gw_signal_strength)
+{
+	ofono_dbus_dict_append(dict, "ReceivedSignalStrengthIndicator",
+				DBUS_TYPE_INT32, &gw_signal_strength->rssi);
+}
+
+static void lte_signal_strength_dict_append(DBusMessageIter *dict,
+	const struct ofono_lte_signal_strength *lte_signal_strength)
+{
+	ofono_dbus_dict_append(dict, "ReceivedSignalStrengthIndicator",
+				DBUS_TYPE_INT32, &lte_signal_strength->rssi);
+
+	ofono_dbus_dict_append(dict, "ReferenceSignalReceivedPower",
+				DBUS_TYPE_INT32, &lte_signal_strength->rsrp);
+
+	ofono_dbus_dict_append(dict, "ReferenceSignalReceivedQuality",
+				DBUS_TYPE_INT32, &lte_signal_strength->rsrq);
+
+	ofono_dbus_dict_append(dict, "SingalToNoiseRatio",
+				DBUS_TYPE_INT32, &lte_signal_strength->rssnr);
+
+	ofono_dbus_dict_append(dict, "ChannelQualityIndicator",
+				DBUS_TYPE_INT32, &lte_signal_strength->cqi);
+}
+
 static void fill_signal_strength_data(struct ofono_netreg *netreg, DBusMessageIter *iter)
 {
 	DBusMessageIter variant;
@@ -814,28 +842,23 @@ static void fill_signal_strength_data(struct ofono_netreg *netreg, DBusMessageIt
 	dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
 						typesig, &array);
 
-	if (netreg->signal_strength_data == NULL)
-		goto done;
+	if (netreg->signal_strength_data) {
+		if (netreg->technology == RADIO_TECH_UMTS
+			&& netreg->signal_strength_data->gw_signal_strength) {
+			gw_signal_strength_dict_append(&array,
+				netreg->signal_strength_data->gw_signal_strength);
+		}
 
-	ofono_dbus_dict_append(&array, "ReceivedSignalStrengthIndicator",
-				DBUS_TYPE_INT32, &netreg->signal_strength_data->rssi);
+		if (netreg->technology == RADIO_TECH_LTE
+			&& netreg->signal_strength_data->lte_signal_strength) {
+			lte_signal_strength_dict_append(&array,
+				netreg->signal_strength_data->lte_signal_strength);
+		}
 
-	ofono_dbus_dict_append(&array, "ReferenceSignalReceivedPower",
-				DBUS_TYPE_INT32, &netreg->signal_strength_data->rsrp);
-
-	ofono_dbus_dict_append(&array, "ReferenceSignalReceivedQuality",
-				DBUS_TYPE_INT32, &netreg->signal_strength_data->rsrq);
-
-	ofono_dbus_dict_append(&array, "SingalToNoiseRatio",
-				DBUS_TYPE_INT32, &netreg->signal_strength_data->rssnr);
-
-	ofono_dbus_dict_append(&array, "ChannelQualityIndicator",
-				DBUS_TYPE_INT32, &netreg->signal_strength_data->cqi);
-
-	ofono_dbus_dict_append(&array, "Level",
+		ofono_dbus_dict_append(&array, "Level",
 				DBUS_TYPE_INT32, &netreg->signal_strength_data->level);
+	}
 
-done:
 	dbus_message_iter_close_container(&variant, &array);
 
 	dbus_message_iter_close_container(iter, &variant);
@@ -874,6 +897,7 @@ static void netreg_emit_signal_strength_changed(struct ofono_netreg *netreg)
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
 	fill_signal_strength_data(netreg, &iter);
 
+	netreg->signal_strength_changed = FALSE;
 	g_dbus_send_message(conn, signal);
 }
 
@@ -1524,6 +1548,7 @@ static void signal_strength_callback(const struct ofono_error *error,
 	struct ofono_netreg *netreg = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		netreg->signal_strength_changed = FALSE;
 		ofono_error("Error during signal strength query");
 		return;
 	}
@@ -1743,7 +1768,7 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 		&& get_gprs_netreg_status(netreg) != NETWORK_REGISTRATION_STATUS_ROAMING)
 		return;
 
-	if (netreg->signal_strength_data)
+	if (netreg->signal_strength_changed)
 		netreg_emit_signal_strength_changed(netreg);
 
 	if (netreg->signal_strength != strength) {
@@ -1893,6 +1918,28 @@ static void spn_read_cb(const char *spn, const char *dc, void *data)
 		netreg_emit_operator_display_name(netreg);
 }
 
+static void fill_signal_strength_with_invalid(struct ofono_signal_strength *signal_strength)
+{
+	if (signal_strength) {
+		if (signal_strength->gw_signal_strength) {
+			signal_strength->gw_signal_strength->strength = INT_MAX;
+			signal_strength->gw_signal_strength->rssi = INT_MAX;
+			signal_strength->gw_signal_strength->ber = INT_MAX;
+		}
+
+		if (signal_strength->lte_signal_strength) {
+			signal_strength->lte_signal_strength->strength = INT_MAX;
+			signal_strength->lte_signal_strength->rssi = INT_MAX;
+			signal_strength->lte_signal_strength->rsrp = INT_MAX;
+			signal_strength->lte_signal_strength->rsrq = INT_MAX;
+			signal_strength->lte_signal_strength->rssnr = INT_MAX;
+			signal_strength->lte_signal_strength->cqi = INT_MAX;
+		}
+
+		signal_strength->level = SIGNAL_STRENGTH_UNKNOWN;
+	}
+}
+
 int ofono_netreg_get_location(struct ofono_netreg *netreg)
 {
 	if (netreg == NULL)
@@ -1956,29 +2003,72 @@ int ofono_netreg_get_singal_strength_level(struct ofono_netreg *netreg)
 }
 
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
-	int signal_strength, int rsrp, int rsrq, int rssnr, int cqi)
+	int ril_tech, const struct ofono_signal_strength *ril_strength)
 {
-	int new_rssi, new_rsrp, new_rsrq, new_rssnr, new_cqi;
+	int ber, rssi, rsrp, rsrq, rssnr, cqi;
 
-	if (netreg->signal_strength_data == NULL)
-		return;
+	if (netreg->signal_strength_data == NULL
+		|| ril_strength == NULL)
+		goto done;
 
-	new_rsrp = in_range_or_unavailable(-rsrp, -140, -43);
-	if (netreg->signal_strength_data->rsrp == new_rsrp)
-		return;
+	if (ril_tech == RADIO_TECH_UMTS) {
+		if (ril_strength->gw_signal_strength == NULL
+			|| netreg->signal_strength_data->gw_signal_strength == NULL)
+			goto done;
 
-	new_rssi = in_range_or_unavailable(get_rssi_dbm_from_asu(signal_strength), -113, -51);
-	new_rssnr = in_range_or_unavailable(convert_rssnr_unit_from_ten_db_to_db(rssnr), -20, 30);
-	new_rsrq = in_range_or_unavailable(-rsrq, -34, 3);
-	new_cqi = in_range_or_unavailable(cqi, 0, 15);
+		rssi = in_range_or_unavailable(
+			get_rssi_dbm_from_asu(
+				ril_strength->gw_signal_strength->strength), -113, -51);
+		if (netreg->signal_strength_data->gw_signal_strength->rssi == rssi) {
+			goto done;
+		}
 
-	netreg->signal_strength_data->rssi = new_rssi;
-	netreg->signal_strength_data->rsrp = new_rsrp;
-	netreg->signal_strength_data->rsrq = new_rsrq;
-	netreg->signal_strength_data->rssnr = new_rssnr;
-	netreg->signal_strength_data->cqi = new_cqi;
+		ber = in_range_or_unavailable(
+			ril_strength->gw_signal_strength->ber, 0, 7);
 
-	netreg->signal_strength_data->level = get_signal_level_from_rsrp(new_rsrp);
+		netreg->signal_strength_data->gw_signal_strength->rssi = rssi;
+		netreg->signal_strength_data->gw_signal_strength->ber = ber;
+
+		netreg->signal_strength_data->level = get_signal_level_from_rssi(rssi);
+	} else if (ril_tech == RADIO_TECH_LTE) {
+		if (ril_strength->lte_signal_strength == NULL
+			|| netreg->signal_strength_data->lte_signal_strength == NULL)
+			goto done;
+
+		rsrp = in_range_or_unavailable(
+			-ril_strength->lte_signal_strength->rsrp, -140, -43);
+		if (netreg->signal_strength_data->lte_signal_strength->rsrp == rsrp) {
+			goto done;
+		}
+
+		rssi = in_range_or_unavailable(
+			get_rssi_dbm_from_asu(
+				ril_strength->lte_signal_strength->strength), -113, -51);
+		rssnr = in_range_or_unavailable(
+			convert_rssnr_unit_from_ten_db_to_db(
+				ril_strength->lte_signal_strength->rssnr), -20, 30);
+		rsrq = in_range_or_unavailable(
+			-ril_strength->lte_signal_strength->rsrq, -34, 3);
+		cqi = in_range_or_unavailable(
+			ril_strength->lte_signal_strength->cqi, 0, 15);
+
+		netreg->signal_strength_data->lte_signal_strength->rssi = rssi;
+		netreg->signal_strength_data->lte_signal_strength->rsrp = rsrp;
+		netreg->signal_strength_data->lte_signal_strength->rsrq = rsrq;
+		netreg->signal_strength_data->lte_signal_strength->rssnr = rssnr;
+		netreg->signal_strength_data->lte_signal_strength->cqi = cqi;
+
+		netreg->signal_strength_data->level = get_signal_level_from_rsrp(rsrp);
+	} else {
+		fill_signal_strength_with_invalid(netreg->signal_strength_data);
+	}
+
+	netreg->signal_strength_changed = TRUE;
+
+	return;
+
+done:
+	netreg->signal_strength_changed = FALSE;
 }
 
 int ofono_netreg_driver_register(const struct ofono_netreg_driver *d)
@@ -2110,6 +2200,16 @@ static void netreg_unregister(struct ofono_atom *atom)
 					OFONO_NETWORK_REGISTRATION_INTERFACE);
 
 	if (netreg->signal_strength_data) {
+		if (netreg->signal_strength_data->gw_signal_strength) {
+			g_free(netreg->signal_strength_data->gw_signal_strength);
+			netreg->signal_strength_data->gw_signal_strength = NULL;
+		}
+
+		if (netreg->signal_strength_data->lte_signal_strength) {
+			g_free(netreg->signal_strength_data->lte_signal_strength);
+			netreg->signal_strength_data->lte_signal_strength = NULL;
+		}
+
 		g_free(netreg->signal_strength_data);
 		netreg->signal_strength_data = NULL;
 	}
@@ -2466,13 +2566,7 @@ static void radio_online_watch_cb(struct ofono_modem *modem,
 		set_registration_location(netreg, -1);
 
 		if (netreg->signal_strength_data) {
-			netreg->signal_strength_data->rssi = INT_MAX;
-			netreg->signal_strength_data->rsrp = INT_MAX;
-			netreg->signal_strength_data->rsrq = INT_MAX;
-			netreg->signal_strength_data->rssnr = INT_MAX;
-			netreg->signal_strength_data->cqi = INT_MAX;
-			netreg->signal_strength_data->level = 0;
-
+			fill_signal_strength_with_invalid(netreg->signal_strength_data);
 			netreg_emit_signal_strength_changed(netreg);
 		}
 
@@ -2524,6 +2618,12 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 					emulator_hfp_watch, netreg, NULL);
 
 	netreg->signal_strength_data = g_new0(struct ofono_signal_strength, 1);
+	if (netreg->signal_strength_data) {
+		netreg->signal_strength_data->gw_signal_strength
+			= g_new0(struct ofono_gw_signal_strength, 1);
+		netreg->signal_strength_data->lte_signal_strength
+			= g_new0(struct ofono_lte_signal_strength, 1);
+	}
 }
 
 void ofono_netreg_remove(struct ofono_netreg *netreg)
