@@ -224,6 +224,7 @@ static void ril_data_reg_cb(struct ril_msg *message, gpointer user_data)
 	ofono_debug("DATA_REGISTRATION_STATE with tech %d", tech);
 	ofono_modem_set_integer(modem, "RilDataRadioTechnology", tech);
 	ofono_gprs_bearer_notify(gprs, ril_tech_to_bearer_tech(tech));
+	ofono_gprs_tech_notify(gprs, tech);
 
 	if (cb)
 		CALLBACK_WITH_SUCCESS(cb, status, cbd->data);

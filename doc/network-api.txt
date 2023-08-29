@@ -123,12 +123,9 @@ Properties	string Mode [readonly]
 			repeated here for convenience.  It can also be obtained
 			from the NetworkOperator interface.
 
-		string Technology [readonly, optional]
+		int32 Technology [readonly, optional]
 
 			Contains the technology of the current network.
-
-			The possible values are: "gsm", "edge", "umts", "hspa",
-							"lte"
 
 		uint16 DenialReason [readonly, optional]
 
