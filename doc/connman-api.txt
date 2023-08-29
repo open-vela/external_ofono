@@ -168,6 +168,10 @@ Properties	boolean Attached [readonly]
 			"hspa" (HSDPA and HSUPA at the same time) and
 			"lte"
 
+		int32 Technology [readonly, optional]
+
+			Contains the technology of the current network.
+
 		boolean Suspended [readonly, optional]
 
 			Contains whether the GPRS service is suspended.

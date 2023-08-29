@@ -67,6 +67,7 @@ void ofono_gprs_detached_notify(struct ofono_gprs *gprs);
 void ofono_gprs_suspend_notify(struct ofono_gprs *gprs, int cause);
 void ofono_gprs_resume_notify(struct ofono_gprs *gprs);
 void ofono_gprs_bearer_notify(struct ofono_gprs *gprs, int bearer);
+void ofono_gprs_tech_notify(struct ofono_gprs *gprs, int tech);
 void ofono_gprs_restricted_notify(struct ofono_gprs *gprs, int status);
 
 struct ofono_modem *ofono_gprs_get_modem(struct ofono_gprs *gprs);
