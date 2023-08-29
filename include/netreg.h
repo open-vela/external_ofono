@@ -53,12 +53,24 @@ enum ofono_signal_strength_level {
 };
 
 struct ofono_signal_strength {
+	struct ofono_gw_signal_strength *gw_signal_strength;
+	struct ofono_lte_signal_strength *lte_signal_strength;
+	enum ofono_signal_strength_level level;
+};
+
+struct ofono_gw_signal_strength {
+	int strength;
+	int rssi;
+	int ber;
+};
+
+struct ofono_lte_signal_strength {
+	int strength;
 	int rssi;
 	int rsrp;
 	int rsrq;
 	int rssnr;
 	int cqi;
-	enum ofono_signal_strength_level level;
 };
 
 typedef void (*ofono_netreg_operator_cb_t)(const struct ofono_error *error,
@@ -135,7 +147,7 @@ const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg);
 int ofono_netreg_get_singal_strength_level(struct ofono_netreg *netreg);
 
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
-		int rssi, int rsrp, int rsrq, int rssnr, int cqi);
+	int ril_tech, const struct ofono_signal_strength *ril_strength);
 
 #ifdef __cplusplus
 }

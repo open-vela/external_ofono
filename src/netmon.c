@@ -123,8 +123,8 @@ static void netmon_cell_info_dict_append(DBusMessageIter *dict,
 	if (cell->ber >= 0)
 		ofono_dbus_dict_append(dict, "BitErrorRate", DBUS_TYPE_BYTE, &cell->ber);
 
-	if (cell->rssi >= 0)
-		ofono_dbus_dict_append(dict, "Strength", DBUS_TYPE_BYTE, &cell->rssi);
+	if (cell->strength >= 0)
+		ofono_dbus_dict_append(dict, "Strength", DBUS_TYPE_BYTE, &cell->strength);
 
 	if (cell->rscp >= 0)
 		ofono_dbus_dict_append(dict, "ReceivedSignalCodePower", DBUS_TYPE_BYTE, &cell->rscp);
