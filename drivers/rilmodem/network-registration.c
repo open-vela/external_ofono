@@ -338,8 +338,7 @@ static void ril_creg_cb(struct ril_msg *message, gpointer user_data)
 	nd->tech = tech;
 
 	CALLBACK_WITH_SUCCESS(cb, status, lac, ci,
-				ril_tech_to_access_tech(tech), denial,
-				cbd->data);
+				tech, denial, cbd->data);
 	return;
 
 error_free:

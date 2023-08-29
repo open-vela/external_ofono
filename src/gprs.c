@@ -73,6 +73,7 @@ struct ofono_gprs {
 	int status;
 	int flags;
 	int bearer;
+	int tech;
 	guint suspend_timeout;
 	struct l_uintset *used_pids;
 	unsigned int last_context_id;
@@ -2004,6 +2005,11 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 					DBUS_TYPE_STRING, &bearer);
 	}
 
+	if (gprs->tech != -1) {
+		ofono_dbus_dict_append(&dict, "Technology",
+					DBUS_TYPE_INT32, &gprs->tech);
+	}
+
 	value = gprs->roaming_allowed;
 	ofono_dbus_dict_append(&dict, "RoamingAllowed",
 				DBUS_TYPE_BOOLEAN, &value);
@@ -3246,6 +3252,21 @@ void ofono_gprs_bearer_notify(struct ofono_gprs *gprs, int bearer)
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
 					"Bearer", DBUS_TYPE_STRING, &value);
+}
+
+void ofono_gprs_tech_notify(struct ofono_gprs *gprs, int tech)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path;
+
+	if (gprs->tech == tech)
+		return;
+
+	gprs->tech = tech;
+	path = __ofono_atom_get_path(gprs->atom);
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_CONNECTION_MANAGER_INTERFACE,
+					"Technology", DBUS_TYPE_INT32, &gprs->tech);
 }
 
 void ofono_gprs_restricted_notify(struct ofono_gprs *gprs, int status)

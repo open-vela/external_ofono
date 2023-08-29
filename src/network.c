@@ -915,11 +915,8 @@ static DBusMessage *network_get_properties(DBusConnection *conn,
 	}
 
 	if (netreg->technology != -1) {
-		const char *technology =
-			registration_tech_to_string(netreg->technology);
-
-		ofono_dbus_dict_append(&dict, "Technology", DBUS_TYPE_STRING,
-					&technology);
+		ofono_dbus_dict_append(&dict, "Technology", DBUS_TYPE_INT32,
+					&netreg->technology);
 	}
 
 	if (netreg->denial_reason != -1) {
@@ -1265,7 +1262,6 @@ static void set_registration_denial_reason(struct ofono_netreg *netreg, int deni
 
 static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 {
-	const char *tech_str = registration_tech_to_string(tech);
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(netreg->atom);
 
@@ -1276,8 +1272,8 @@ static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
-					"Technology", DBUS_TYPE_STRING,
-					&tech_str);
+					"Technology", DBUS_TYPE_INT32,
+					&netreg->technology);
 }
 
 static void set_nitz_time(struct ofono_netreg *netreg,
