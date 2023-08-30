@@ -315,26 +315,13 @@ static struct ofono_gprs_context *find_avail_gprs_context(
 	return NULL;
 }
 
-static gboolean assign_context(struct pri_context *ctx, unsigned int use_cid)
+static gboolean assign_context(struct pri_context *ctx)
 {
-	struct l_uintset *used_cids = ctx->gprs->used_cids;
 	struct ofono_gprs_context *gc;
-
-	if (used_cids == NULL)
-		return FALSE;
-
-	if (!use_cid)
-		use_cid = l_uintset_find_unused_min(used_cids);
-
-	if (use_cid > l_uintset_get_max(used_cids))
-		return FALSE;
 
 	gc = find_avail_gprs_context(ctx);
 	if (gc == NULL)
 		return FALSE;
-
-	l_uintset_put(used_cids, use_cid);
-	ctx->context.cid = use_cid;
 
 	ctx->context_driver = gc;
 	ctx->context_driver->inuse = TRUE;
@@ -1113,7 +1100,7 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 		return;
 	}
 
-	if (assign_context(ctx, 0) == FALSE) {
+	if (assign_context(ctx) == FALSE) {
 		ofono_error("failed to assign gc for apn type (%s) - %s.", apn_typestr, __func__);
 		return;
 	}
@@ -1580,7 +1567,7 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 		if (value && !ctx->gprs->attached)
 			return __ofono_error_not_attached(msg);
 
-		if (value && assign_context(ctx, 0) == FALSE)
+		if (value && assign_context(ctx) == FALSE)
 			return __ofono_error_not_implemented(msg);
 
 		gc = ctx->context_driver;
@@ -2321,7 +2308,7 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 	return context;
 }
 
-void ofono_gprs_cid_activated(struct ofono_gprs  *gprs, unsigned int cid,
+void ofono_gprs_cid_activated(struct ofono_gprs *gprs, unsigned int cid,
 				const char *apn)
 {
 	struct pri_context *pri_ctx;
@@ -2358,7 +2345,7 @@ void ofono_gprs_cid_activated(struct ofono_gprs  *gprs, unsigned int cid,
 		}
 	}
 
-	if (assign_context(pri_ctx, cid) == FALSE) {
+	if (assign_context(pri_ctx) == FALSE) {
 		ofono_warn("Can't assign context to driver for APN.");
 		return;
 	}
@@ -3429,6 +3416,28 @@ void ofono_gprs_context_set_interface(struct ofono_gprs_context *gc,
 {
 	g_free(gc->interface);
 	gc->interface = g_strdup(interface);
+}
+
+void ofono_gprs_context_set_cid(struct ofono_gprs_context *gc, unsigned int cid)
+{
+	struct ofono_gprs *gprs = gc->gprs;
+	struct pri_context *ctx;
+
+	ctx = gprs_context_by_type(gprs, gc->type);
+	if (ctx)
+		ctx->context.cid = cid;
+}
+
+unsigned int ofono_gprs_context_get_cid(struct ofono_gprs_context *gc)
+{
+	struct ofono_gprs *gprs = gc->gprs;
+	struct pri_context *ctx;
+
+	ctx = gprs_context_by_type(gprs, gc->type);
+	if (ctx)
+		return ctx->context.cid;
+
+	return 0;
 }
 
 void ofono_gprs_context_set_ipv4_address(struct ofono_gprs_context *gc,

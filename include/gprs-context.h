@@ -114,6 +114,11 @@ const char *ofono_gprs_context_get_interface(struct ofono_gprs_context *gc);
 void ofono_gprs_context_set_interface(struct ofono_gprs_context *gc,
 					const char *interface);
 
+void ofono_gprs_context_set_cid(struct ofono_gprs_context *gc,
+					unsigned int cid);
+
+unsigned int ofono_gprs_context_get_cid(struct ofono_gprs_context *gc);
+
 void ofono_gprs_context_set_mtu(struct ofono_gprs_context *gc, unsigned int mtu);
 unsigned int ofono_gprs_context_get_mtu(struct ofono_gprs_context *gc);
 

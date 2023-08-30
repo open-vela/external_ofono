@@ -469,6 +469,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 		goto error_free;
 	}
 
+	ofono_gprs_context_set_cid(gc, cid);
+
 	ofono_gprs_context_set_interface(gc, ifname);
 
 	/* Split DNS addresses */
@@ -628,7 +630,7 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 	 * 0: CDMA 1: GSM/UMTS, 2...
 	 * anything 2+ is a RadioTechnology value +2
 	 */
-	ofono_debug("*gc: %p activating cid: %d; curr_tech: %d", gc, ctx->cid, tech);
+	ofono_debug("*gc: %p activating apn: %s; curr_tech: %d", gc, ctx->apn, tech);
 
 	parcel_init(&rilp);
 
