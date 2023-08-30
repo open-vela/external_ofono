@@ -1082,7 +1082,7 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 
 	if (apn_type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 		if (!gprs->data_on || (!gprs->roaming_allowed
-			&& gprs->netreg_status == NETWORK_REGISTRATION_STATUS_ROAMING)) {
+			&& gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING)) {
 			ofono_warn("data switch is off.");
 			return;
 		}
@@ -1175,7 +1175,7 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 		if (!gprs->data_on)
 			cleanup = TRUE;
 		else if (!gprs->roaming_allowed
-				&& gprs->netreg_status == NETWORK_REGISTRATION_STATUS_ROAMING)
+				&& gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING)
 			cleanup = TRUE;
 		else if (ctx->ref_count == 0)
 			cleanup = TRUE;
@@ -2005,7 +2005,7 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 	value = gprs->attached;
 	ofono_dbus_dict_append(&dict, "Attached", DBUS_TYPE_BOOLEAN, &value);
 
-	ofono_dbus_dict_append(&dict, "Status", DBUS_TYPE_INT32, &gprs->netreg_status);
+	ofono_dbus_dict_append(&dict, "Status", DBUS_TYPE_INT32, &gprs->status);
 
 	value = gprs->restricted;
 	ofono_dbus_dict_append(&dict, "Restricted", DBUS_TYPE_BOOLEAN, &value);
