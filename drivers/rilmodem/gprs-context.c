@@ -59,7 +59,6 @@ enum state {
 struct gprs_context_data {
 	GRil *ril;
 	unsigned vendor;
-	gint active_ctx_cid;
 	gint active_rild_cid;
 	enum state state;
 	guint call_list_id;
@@ -99,7 +98,6 @@ static void set_context_disconnected(struct gprs_context_data *gcd)
 {
 	DBG("");
 
-	gcd->active_ctx_cid = -1;
 	gcd->active_rild_cid = -1;
 	gcd->state = STATE_IDLE;
 	g_free(gcd->apn);
@@ -164,7 +162,7 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 
 data_lost:
 	ofono_debug("%s , cid - %d is lost", __func__, gcd->active_rild_cid);
-	ofono_gprs_context_deactivated(gc, gcd->active_ctx_cid);
+	ofono_gprs_context_deactivated(gc, gcd->active_rild_cid);
 	set_context_disconnected(gcd);
 }
 
@@ -704,12 +702,11 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 		g_ril_append_print_buf(gcd->ril, "(%d,%s,%s,***,***,%d,%s)",
 				tech, profile, ctx->apn, auth_type,
 				ril_util_gprs_proto_to_ril_string(ctx->proto));
-	
+
 	gcd->act_retries = 0;
 	if (g_ril_send(gcd->ril, RIL_REQUEST_SETUP_DATA_CALL, &rilp,
 				ril_setup_data_call_cb, cbd, g_free) > 0) {
 		gcd->apn = g_strdup(ctx->apn);
-		gcd->active_ctx_cid = ctx->cid;
 		gcd->state = STATE_ENABLING;
 		gcd->retry_ctx = retry_ctx;
 
@@ -806,14 +803,12 @@ static void ril_deactivate_data_call_cb(struct ril_msg *message,
 	ofono_gprs_context_cb_t cb = cbd->cb;
 	struct ofono_gprs_context *gc = cbd->user;
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
-	gint active_ctx_cid;
 
 	DBG("*gc: %p", gc);
 
 	if (message->error == RIL_E_SUCCESS) {
 		g_ril_print_response_no_args(gcd->ril, message);
 
-		active_ctx_cid = gcd->active_ctx_cid;
 		set_context_disconnected(gcd);
 
 		/*
@@ -824,7 +819,7 @@ static void ril_deactivate_data_call_cb(struct ril_msg *message,
 		if (cb)
 			CALLBACK_WITH_SUCCESS(cb, cbd->data);
 		else
-			ofono_gprs_context_deactivated(gc, active_ctx_cid);
+			ofono_gprs_context_deactivated(gc, gcd->active_rild_cid);
 
 	} else {
 		ofono_error("%s: reply failure for apn: %s - %s",
