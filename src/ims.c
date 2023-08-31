@@ -54,7 +54,11 @@ struct ofono_ims {
 	unsigned int radio_online_watch;
 	ofono_bool_t user_setting;
 	GKeyFile *settings;
+	GKeyFile *imsi_settings;
 	enum ofono_sim_state sim_state;
+	struct ofono_sim *sim;
+	char *imsi;
+	char *ph_number_from_setting;
 	char ph_number[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
 };
 
@@ -123,11 +127,57 @@ static void ims_load_settings(struct ofono_ims *ims)
 	}
 }
 
+static void ims_load_settings_from_imsi(struct ofono_ims *ims)
+{
+	struct ofono_modem *modem = __ofono_atom_get_modem(ims->atom);
+	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
+	GError *error;
+	const char *imsi;
+
+	ims->sim = sim;
+
+	imsi = ofono_sim_get_imsi(ims->sim);
+	if (imsi == NULL)
+		return;
+
+	ims->imsi_settings = storage_open(imsi, SETTINGS_STORE);
+	if (ims->imsi_settings == NULL) {
+		ofono_error("ims imsi setting storage open failed");
+		return;
+	}
+
+	ims->imsi = g_strdup(imsi);
+
+	error = NULL;
+	ims->ph_number_from_setting = g_key_file_get_string(ims->imsi_settings, SETTINGS_GROUP,
+					"ImsNumber", &error);
+
+	if (error) {
+		ofono_error("ims number storage read failed");
+
+		g_error_free(error);
+		ims->ph_number_from_setting = ims->ph_number;
+		g_key_file_set_string(ims->imsi_settings, SETTINGS_GROUP,
+						"ImsNumber", ims->ph_number_from_setting);
+	}
+}
+
 static void ims_close_settings(struct ofono_ims *ims)
 {
 	if (ims->settings) {
 		storage_close(SETTINGS_KEY, SETTINGS_STORE, ims->settings, TRUE);
 		ims->settings = NULL;
+	}
+}
+
+static void ims_close_settings_from_imsi(struct ofono_ims *ims)
+{
+	if (ims->imsi_settings) {
+		storage_close(ims->imsi, SETTINGS_STORE, ims->imsi_settings, TRUE);
+
+		g_free(ims->imsi);
+		ims->imsi = NULL;
+		ims->imsi_settings = NULL;
 	}
 }
 
@@ -164,7 +214,7 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 					DBUS_TYPE_BOOLEAN, &value);
 	}
 
-	ph_number = ims->ph_number;
+	ph_number = ims->ph_number_from_setting;
 	ofono_dbus_dict_append(&dict, "SubscriberUriNumber", DBUS_TYPE_STRING, &ph_number);
 
 	dbus_message_iter_close_container(&iter, &dict);
@@ -295,6 +345,7 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 skip:
 	ims->reg_info = reg_info;
 	ims->ext_info = ext_info;
+	ims->ph_number_from_setting = NULL;
 
 	notify_status_watches(ims);
 }
@@ -513,10 +564,12 @@ static void ims_sim_state_change(int state, void *data)
 	case OFONO_SIM_STATE_RESETTING:
 	case OFONO_SIM_STATE_ERROR:
 		ims_close_settings(ims);
+		ims_close_settings_from_imsi(ims);
 		break;
 	case OFONO_SIM_STATE_READY:
 		ims_load_settings(ims);
 		send_ims_config(ims);
+		ims_load_settings_from_imsi(ims);
 		break;
 	}
 }
@@ -558,7 +611,10 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 
 	ims->reg_info = 0;
 	ims->ext_info = 0;
+	ims->ph_number[0] = '\0';
+	ims->ph_number_from_setting = NULL;
 	ims->settings = NULL;
+	ims->imsi_settings = NULL;
 	ims->sim_state = OFONO_SIM_STATE_NOT_PRESENT;
 
 	for (l = g_drivers; l; l = l->next) {
@@ -606,6 +662,7 @@ static void ims_atom_unregister(struct ofono_atom *atom)
 	const char *path = __ofono_atom_get_path(atom);
 
 	ims_close_settings(ims);
+	ims_close_settings_from_imsi(ims);
 
 	__ofono_watchlist_free(ims->status_watches);
 	ims->status_watches = NULL;
