@@ -144,7 +144,7 @@ static void ril_csca_query(struct ofono_sms *sms, ofono_sms_sca_query_cb_t cb,
 	struct sms_data *sd = ofono_sms_get_data(sms);
 	struct cb_data *cbd = cb_data_new(cb, user_data, sd);
 
-	DBG("Sending csca_query");
+	ofono_debug("Sending csca_query");
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_GET_SMSC_ADDRESS, NULL,
 			ril_csca_query_cb, cbd, g_free) == 0) {
@@ -234,8 +234,6 @@ static void imc_sms_bearer_query_cb(struct ril_msg *message,
 	char **strv = NULL;
 	char *endptr;
 
-	DBG("");
-
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("Reply failure: %s",
 				ril_error_to_string(message->error));
@@ -282,8 +280,6 @@ static void ril_sms_bearer_query(struct ofono_sms *sms,
 	int cmd_id;
 	char buf[4];
 
-	DBG("");
-
 	if (sd->vendor == OFONO_RIL_VENDOR_IMC_SOFIA3GR) {
 		/*
 		 * OEM_HOOK_STRINGS request is a char **, representing an array
@@ -313,8 +309,6 @@ static void imc_set_domain_pref_cb(struct ril_msg *message, void *user_data)
 	ofono_sms_bearer_set_cb_t cb = cbd->cb;
 	struct sms_data *sd = cbd->user;
 
-	DBG("");
-
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("%s RILD reply failure: %s",
 				g_ril_request_id_to_string(sd->ril, message->req),
@@ -336,7 +330,7 @@ static void ril_sms_bearer_set(struct ofono_sms *sms, int bearer,
 	char buf1[4];
 	char buf2[4];
 
-	DBG("Bearer: %d", bearer);
+	ofono_debug("Bearer: %d", bearer);
 
 	if (sd->vendor == OFONO_RIL_VENDOR_IMC_SOFIA3GR) {
 		/*
@@ -374,7 +368,7 @@ static void ril_cmgs(struct ofono_sms *sms, const unsigned char *pdu,
 	int smsc_len;
 	char hexbuf[tpdu_len * 2 + 1];
 
-	DBG("pdu_len: %d, tpdu_len: %d mms: %d", pdu_len, tpdu_len, mms);
+	ofono_debug("pdu_len: %d, tpdu_len: %d mms: %d", pdu_len, tpdu_len, mms);
 
 	/* TODO: if (mms) { ... } */
 
@@ -426,7 +420,7 @@ static void ril_sms_write_to_sim(struct ofono_sms *sms, const unsigned char *pdu
 	int smsc_len;
 	char hexbuf[tpdu_len * 2 + 1];
 
-	DBG("pdu_len: %d", pdu_len);
+	ofono_debug("pdu_len: %d", pdu_len);
 
 	parcel_init(&rilp);
 
@@ -522,7 +516,7 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	size_t ril_pdu_len;
 	unsigned char pdu[176];
 
-	DBG("req: %d; data_len: %d", message->req, (int) message->buf_len);
+	ofono_debug("req: %d; data_len: %d", message->req, (int) message->buf_len);
 
 	g_ril_init_parcel(message, &rilp);
 
@@ -535,12 +529,16 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 
 	ril_pdu_len = strlen(ril_pdu);
 
-	if (ril_pdu_len > sizeof(pdu) * 2)
+	if (ril_pdu_len > sizeof(pdu) * 2) {
+		ofono_error("invalid pdu, return !");
 		goto fail;
+	}
 
 	if (decode_hex_own_buf(ril_pdu, ril_pdu_len,
-					&ril_buf_len, -1, pdu) == NULL)
+					&ril_buf_len, -1, pdu) == NULL) {
+		ofono_error("decoded pdu failed !");
 		goto fail;
+	}
 
 	/*
 	 * The first octect in the pdu contains the SMSC address length
@@ -549,7 +547,7 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	 * to calculate the proper tpdu length.
 	 */
 	smsc_len = pdu[0] + 1;
-	DBG("smsc_len is %d", smsc_len);
+	ofono_debug("smsc_len is %d", smsc_len);
 
 	if (message->req == RIL_UNSOL_RESPONSE_NEW_SMS)
 		/* Last parameter is 'tpdu_len' ( substract SMSC length ) */
@@ -571,7 +569,6 @@ static gboolean ril_delayed_register(gpointer user_data)
 	struct ofono_sms *sms = user_data;
 	struct sms_data *data = ofono_sms_get_data(sms);
 
-	DBG("");
 	ofono_sms_register(sms);
 
 	g_ril_register(data->ril, RIL_UNSOL_RESPONSE_NEW_SMS,
@@ -602,8 +599,6 @@ static int ril_sms_probe(struct ofono_sms *sms, unsigned int vendor,
 static void ril_sms_remove(struct ofono_sms *sms)
 {
 	struct sms_data *data = ofono_sms_get_data(sms);
-
-	DBG("");
 
 	g_ril_unref(data->ril);
 	g_free(data);
