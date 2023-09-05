@@ -1683,7 +1683,7 @@ error:
 }
 
 static void at_open_channel(struct ofono_sim *sim, const unsigned char *aid,
-		ofono_sim_open_channel_cb_t cb, void *data)
+		int length, ofono_sim_open_channel_cb_t cb, void *data)
 {
 	struct sim_data *sd = ofono_sim_get_data(sim);
 	struct cb_data *cbd = cb_data_new(cb, data);

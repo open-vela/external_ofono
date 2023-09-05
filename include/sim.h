@@ -227,7 +227,7 @@ struct ofono_sim_driver {
 	void (*list_apps)(struct ofono_sim *sim,
 			ofono_sim_list_apps_cb_t cb, void *data);
 	void (*open_channel)(struct ofono_sim *sim, const unsigned char *aid,
-			ofono_sim_open_channel_cb_t cb, void *data);
+			int length, ofono_sim_open_channel_cb_t cb, void *data);
 	void (*close_channel)(struct ofono_sim *sim, int session_id,
 			ofono_sim_close_channel_cb_t cb, void *data);
 	void (*session_read_binary)(struct ofono_sim *sim, int session,
