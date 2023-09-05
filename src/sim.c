@@ -1635,7 +1635,7 @@ static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
 
 	sim->pending = dbus_message_ref(msg);
 
-	sim->driver->open_channel(sim, aid, open_logical_channel_cb, sim);
+	sim->driver->open_channel(sim, aid, length, open_logical_channel_cb, sim);
 
 	return NULL;
 }
@@ -4363,8 +4363,8 @@ static void close_channel_cb(const struct ofono_error *error, void *data)
 		 * here.
 		 */
 		session->sim->driver->open_channel(session->sim,
-				session->record->aid, open_channel_cb,
-				session);
+				session->record->aid, session->record->aid_len,
+				open_channel_cb, session);
 		return;
 	}
 
@@ -4442,8 +4442,8 @@ unsigned int __ofono_sim_add_session_watch(
 		 */
 		session->state = SESSION_STATE_OPENING;
 		session->sim->driver->open_channel(session->sim,
-				session->record->aid, open_channel_cb,
-				session);
+				session->record->aid, session->record->aid_len,
+				open_channel_cb, session);
 	} else if (session->state == SESSION_STATE_OPEN) {
 		/*
 		 * Session is already open and available, just call the
