@@ -1907,7 +1907,7 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 	struct sms s;
 	enum sms_class cls;
 
-	DBG("len %d tpdu len %d", len, tpdu_len);
+	ofono_debug("len %d tpdu len %d", len, tpdu_len);
 
 	if (!sms_decode(pdu, len, FALSE, tpdu_len, &s)) {
 		ofono_error("Unable to decode PDU");
