@@ -74,3 +74,7 @@ Properties	boolean Registered [readonly]
 		string SubscriberUriNumber [readonly]
 			Phone number of the current subscriber given by
 			the IMS implementation.
+
+		boolean ImsSwitchStatus [readonly, optional]
+
+			Boolean representing whether the VoLTE switch is turned on.
