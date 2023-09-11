@@ -217,6 +217,9 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 	ph_number = ims->ph_number_from_setting;
 	ofono_dbus_dict_append(&dict, "SubscriberUriNumber", DBUS_TYPE_STRING, &ph_number);
 
+	value = ims->user_setting;
+	ofono_dbus_dict_append(&dict, "ImsSwitchStatus", DBUS_TYPE_BOOLEAN, &value);
+
 	dbus_message_iter_close_container(&iter, &dict);
 
 	return reply;
@@ -381,6 +384,7 @@ static DBusMessage *ofono_ims_send_register(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
 	struct ofono_ims *ims = data;
+	const char *path = __ofono_atom_get_path(ims->atom);
 
 	if (ims->pending)
 		return __ofono_error_busy(msg);
@@ -398,6 +402,10 @@ static DBusMessage *ofono_ims_send_register(DBusConnection *conn,
 
 	storage_sync(SETTINGS_KEY, SETTINGS_STORE, ims->settings);
 
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_IMS_INTERFACE,
+					"ImsSwitchStatus", DBUS_TYPE_BOOLEAN, &ims->user_setting);
+
 	return NULL;
 }
 
@@ -405,6 +413,7 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
 	struct ofono_ims *ims = data;
+	const char *path = __ofono_atom_get_path(ims->atom);
 
 	if (ims->pending)
 		return __ofono_error_busy(msg);
@@ -422,6 +431,10 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 
 	storage_sync(SETTINGS_KEY, SETTINGS_STORE, ims->settings);
 
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_IMS_INTERFACE,
+					"ImsSwitchStatus", DBUS_TYPE_BOOLEAN, &ims->user_setting);
+
 	return NULL;
 }
 
@@ -433,12 +446,18 @@ static void ims_config_cb(const struct ofono_error *error, void *data)
 static void send_ims_config(struct ofono_ims *ims)
 {
 	const struct ofono_ims_driver *driver = ims->driver;
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(ims->atom);
 
 	if (driver == NULL)
 		return;
 
 	if (driver->ims_register == NULL)
 		return;
+
+	ofono_dbus_signal_property_changed(conn, path,
+					OFONO_IMS_INTERFACE,
+					"ImsSwitchStatus", DBUS_TYPE_BOOLEAN, &ims->user_setting);
 
 	if (ims->user_setting)
 		driver->ims_register(ims, ims_config_cb, ims);
