@@ -96,6 +96,11 @@ int ofono_gprs_get_status(struct ofono_gprs *gprs);
 
 void ofono_gprs_set_context_status(struct ofono_gprs_context *gc, int status);
 
+int ofono_gprs_get_context_status(struct ofono_gprs_context *gc);
+
+struct ofono_gprs_primary_context *ofono_gprs_get_pri_context_by_name(
+	struct ofono_gprs_context *gc, const char *apn);
+
 #ifdef __cplusplus
 }
 #endif
