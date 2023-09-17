@@ -38,6 +38,14 @@
 
 #define MODEM_PROP_LTE_CAPABLE "lte-capable"
 
+#define DATA_PROFILE_DEFAULT_STR "0"
+#define DATA_PROFILE_TETHERED_STR "1"
+#define DATA_PROFILE_IMS_STR "2"
+#define DATA_PROFILE_FOTA_STR "3"
+#define DATA_PROFILE_CBS_STR "4"
+#define DATA_PROFILE_OEM_BASE_STR "1000"
+#define DATA_PROFILE_MTK_MMS_STR "1001"
+
 enum ril_util_sms_store {
 	RIL_UTIL_SMS_STORE_SM =	0,
 	RIL_UTIL_SMS_STORE_ME =	1,
@@ -72,10 +80,11 @@ typedef void (*ril_util_sim_inserted_cb_t)(gboolean present, void *userdata);
 void decode_ril_error(struct ofono_error *error, const char *final);
 gchar *ril_util_get_netmask(const char *address);
 
+void ril_util_build_activate_data_call(GRil *gril, struct parcel *rilp,
+	const char *apn, int type, const char *user, const char *pwd,
+		int auth_method, int proto, gpointer user_data);
 void ril_util_build_deactivate_data_call(GRil *gril, struct parcel *rilp,
 						int cid, unsigned int reason);
-void ril_util_build_activate_data_call(GRil *gril, struct parcel *rilp,
-						struct retry_context *retry_ctx);
 
 struct cb_data {
 	void *cb;
@@ -105,6 +114,16 @@ static inline int ril_util_convert_signal_strength(int strength)
 		result = (strength * 100) / 31;
 
 	return result;
+}
+
+static inline const char *ril_util_get_apn_profile_id(enum ofono_gprs_context_type type) {
+	if (type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		return DATA_PROFILE_DEFAULT_STR;
+	} else if (type == OFONO_GPRS_CONTEXT_TYPE_IMS) {
+		return DATA_PROFILE_IMS_STR;
+	} else {
+		return DATA_PROFILE_DEFAULT_STR;
+	}
 }
 
 const char *ril_util_gprs_proto_to_ril_string(enum ofono_gprs_proto);

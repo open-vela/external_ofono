@@ -78,33 +78,67 @@ gchar *ril_util_get_netmask(const gchar *address)
 }
 
 void ril_util_build_activate_data_call(GRil *gril, struct parcel *rilp,
-						struct retry_context *retry_ctx)
+		const char *apn, int type, const char *user, const char *pwd,
+			int auth_method, int proto, gpointer user_data)
 {
-	char *tech_str = NULL;
-	char *auth_type_str = NULL;
-	char *cid_str = NULL;
+	struct cb_data *cbd = user_data;
+	struct ofono_gprs_context *gc = cbd->user;
+	struct ofono_modem *modem = ofono_gprs_context_get_modem(gc);
+	char buf[256];
+	int num_param = 7;
+	int tech;
+	const char *profile;
+	int auth_type;
 
-	tech_str = g_strdup_printf("%d", retry_ctx->tech);
-	auth_type_str = g_strdup_printf("%d", retry_ctx->auth_type);
+	tech = ofono_modem_get_integer(modem, "RilDataRadioTechnology");
+
+	/*
+	 * 0: CDMA 1: GSM/UMTS, 2...
+	 * anything 2+ is a RadioTechnology value +2
+	 */
+	ofono_debug("*gc: %p activating apn: %s; curr_tech: %d", gc, apn, tech);
 
 	parcel_init(rilp);
-	parcel_w_int32(rilp, retry_ctx->num_param);
-	parcel_w_string(rilp, tech_str);
-	parcel_w_string(rilp, retry_ctx->profile);
-	parcel_w_string(rilp, retry_ctx->apn);
-	parcel_w_string(rilp, retry_ctx->username);
-	parcel_w_string(rilp, retry_ctx->password);
-	parcel_w_string(rilp, auth_type_str);
-	parcel_w_string(rilp, retry_ctx->proto);
+	parcel_w_int32(rilp, num_param);
 
-	if (g_ril_vendor(gril) == OFONO_RIL_VENDOR_MTK) {
-		cid_str = g_strdup_printf("%" PRIu32, retry_ctx->cid);
-		parcel_w_string(rilp, cid_str);
-	}
+	if (tech == RADIO_TECH_UNKNOWN) {
+		ofono_error("%s: radio tech for apn: %s UNKNOWN!", __func__, apn);
+		tech = 1;
+	} else
+		tech = tech + 2;
 
-	g_free(tech_str);
-	g_free(auth_type_str);
-	g_free(cid_str);
+	sprintf(buf, "%d", tech);
+	parcel_w_string(rilp, buf);
+
+	profile = ril_util_get_apn_profile_id(type);
+
+	parcel_w_string(rilp, profile);
+	parcel_w_string(rilp, apn);
+	parcel_w_string(rilp, user);
+	parcel_w_string(rilp, pwd);
+
+	/*
+	 * We do the same as in $AOSP/frameworks/opt/telephony/src/java/com/
+	 * android/internal/telephony/dataconnection/DataConnection.java,
+	 * onConnect(), and use authentication or not depending on whether
+	 * the user field is empty or not,
+	 * on top of the verification for the authentication method.
+	 */
+
+	if (auth_method != OFONO_GPRS_AUTH_METHOD_NONE &&
+						user[0] != '\0')
+		auth_type = RIL_AUTH_BOTH;
+	else
+		auth_type = RIL_AUTH_NONE;
+
+	sprintf(buf, "%d", auth_type);
+	parcel_w_string(rilp, buf);
+
+	parcel_w_string(rilp, ril_util_gprs_proto_to_ril_string(proto));
+
+	g_ril_append_print_buf(gril, "(%d,%s,%s,***,***,%d,%s)",
+					tech, profile, apn, auth_type,
+					ril_util_gprs_proto_to_ril_string(proto));
 }
 
 void ril_util_build_deactivate_data_call(GRil *gril, struct parcel *rilp,

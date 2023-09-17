@@ -65,11 +65,10 @@ struct gprs_context_data {
 	char *apn;
 	int deact_retries;
 	int act_retries;
-	guint retry_ev_id;
+	guint retry_deact_id;
 	guint retry_act_id;
-	struct cb_data *retry_cbd;
+	struct cb_data *deact_retry_cbd;
 	struct cb_data *active_retry_cbd;
-	struct retry_context *retry_ctx;
 	guint reset_ev_id;
 };
 
@@ -79,20 +78,10 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 						void *data);
 static void ril_deactivate_data_call_cb(struct ril_msg *message,
 					gpointer user_data);
-static gboolean ril_gprs_context_abort_activate_retry(struct ofono_gprs_context *gc);
 static gboolean retry_activate(gpointer user_data);
-static gboolean need_retry(unsigned int status);
-
-static void free_retry_context(gpointer user_data) {
-	struct retry_context *retry_ctx = user_data;
-	g_free(retry_ctx->profile);
-	g_free(retry_ctx->apn);
-	g_free(retry_ctx->username);
-	g_free(retry_ctx->password);
-	g_free(retry_ctx->proto);
-	g_free(retry_ctx);
-	retry_ctx = NULL;
-}
+static gboolean retry_activate_abort(struct ofono_gprs_context *gc);
+static int get_next_activate_retry_delay(struct gprs_context_data *gcd,
+					int fail_cause, int raw_delay);
 
 static void set_context_disconnected(struct gprs_context_data *gcd)
 {
@@ -411,15 +400,18 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	}
 
 	status = parcel_r_int32(&rilp);
+	retry = parcel_r_int32(&rilp);
 
 	if (status != PDP_FAIL_NONE) {
-		if (need_retry(status) && gcd->act_retries < NUM_ACTIVATION_RETRIES) {
-			ofono_gprs_set_context_status(gc, CONTEXT_STATUS_RETRYING);
+		int delay_s = get_next_activate_retry_delay(gcd, status, retry/1000);
+
+		if (delay_s > 0) {
 			gcd->act_retries += 1;
 			gcd->active_retry_cbd = cb_data_new(cb, cbd->data, gc);
 			gcd->retry_act_id = g_timeout_add_seconds(
-					TIME_BETWEEN_ACT_RETRIES_S,
-					retry_activate, gcd->active_retry_cbd);
+					delay_s, retry_activate, gcd->active_retry_cbd);
+			ofono_gprs_set_context_status(gc, CONTEXT_STATUS_RETRYING);
+
 			return;
 		} else {
 			ofono_error("%s: status for apn: %s, is non-zero: %s",
@@ -427,12 +419,10 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 					ril_pdp_fail_to_string(status));
 
 			set_context_disconnected(gcd);
-			free_retry_context(gcd->retry_ctx);
 			goto error;
 		}
 	}
 
-	retry = parcel_r_int32(&rilp);          /* ignore */
 	cid = parcel_r_int32(&rilp);
 	active = parcel_r_int32(&rilp);
 	type = parcel_r_string(&rilp);
@@ -562,7 +552,6 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	g_free(raw_dns);
 	g_free(raw_gws);
 	g_free(pcscf_addrs);
-	free_retry_context(gcd->retry_ctx);
 
 	gcd->active_rild_cid = cid;
 	gcd->state = STATE_ACTIVE;
@@ -582,29 +571,10 @@ error_free:
 	g_free(raw_addrs);
 	g_free(raw_dns);
 	g_free(raw_gws);
-	free_retry_context(gcd->retry_ctx);
 
 	disconnect_context(gc);
 error:
 	CALLBACK_WITH_FAILURE(cb, cbd->data);
-}
-
-#define DATA_PROFILE_DEFAULT_STR "0"
-#define DATA_PROFILE_TETHERED_STR "1"
-#define DATA_PROFILE_IMS_STR "2"
-#define DATA_PROFILE_FOTA_STR "3"
-#define DATA_PROFILE_CBS_STR "4"
-#define DATA_PROFILE_OEM_BASE_STR "1000"
-#define DATA_PROFILE_MTK_MMS_STR "1001"
-
-static const char *ril_get_apn_profile_id(enum ofono_gprs_context_type type) {
-	if (type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
-		return DATA_PROFILE_DEFAULT_STR;
-	} else if (type == OFONO_GPRS_CONTEXT_TYPE_IMS) {
-		return DATA_PROFILE_IMS_STR;
-	} else {
-		return DATA_PROFILE_DEFAULT_STR;
-	}
 }
 
 static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
@@ -612,109 +582,22 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 				ofono_gprs_context_cb_t cb, void *data)
 {
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
-	struct ofono_modem *modem = ofono_gprs_context_get_modem(gc);
 	struct cb_data *cbd = cb_data_new(cb, data, gc);
-	struct retry_context *retry_ctx = g_new0(struct retry_context, 1);
 	struct parcel rilp;
-	char buf[256];
-	int num_param = 7;
-	int tech;
-	const char *profile;
-	int auth_type;
-
-	tech = ofono_modem_get_integer(modem, "RilDataRadioTechnology");
-
-	/*
-	 * 0: CDMA 1: GSM/UMTS, 2...
-	 * anything 2+ is a RadioTechnology value +2
-	 */
-	ofono_debug("*gc: %p activating apn: %s; curr_tech: %d", gc, ctx->apn, tech);
-
-	parcel_init(&rilp);
-
-	if (g_ril_vendor(gcd->ril) == OFONO_RIL_VENDOR_MTK)
-		num_param += 1;
-
-	parcel_w_int32(&rilp, num_param);
-	retry_ctx->num_param = num_param;
-
-	if (tech == RADIO_TECH_UNKNOWN) {
-		ofono_error("%s: radio tech for apn: %s UNKNOWN!", __func__,
-				gcd->apn);
-		tech = 1;
-	} else
-		tech = tech + 2;
-
-	sprintf(buf, "%d", tech);
-	parcel_w_string(&rilp, buf);
-	retry_ctx->tech = tech;
-
-	profile = ril_get_apn_profile_id(ctx->type);
-
-	if (g_ril_vendor(gcd->ril) == OFONO_RIL_VENDOR_MTK &&
-			ofono_gprs_context_get_type(gc) ==
-						OFONO_GPRS_CONTEXT_TYPE_MMS)
-		profile = DATA_PROFILE_MTK_MMS_STR;
-
-	parcel_w_string(&rilp, profile);
-	retry_ctx->profile = g_strdup(profile);
-	parcel_w_string(&rilp, ctx->apn);
-	retry_ctx->apn = g_strdup(ctx->apn);
-	parcel_w_string(&rilp, ctx->username);
-	retry_ctx->username = g_strdup(ctx->username);
-	parcel_w_string(&rilp, ctx->password);
-	retry_ctx->password = g_strdup(ctx->password);
-
-	/*
-	 * We do the same as in $AOSP/frameworks/opt/telephony/src/java/com/
-	 * android/internal/telephony/dataconnection/DataConnection.java,
-	 * onConnect(), and use authentication or not depending on whether
-	 * the user field is empty or not,
-	 * on top of the verification for the authentication method.
-	 */
-
-	if (ctx->auth_method != OFONO_GPRS_AUTH_METHOD_NONE &&
-						ctx->username[0] != '\0')
-		auth_type = RIL_AUTH_BOTH;
-	else
-		auth_type = RIL_AUTH_NONE;
-
-	sprintf(buf, "%d", auth_type);
-	parcel_w_string(&rilp, buf);
-	retry_ctx->auth_type = auth_type;
-
-	parcel_w_string(&rilp, ril_util_gprs_proto_to_ril_string(ctx->proto));
-	retry_ctx->proto = g_strdup(ril_util_gprs_proto_to_ril_string(ctx->proto));
-
-	if (g_ril_vendor(gcd->ril) == OFONO_RIL_VENDOR_MTK) {
-		sprintf(buf, "%u", ctx->cid);
-		parcel_w_string(&rilp, buf);
-		retry_ctx->cid = ctx->cid;
-
-		g_ril_append_print_buf(gcd->ril, "(%d,%s,%s,%s,%s,%d,%s,%u)",
-				tech, profile, ctx->apn,
-				auth_type == RIL_AUTH_NONE ? "" : "***",
-				auth_type == RIL_AUTH_NONE ? "" : "***",
-				auth_type,
-				ril_util_gprs_proto_to_ril_string(ctx->proto),
-				ctx->cid);
-	} else
-		g_ril_append_print_buf(gcd->ril, "(%d,%s,%s,***,***,%d,%s)",
-				tech, profile, ctx->apn, auth_type,
-				ril_util_gprs_proto_to_ril_string(ctx->proto));
 
 	gcd->act_retries = 0;
+	ril_util_build_activate_data_call(gcd->ril, &rilp, ctx->apn, ctx->type,
+		ctx->username, ctx->password, ctx->auth_method, ctx->proto, cbd);
+
 	if (g_ril_send(gcd->ril, RIL_REQUEST_SETUP_DATA_CALL, &rilp,
 				ril_setup_data_call_cb, cbd, g_free) > 0) {
 		gcd->apn = g_strdup(ctx->apn);
 		gcd->state = STATE_ENABLING;
-		gcd->retry_ctx = retry_ctx;
 
 		return;
 	}
 
 	g_free(cbd);
-	free_retry_context(retry_ctx);
 	CALLBACK_WITH_FAILURE(cb, data);
 }
 
@@ -724,12 +607,22 @@ static gboolean reset_modem(gpointer data)
 	return FALSE;
 }
 
-static gboolean need_retry(unsigned int status)
+static int get_next_activate_retry_delay(struct gprs_context_data *gcd,
+	int fail_cause, int raw_delay)
 {
-	return status != PDP_FAIL_VOICE_REGISTRATION_FAIL
-			&& status != PDP_FAIL_DATA_REGISTRATION_FAIL
-			&& status != PDP_FAIL_SIGNAL_LOST
-			&& status != PDP_FAIL_RADIO_POWER_OFF;
+	if (gcd->act_retries >= NUM_ACTIVATION_RETRIES)
+		return -1;
+
+	if (fail_cause == PDP_FAIL_VOICE_REGISTRATION_FAIL
+			&& fail_cause == PDP_FAIL_DATA_REGISTRATION_FAIL
+			&& fail_cause == PDP_FAIL_SIGNAL_LOST
+			&& fail_cause == PDP_FAIL_RADIO_POWER_OFF)
+		return -1;
+
+	if (raw_delay > 0)
+		return raw_delay;
+
+	return TIME_BETWEEN_ACT_RETRIES_S;
 }
 
 static gboolean retry_activate(gpointer user_data)
@@ -738,12 +631,23 @@ static gboolean retry_activate(gpointer user_data)
 	ofono_gprs_context_cb_t cb = cbd->cb;
 	struct ofono_gprs_context *gc = cbd->user;
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
+	struct ofono_gprs_primary_context *ctx;
 	struct parcel rilp;
 
-	gcd->retry_act_id = 0;
+	if (gcd->retry_act_id > 0) {
+		g_source_remove(gcd->retry_act_id);
+		gcd->retry_act_id = 0;
+	}
 
-	ril_util_build_activate_data_call(gcd->ril, &rilp,
-					gcd->retry_ctx);
+	if (ofono_gprs_get_context_status(gc) != CONTEXT_STATUS_RETRYING) {
+		retry_activate_abort(gc);
+		return FALSE;
+	}
+
+	ctx = ofono_gprs_get_pri_context_by_name(gc, gcd->apn);
+	ril_util_build_activate_data_call(
+		gcd->ril, &rilp, ctx->apn, ctx->type,
+			ctx->username, ctx->password, ctx->auth_method, ctx->proto, user_data);
 
 	if (g_ril_send(gcd->ril, RIL_REQUEST_SETUP_DATA_CALL, &rilp,
 			ril_setup_data_call_cb, cbd, g_free) == 0) {
@@ -753,7 +657,6 @@ static gboolean retry_activate(gpointer user_data)
 			CALLBACK_WITH_FAILURE(cb, cbd->data);
 
 		g_free(cbd);
-		free_retry_context(gcd->retry_ctx);
 	}
 
 	return FALSE;
@@ -767,7 +670,10 @@ static gboolean retry_deactivate(gpointer user_data)
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
 	struct parcel rilp;
 
-	gcd->retry_ev_id = 0;
+	if (gcd->retry_deact_id > 0) {
+		g_source_remove(gcd->retry_deact_id);
+		gcd->retry_deact_id = 0;
+	}
 
 	/* We might have received a call list update while waiting */
 	if (gcd->state == STATE_IDLE) {
@@ -831,11 +737,11 @@ static void ril_deactivate_data_call_cb(struct ril_msg *message,
 		 * temporarily. We do retries to handle that case.
 		 */
 		if (--(gcd->deact_retries) > 0) {
-			gcd->retry_cbd = cb_data_new(cb, cbd->data, gc);
-			gcd->retry_ev_id =
+			gcd->deact_retry_cbd = cb_data_new(cb, cbd->data, gc);
+			gcd->retry_deact_id =
 				g_timeout_add_seconds(
 					TIME_BETWEEN_DEACT_RETRIES_S,
-					retry_deactivate, gcd->retry_cbd);
+					retry_deactivate, gcd->deact_retry_cbd);
 		} else {
 			ofono_error("%s: retry limit hit", __func__);
 
@@ -864,7 +770,7 @@ static void ril_gprs_context_deactivate_primary(struct ofono_gprs_context *gc,
 
 	if (gcd->retry_act_id > 0) {
 		ofono_info("Abort active retries..., timer_id: %u\n", gcd->retry_act_id);
-		ril_gprs_context_abort_activate_retry(gc);
+		retry_activate_abort(gc);
 
 		if (cb) {
 			CALLBACK_WITH_SUCCESS(cb, data);
@@ -945,7 +851,7 @@ static int ril_gprs_context_probe(struct ofono_gprs_context *gc,
 	return 0;
 }
 
-static gboolean ril_gprs_context_abort_activate_retry(struct ofono_gprs_context *gc)
+static gboolean retry_activate_abort(struct ofono_gprs_context *gc)
 {
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
 	struct cb_data *cbd = gcd->active_retry_cbd;
@@ -955,10 +861,11 @@ static gboolean ril_gprs_context_abort_activate_retry(struct ofono_gprs_context 
 		g_source_remove(gcd->retry_act_id);
 		gcd->retry_act_id = 0;
 		set_context_disconnected(gcd);
-		free_retry_context(gcd->retry_ctx);
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
 		g_free(gcd->active_retry_cbd);
 		gcd->active_retry_cbd = NULL;
+
+		ofono_gprs_set_context_status(gc, CONTEXT_STATUS_DEACTIVATED);
 
 		return TRUE;
 	}
@@ -983,12 +890,12 @@ static void ril_gprs_context_remove(struct ofono_gprs_context *gc)
 						&rilp, NULL, NULL, NULL);
 	}
 
-	if (gcd->retry_ev_id > 0) {
-		g_source_remove(gcd->retry_ev_id);
-		g_free(gcd->retry_cbd);
+	if (gcd->retry_deact_id > 0) {
+		g_source_remove(gcd->retry_deact_id);
+		g_free(gcd->deact_retry_cbd);
 	}
 
-	ril_gprs_context_abort_activate_retry(gc);
+	retry_activate_abort(gc);
 
 	if (gcd->reset_ev_id > 0)
 		g_source_remove(gcd->reset_ev_id);
