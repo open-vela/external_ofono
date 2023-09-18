@@ -38,6 +38,7 @@
 #include <gdbus.h>
 #include "ofono.h"
 #include "common.h"
+#include "util.h"
 
 static GSList *g_drivers = NULL;
 
@@ -339,6 +340,12 @@ struct ofono_call_volume *ofono_call_volume_create(struct ofono_modem *modem,
 	struct ofono_call_volume *cv;
 	GSList *l;
 
+	/* Check for Call Volume interface support */
+	if (!is_ofono_interface_supported(CALL_VOLUME_INTERFACE)) {
+		ofono_debug("%s : not support for call volume! \n", __func__);
+		return NULL;
+	}
+
 	if (driver == NULL)
 		return NULL;
 
@@ -400,7 +407,13 @@ void ofono_call_volume_register(struct ofono_call_volume *cv)
 
 int ofono_call_volume_driver_register(const struct ofono_call_volume_driver *d)
 {
-	DBG("driver: %p, name: %s", d, d->name);
+	/* Check for Call Volume interface support */
+	if (!is_ofono_interface_supported(CALL_VOLUME_INTERFACE)) {
+		ofono_debug("%s : not support for call volume! \n", __func__);
+		return 0;
+	}
+
+	ofono_debug("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
 		return -EINVAL;

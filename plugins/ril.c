@@ -64,6 +64,7 @@
 #include "ril.h"
 #include "drivers/rilmodem/rilmodem.h"
 #include "drivers/rilmodem/vendor.h"
+#include "src/common.h"
 
 #define	RADIO_GID 1001
 #define	RADIO_UID 1001
@@ -247,47 +248,59 @@ void ril_post_online(struct ofono_modem *modem)
 	ofono_lte_create(modem, rd->vendor, RILMODEM, rd->ril);
 
 	gprs = ofono_gprs_create(modem, rd->vendor, RILMODEM, rd->ril);
-	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	if (is_gprs_context_type_support("internet")) {
+		gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	if (gc) {
-		ofono_gprs_context_set_type(gc,
-					OFONO_GPRS_CONTEXT_TYPE_INTERNET);
-		ofono_gprs_add_context(gprs, gc);
+		if (gc) {
+			ofono_gprs_context_set_type(gc,
+						OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 
-	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	if (is_gprs_context_type_support("mms")) {
+		gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	if (gc) {
-		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_MMS);
-		ofono_gprs_add_context(gprs, gc);
+		if (gc) {
+			ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_MMS);
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 
-	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	if (is_gprs_context_type_support("ims")) {
+		gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	if (gc) {
-		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_IMS);
-		ofono_gprs_add_context(gprs, gc);
+		if (gc) {
+			ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_IMS);
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 
-	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	if (is_gprs_context_type_support("hipri")) {
+		gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	if (gc) {
-		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_HIPRI);
-		ofono_gprs_add_context(gprs, gc);
+		if (gc) {
+			ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_HIPRI);
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 
-	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	if (is_gprs_context_type_support("supl")) {
+		gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	if (gc) {
-		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_SUPL);
-		ofono_gprs_add_context(gprs, gc);
+		if (gc) {
+			ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_SUPL);
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 
-	gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
+	if (is_gprs_context_type_support("emergency")) {
+		gc = ofono_gprs_context_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	if (gc) {
-		ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_EMERGENCY);
-		ofono_gprs_add_context(gprs, gc);
+		if (gc) {
+			ofono_gprs_context_set_type(gc, OFONO_GPRS_CONTEXT_TYPE_EMERGENCY);
+			ofono_gprs_add_context(gprs, gc);
+		}
 	}
 }
 

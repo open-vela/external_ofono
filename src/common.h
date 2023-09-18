@@ -243,3 +243,4 @@ int get_rssi_dbm_from_asu(int rssi_asu);
 int convert_rssnr_unit_from_ten_db_to_db(int rssnr);
 int get_signal_level_from_rsrp(int rsrp);
 int get_signal_level_from_rssi(int rssi);
+gboolean is_gprs_context_type_support(const char *gc_type);
