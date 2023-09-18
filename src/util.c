@@ -3792,6 +3792,8 @@ static const char *ofono_interface_to_string(enum ofono_interface interface)
 		return "OFONO_IMS_INTERFACE_SUPPORT";
 	case PHONEBOOK_INTERFACE:
 		return "OFONO_PHONEBOOK_INTERFACE_SUPPORT";
+	case CALL_VOLUME_INTERFACE:
+		return "OFONO_CALL_VOLUME_INTERFACE_SUPPORT";
 	}
 
 	return NULL;
