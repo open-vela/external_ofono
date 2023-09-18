@@ -108,6 +108,7 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 	int cid;
 	int active;
 	int i;
+	int used_cid = gcd->active_rild_cid;
 
 	if (gcd->state == STATE_IDLE)
 		return;
@@ -145,14 +146,14 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 			return;
 		}
 
-		if (cid == gcd->active_rild_cid)
+		if (cid == used_cid)
 			return;
 	}
 
 data_lost:
-	ofono_debug("%s , cid - %d is lost", __func__, gcd->active_rild_cid);
-	ofono_gprs_context_deactivated(gc, gcd->active_rild_cid);
+	ofono_debug("%s , cid - %d is lost", __func__, used_cid);
 	set_context_disconnected(gcd);
+	ofono_gprs_context_deactivated(gc, used_cid);
 }
 
 static int gprs_context_set_dns_servers(struct ofono_gprs_context *gc,
@@ -403,7 +404,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	retry = parcel_r_int32(&rilp);
 
 	if (status != PDP_FAIL_NONE) {
-		int delay_s = get_next_activate_retry_delay(gcd, status, retry/1000);
+		int delay_s = get_next_activate_retry_delay(gcd, status, retry / 1000);
+		ofono_debug("%s: retry will happen in %d seconds", __func__, delay_s);
 
 		if (delay_s > 0) {
 			gcd->act_retries += 1;
