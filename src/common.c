@@ -928,3 +928,15 @@ int get_signal_level_from_rssi(int rssi)
 	return level;
 }
 
+gboolean is_gprs_context_type_support(const char *gc_type) {
+	const char *gc_type_support;
+
+	gc_type_support = getenv("OFONO_GPRS_CONTEXT_TYPE_SUPPORT");
+	if (gc_type_support != NULL && strstr(gc_type_support, gc_type) != NULL)  {
+		return TRUE;
+	} else {
+		ofono_debug("not support for gprs context %s type ! \n", gc_type);
+		return FALSE;
+	}
+}
+

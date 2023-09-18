@@ -55,6 +55,7 @@ enum ofono_interface {
 	CALL_SETTINGS_INTERFACE,
 	IMS_INTERFACE,
 	PHONEBOOK_INTERFACE,
+	CALL_VOLUME_INTERFACE,
 };
 
 char *convert_gsm_to_utf8(const unsigned char *text, long len, long *items_read,
