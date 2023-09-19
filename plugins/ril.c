@@ -71,9 +71,9 @@
 
 #define MAX_SIM_STATUS_RETRIES 15
 
-/* this gives 30s for rild to initialize */
-#define RILD_MAX_CONNECT_RETRIES 5
-#define RILD_CONNECT_RETRY_TIME_S 5
+/* this gives 30s retry for rild to initialize */
+#define RILD_MAX_CONNECT_RETRIES 30
+#define RILD_CONNECT_RETRY_TIME_S 1
 
 char *RILD_CMD_SOCKET[] = {"/dev/socket/rild", "/dev/socket/rild1"};
 char *GRIL_HEX_PREFIX[] = {"Device 0: ", "Device 1: "};
@@ -481,7 +481,7 @@ static gboolean connect_rild(gpointer user_data)
 #ifndef CONFIG_ARCH_SIM
 		ofono_error("Failed to connect to rild.");
 #endif
-		return TRUE;
+		return FALSE;
 	}
 
 	return FALSE;
