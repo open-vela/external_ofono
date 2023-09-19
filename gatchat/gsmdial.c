@@ -765,7 +765,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	signal_fd = signalfd(-1, &mask, 0);
+	signal_fd = signalfd(-1, &mask, SFD_CLOEXEC);
 	if (signal_fd < 0) {
 		perror("Can't create signal filedescriptor");
 		return 1;

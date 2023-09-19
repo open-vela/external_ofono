@@ -102,7 +102,7 @@ static guint setup_signalfd(void)
 		return 0;
 	}
 
-	fd = signalfd(-1, &mask, 0);
+	fd = signalfd(-1, &mask, SFD_CLOEXEC);
 	if (fd < 0) {
 		perror("Failed to create signal descriptor");
 		return 0;
