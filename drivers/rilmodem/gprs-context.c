@@ -44,8 +44,8 @@
 
 #include "rilmodem.h"
 
-#define NUM_ACTIVATION_RETRIES 3
-#define TIME_BETWEEN_ACT_RETRIES_S 20
+#define NUM_ACTIVATION_RETRIES 5
+#define TIME_BETWEEN_ACT_RETRIES_S 2
 #define NUM_DEACTIVATION_RETRIES 4
 #define TIME_BETWEEN_DEACT_RETRIES_S 2
 
@@ -402,10 +402,10 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 
 	status = parcel_r_int32(&rilp);
 	retry = parcel_r_int32(&rilp);
+	ofono_debug("%s - [status=%d,retry=%d]", __func__, status, retry);
 
 	if (status != PDP_FAIL_NONE) {
 		int delay_s = get_next_activate_retry_delay(gcd, status, retry / 1000);
-		ofono_debug("%s: retry will happen in %d seconds", __func__, delay_s);
 
 		if (delay_s > 0) {
 			gcd->act_retries += 1;
@@ -414,6 +414,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 					delay_s, retry_activate, gcd->active_retry_cbd);
 			ofono_gprs_set_context_status(gc, CONTEXT_STATUS_RETRYING);
 
+			ofono_debug("%s: retry will happen in %d seconds", __func__, delay_s);
 			return;
 		} else {
 			ofono_error("%s: status for apn: %s, is non-zero: %s",
@@ -621,7 +622,7 @@ static int get_next_activate_retry_delay(struct gprs_context_data *gcd,
 			&& fail_cause == PDP_FAIL_RADIO_POWER_OFF)
 		return -1;
 
-	if (raw_delay > 0)
+	if (raw_delay > 0 && raw_delay < TIME_BETWEEN_ACT_RETRIES_S * NUM_ACTIVATION_RETRIES)
 		return raw_delay;
 
 	return TIME_BETWEEN_ACT_RETRIES_S;
