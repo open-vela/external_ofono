@@ -144,10 +144,11 @@ int ofono_netreg_get_status(struct ofono_netreg *netreg);
 int ofono_netreg_get_technology(struct ofono_netreg *netreg);
 const char *ofono_netreg_get_mcc(struct ofono_netreg *netreg);
 const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg);
-int ofono_netreg_get_singal_strength_level(struct ofono_netreg *netreg);
 
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 	int ril_tech, const struct ofono_signal_strength *ril_strength);
+int ofono_netreg_get_signal_strength_level(struct ofono_netreg *netreg);
+void ofono_netreg_poll_signal_strength(struct ofono_netreg *netreg);
 
 #ifdef __cplusplus
 }
