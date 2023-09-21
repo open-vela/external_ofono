@@ -3157,6 +3157,9 @@ void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 		return;
 	}
 
+	if (gprs->netreg)
+		ofono_netreg_poll_signal_strength(gprs->netreg);
+
 	/* We registered without being powered */
 	if (gprs->powered == FALSE)
 		goto detach;
