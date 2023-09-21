@@ -178,14 +178,6 @@ static void init_register(const struct ofono_error *error, void *data)
 					registration_status_callback, netreg);
 }
 
-static int get_gprs_netreg_status(struct ofono_netreg *netreg)
-{
-	struct ofono_modem *modem = __ofono_atom_get_modem(netreg->atom);
-	struct ofono_gprs *gprs = __ofono_atom_find(OFONO_ATOM_TYPE_GPRS, modem);
-
-	return ofono_gprs_get_status(gprs);
-}
-
 static void enforce_auto_only(struct ofono_netreg *netreg)
 {
 	if (netreg->mode != NETWORK_REGISTRATION_MODE_MANUAL)
@@ -1614,9 +1606,7 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 			netreg->driver->current_operator(netreg,
 					current_operator_callback, netreg);
 
-		if (netreg->driver->strength != NULL)
-			netreg->driver->strength(netreg,
-					signal_strength_callback, netreg);
+		ofono_netreg_poll_signal_strength(netreg);
 	} else {
 		struct ofono_error error;
 
@@ -1758,21 +1748,11 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_modem *modem;
 
-	/*
-	 * Theoretically we can get signal strength even when not registered
-	 * to any network.  However, what do we do with it in that case?
-	 */
-	if (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED
-		&& netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING
-		&& get_gprs_netreg_status(netreg) != NETWORK_REGISTRATION_STATUS_REGISTERED
-		&& get_gprs_netreg_status(netreg) != NETWORK_REGISTRATION_STATUS_ROAMING)
-		return;
-
 	if (netreg->signal_strength_changed)
 		netreg_emit_signal_strength_changed(netreg);
 
 	if (netreg->signal_strength != strength) {
-		ofono_info("strength %d", strength);
+		ofono_debug("%s - strength %d", __func__, strength);
 
 		netreg->signal_strength = strength;
 
@@ -1920,6 +1900,8 @@ static void spn_read_cb(const char *spn, const char *dc, void *data)
 
 static void fill_signal_strength_with_invalid(struct ofono_signal_strength *signal_strength)
 {
+	ofono_debug("%s", __func__);
+
 	if (signal_strength) {
 		if (signal_strength->gw_signal_strength) {
 			signal_strength->gw_signal_strength->strength = INT_MAX;
@@ -1994,12 +1976,22 @@ const char *ofono_netreg_get_mnc(struct ofono_netreg *netreg)
 	return netreg->current_operator->mnc;
 }
 
-int ofono_netreg_get_singal_strength_level(struct ofono_netreg *netreg)
+int ofono_netreg_get_signal_strength_level(struct ofono_netreg *netreg)
 {
 	if (netreg == NULL || netreg->signal_strength_data == NULL)
 		return SIGNAL_STRENGTH_UNKNOWN;
 
 	return netreg->signal_strength_data->level;
+}
+
+void ofono_netreg_poll_signal_strength(struct ofono_netreg *netreg)
+{
+	if (netreg == NULL || netreg->driver == NULL || netreg->driver->strength == NULL)
+		return;
+
+	ofono_debug("%s", __func__);
+	netreg->driver->strength(netreg,
+			signal_strength_callback, netreg);
 }
 
 void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
@@ -2011,6 +2003,7 @@ void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 		|| ril_strength == NULL)
 		goto done;
 
+	ofono_debug("%s - tech = %d", __func__, ril_tech);
 	if (ril_tech == RADIO_TECH_UMTS) {
 		if (ril_strength->gw_signal_strength == NULL
 			|| netreg->signal_strength_data->gw_signal_strength == NULL)
@@ -2020,6 +2013,8 @@ void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 			get_rssi_dbm_from_asu(
 				ril_strength->gw_signal_strength->strength), -113, -51);
 		if (netreg->signal_strength_data->gw_signal_strength->rssi == rssi) {
+			ofono_debug("%s - old rssi = %d, new rssi = %d", __func__,
+				netreg->signal_strength_data->gw_signal_strength->rssi, rssi);
 			goto done;
 		}
 
@@ -2038,6 +2033,8 @@ void ofono_netreg_set_signal_strength(struct ofono_netreg *netreg,
 		rsrp = in_range_or_unavailable(
 			-ril_strength->lte_signal_strength->rsrp, -140, -43);
 		if (netreg->signal_strength_data->lte_signal_strength->rsrp == rsrp) {
+			ofono_debug("%s - old rsrp = %d, new rsrp = %d", __func__,
+				netreg->signal_strength_data->lte_signal_strength->rsrp, rsrp);
 			goto done;
 		}
 

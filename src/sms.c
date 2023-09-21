@@ -273,7 +273,7 @@ static gboolean sms_in_good_coverage(struct ofono_sms *sms)
 	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
 	struct ofono_netreg *netreg = __ofono_atom_find(OFONO_ATOM_TYPE_NETREG, modem);
 
-	return ofono_netreg_get_singal_strength_level(netreg) >= SIGNAL_STRENGTH_GOOD;
+	return ofono_netreg_get_signal_strength_level(netreg) >= SIGNAL_STRENGTH_GOOD;
 }
 
 unsigned int __ofono_sms_text_watch_add(struct ofono_sms *sms,
