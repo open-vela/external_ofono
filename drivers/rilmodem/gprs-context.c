@@ -637,11 +637,6 @@ static gboolean retry_activate(gpointer user_data)
 	struct ofono_gprs_primary_context *ctx;
 	struct parcel rilp;
 
-	if (gcd->retry_act_id > 0) {
-		g_source_remove(gcd->retry_act_id);
-		gcd->retry_act_id = 0;
-	}
-
 	if (ofono_gprs_get_context_status(gc) != CONTEXT_STATUS_RETRYING) {
 		retry_activate_abort(gc);
 		return FALSE;
@@ -650,7 +645,13 @@ static gboolean retry_activate(gpointer user_data)
 	ctx = ofono_gprs_get_pri_context_by_name(gc, gcd->apn);
 	if (ctx == NULL) {
 		ofono_debug("%s - ignore retry due to invalid ctx.", __func__);
+		retry_activate_abort(gc);
 		return FALSE;
+	}
+
+	if (gcd->retry_act_id > 0) {
+		g_source_remove(gcd->retry_act_id);
+		gcd->retry_act_id = 0;
 	}
 
 	ril_util_build_activate_data_call(
