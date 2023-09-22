@@ -617,9 +617,9 @@ static int get_next_activate_retry_delay(struct gprs_context_data *gcd,
 		return -1;
 
 	if (fail_cause == PDP_FAIL_VOICE_REGISTRATION_FAIL
-			&& fail_cause == PDP_FAIL_DATA_REGISTRATION_FAIL
-			&& fail_cause == PDP_FAIL_SIGNAL_LOST
-			&& fail_cause == PDP_FAIL_RADIO_POWER_OFF)
+			|| fail_cause == PDP_FAIL_DATA_REGISTRATION_FAIL
+			|| fail_cause == PDP_FAIL_SIGNAL_LOST
+			|| fail_cause == PDP_FAIL_RADIO_POWER_OFF)
 		return -1;
 
 	if (raw_delay > 0 && raw_delay < TIME_BETWEEN_ACT_RETRIES_S * NUM_ACTIVATION_RETRIES)
