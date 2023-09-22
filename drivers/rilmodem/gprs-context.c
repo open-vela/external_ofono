@@ -648,6 +648,11 @@ static gboolean retry_activate(gpointer user_data)
 	}
 
 	ctx = ofono_gprs_get_pri_context_by_name(gc, gcd->apn);
+	if (ctx == NULL) {
+		ofono_debug("%s - ignore retry due to invalid ctx.", __func__);
+		return FALSE;
+	}
+
 	ril_util_build_activate_data_call(
 		gcd->ril, &rilp, ctx->apn, ctx->type,
 			ctx->username, ctx->password, ctx->auth_method, ctx->proto, user_data);
