@@ -4321,11 +4321,27 @@ struct ofono_gprs_primary_context *ofono_gprs_get_pri_context_by_name(
 	struct ofono_gprs *gprs = gc->gprs;
 	GSList *l;
 
+	if (apn == NULL)
+		return NULL;
+
 	for (l = gprs->contexts; l; l = l->next) {
 		struct pri_context *ctx = l->data;
+		char *ctx_name = NULL;
 
-		if (g_str_equal(ctx->name, apn) == TRUE)
+		if (ctx == NULL) {
+			continue;
+		}
+
+		ctx_name = g_strdup(ctx->name);
+		if (ctx_name == NULL)
+			continue;
+
+		if (g_str_equal(ctx_name, apn) == TRUE) {
+			g_free(ctx_name);
 			return &(ctx->context);
+		}
+
+		g_free(ctx_name);
 	}
 
 	return NULL;
