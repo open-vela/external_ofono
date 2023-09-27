@@ -903,6 +903,7 @@ static void get_call_forwarding_cb(const struct ofono_error *error, int total,
 
 	l = cf_cond_list_create(total, list);
 	cf_cond_list_print(l);
+	g_slist_free_full(l, g_free);
 
 	number = g_strdup(list->phone_number.number);
 
