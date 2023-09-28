@@ -679,6 +679,14 @@ const char *registration_status_to_string(int status)
 		return "registered";
 	case NETWORK_REGISTRATION_STATUS_ROAMING_SMS_EUTRAN:
 		return "roaming";
+	case NETWORK_REGISTRATION_STATUS_NOT_REGISTERED_EM:
+		return "unregistered_em";
+	case NETWORK_REGISTRATION_STATUS_SEARCHING_EM:
+		return "searching_em";
+	case NETWORK_REGISTRATION_STATUS_DENIED_EM:
+		return "denied_em";
+	case NETWORK_REGISTRATION_STATUS_UNKNOWN_EM:
+		return "unknown_em";
 	}
 
 	return "";
