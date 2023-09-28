@@ -73,6 +73,7 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 
 	ofono_debug("ril_registration_status_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
 	cb(&error, reg_info, ext_info, subscriber_uri, cbd->data);
+	g_free(subscriber_uri);
 	return;
 
 error:
@@ -141,6 +142,7 @@ static void ims_state_change_cb(struct ril_msg *message, gpointer user_data){
 result:
 	ofono_debug("ims_state_change_cb reg_info:%d, ext_info:%d", reg_info, ext_info);
 	ofono_ims_status_notify(ims, reg_info, ext_info, subscriber_uri);
+	g_free(subscriber_uri);
 }
 
 static void get_ims_registration_state(struct ofono_ims *ims) {
