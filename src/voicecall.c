@@ -125,7 +125,7 @@ static struct ofono_ecc_info cust_ecc_list[] = {
 {	"110", 0, 2, "460", "FFF" },
 {	"119", 0, 2, "460", "FFF" },
 {	"120", 0, 2, "460", "FFF" },
-{	"118", 0, 2, "460", "FFF" },
+{	"118", 0, 1, "460", "FFF" },
 {	"999", 0, 2, "460", "FFF" },
 {	"122", 0, 2, "460", "FFF" },
 {	"000", 0, 1, "460", "FFF" },
@@ -135,6 +135,7 @@ static struct ofono_ecc_info cust_ecc_list[] = {
 static const char *default_en_list[] = { "911", "112", NULL };
 static const char *default_en_list_no_sim[] = { "119", "118", "999", "110",
 						"08", "000", NULL };
+static const char *valid_ecc_number_whitelist[] = {"08", NULL};
 
 static void send_ciev_after_swap_callback(const struct ofono_error *error,
 								void *data);
@@ -418,6 +419,19 @@ static gboolean is_emergency_number(struct ofono_voicecall *vc,
 					const char *number)
 {
 	return g_hash_table_lookup_extended(vc->en_list, number, NULL, NULL);
+}
+
+static gboolean is_valid_ecc_number_in_whitelist(const char *number)
+{
+	const char *temp;
+	int i = 0;
+	while ((temp = valid_ecc_number_whitelist[i++]) != NULL) {
+		if (strcmp(number, temp) == 0) {
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 static void append_voicecall_properties(struct voicecall *v,
@@ -1593,11 +1607,11 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 	if (g_slist_length(vc->call_list) >= MAX_VOICE_CALLS)
 		return -EPERM;
 
-	if (valid_ussd_string(number, vc->call_list != NULL))
-		return -EINVAL;
-
-	if (!valid_long_phone_number_format(number))
-		return -EINVAL;
+	if (!is_valid_ecc_number_in_whitelist(number)) {
+		if ((valid_ussd_string(number, vc->call_list != NULL)) ||
+			!valid_long_phone_number_format(number))
+			return -EINVAL;
+	}
 
 	if (ofono_modem_get_online(modem) == FALSE)
 		return -ENETDOWN;

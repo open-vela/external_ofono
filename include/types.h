@@ -110,7 +110,23 @@ struct ofono_call {
 
 struct ofono_ecc_info {
 	char *number;
+	/* Category: the service category (From 3GPP TS24.008)
+	 * - Bit 1 (1): Police
+	 * - Bit 2 (2): Ambulance
+	 * - Bit 3 (4): Fire Brigade
+	 * - Bit 4 (8): Marine Guard
+	 * - Bit 5 (16): Mountain Rescue
+	 * - Bit 6 (32): Manually initiated eCall
+	 * - Bit 7 (64): Automatically initiated eCall
+	 * - Bit 8 (128): is spare and set to "0"
+	*/
 	unsigned int  category;
+	/* Condition: there are following values:
+	 * 0  emergency call when card absent
+	 * 1  real emergency call
+	 * 2  fake emergency call
+	 * 3  emergency call when card present
+	*/
 	unsigned int condition;
 	char mcc[OFONO_MAX_MCC_LENGTH + 1];
 	char mnc[OFONO_MAX_MNC_LENGTH + 1];
