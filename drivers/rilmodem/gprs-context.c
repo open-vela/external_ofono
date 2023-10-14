@@ -863,10 +863,11 @@ static int ril_gprs_context_probe(struct ofono_gprs_context *gc,
 static gboolean retry_activate_abort(struct ofono_gprs_context *gc)
 {
 	struct gprs_context_data *gcd = ofono_gprs_context_get_data(gc);
-	struct cb_data *cbd = gcd->active_retry_cbd;
-	ofono_gprs_context_cb_t cb = cbd->cb;
 
 	if (gcd->retry_act_id > 0) {
+		struct cb_data *cbd = gcd->active_retry_cbd;
+		ofono_gprs_context_cb_t cb = cbd->cb;
+
 		g_source_remove(gcd->retry_act_id);
 		gcd->retry_act_id = 0;
 		set_context_disconnected(gcd);
