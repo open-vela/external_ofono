@@ -34,6 +34,7 @@
 #include <ofono/plugin.h>
 #include <ofono/modem.h>
 #include <ofono/gprs-provision.h>
+#include <ofono/carrier-config.h>
 
 #include "mbpi.h"
 
@@ -99,19 +100,37 @@ static int provision_get_settings(const char *mcc, const char *mnc,
 	return 0;
 }
 
+static int provision_get_carrier_configs(const char *mcc, const char *mnc,
+				int mvno_type, const char* mvno_value,
+				struct ofono_carrier_config_data **configs)
+{
+	// TODO
+
+	return 0;
+}
+
 static struct ofono_gprs_provision_driver provision_driver = {
 	.name		= "Provisioning",
 	.get_settings	= provision_get_settings
 };
 
+static struct ofono_carrier_config_driver carrier_config_driver = {
+	.name		= "CarrierConfig",
+	.get_carrier_configs	= provision_get_carrier_configs
+};
+
 static int provision_init(void)
 {
-	return ofono_gprs_provision_driver_register(&provision_driver);
+	ofono_gprs_provision_driver_register(&provision_driver);
+	ofono_carrier_config_driver_register(&carrier_config_driver);
+
+	return 0;
 }
 
 static void provision_exit(void)
 {
 	ofono_gprs_provision_driver_unregister(&provision_driver);
+	ofono_carrier_config_driver_unregister(&carrier_config_driver);
 }
 
 OFONO_PLUGIN_DEFINE(provision, "Provisioning Plugin", VERSION,
