@@ -97,7 +97,7 @@ struct ofono_modem {
 	void			*driver_data;
 	char			*driver_type;
 	char			*name;
-	struct ofono_carrier_config_data *configs;
+	struct ofono_carrier_config_data	*configs;
 	GKeyFile		*settings;
 };
 
@@ -913,15 +913,24 @@ static void initial_status_query_cb(const struct ofono_error *error,
 static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc,
 				const char *mnc)
 {
-	ofono_info("provision_carrier_configs  mcc = %s; mnc = %s", mcc, mnc);
+	DBusConnection *conn = ofono_dbus_get_connection();
 
-	if (modem->configs)
+	ofono_info("provision_carrier_configs  mcc = %s; mnc = %s", mcc, mnc);
+	if (modem->configs) {
 		__ofono_carrier_config_free_configs(modem->configs);
+		modem->configs = NULL;
+	}
 
 	if (__ofono_carrier_config_get_configs(mcc, mnc, 0, "",
 						&modem->configs) == FALSE) {
 		ofono_warn("provision_carrier_configs failed");
 		return;
+	}
+
+	if (modem->configs) {
+		if (modem->configs->spn_name)
+			ofono_dbus_signal_property_changed(conn, modem->path, OFONO_MODEM_INTERFACE,
+					"Spn", DBUS_TYPE_STRING, &modem->configs->spn_name);
 	}
 }
 
@@ -1034,6 +1043,12 @@ void __ofono_modem_append_properties(struct ofono_modem *modem,
 
 	ofono_dbus_dict_append(dict, "RadioState", DBUS_TYPE_UINT32,
 				&modem->radio_status);
+
+	if (modem->configs) {
+		if (modem->configs->spn_name)
+			ofono_dbus_dict_append(dict, "Spn", DBUS_TYPE_STRING,
+						&modem->configs->spn_name);
+	}
 
 	info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
 	if (info) {
