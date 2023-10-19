@@ -34,6 +34,7 @@
 #include "common.h"
 #include "storage.h"
 #include "missing.h"
+#include <ofono/carrier-config.h>
 
 #define DEFAULT_POWERED_TIMEOUT (20)
 #define DEFAULT_OEM_REQ_STRING_MAX_LEN 10
@@ -96,6 +97,7 @@ struct ofono_modem {
 	void			*driver_data;
 	char			*driver_type;
 	char			*name;
+	struct ofono_carrier_config_data *configs;
 	GKeyFile		*settings;
 };
 
@@ -908,10 +910,26 @@ static void initial_status_query_cb(const struct ofono_error *error,
 	}
 }
 
+static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc,
+				const char *mnc)
+{
+	ofono_info("provision_carrier_configs  mcc = %s; mnc = %s", mcc, mnc);
+
+	if (modem->configs)
+		__ofono_carrier_config_free_configs(modem->configs);
+
+	if (__ofono_carrier_config_get_configs(mcc, mnc, 0, "",
+						&modem->configs) == FALSE) {
+		ofono_warn("provision_carrier_configs failed");
+		return;
+	}
+}
+
 static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 {
 	struct ofono_atom *atom;
 	struct ofono_modem *modem;
+	struct ofono_sim *sim;
 	GSList *l;
 
 	ofono_info("modem - %s, sim state = %d", __func__, new_state);
@@ -926,6 +944,16 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 		if (atom != NULL && atom->sim_state_change != NULL)
 			atom->sim_state_change(new_state, atom);
 	}
+
+	if (new_state != OFONO_SIM_STATE_READY)
+		return;
+
+	sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
+	if (sim == NULL)
+		return;
+
+	provision_carrier_configs(modem, ofono_sim_get_mcc(sim),
+			ofono_sim_get_mnc(sim));
 }
 
 static DBusMessage *set_property_online(struct ofono_modem *modem,
@@ -2426,6 +2454,7 @@ struct ofono_modem *ofono_modem_create(const char *name, const char *type)
 	modem->properties = g_hash_table_new_full(g_str_hash, g_str_equal,
 						g_free, unregister_property);
 	modem->timeout_hint = DEFAULT_POWERED_TIMEOUT;
+	modem->configs = NULL;
 
 	g_modem_list = g_slist_prepend(g_modem_list, modem);
 
@@ -2694,6 +2723,9 @@ void ofono_modem_remove(struct ofono_modem *modem)
 		modem_unregister(modem);
 
 	g_modem_list = g_slist_remove(g_modem_list, modem);
+
+	if (modem->configs)
+		__ofono_carrier_config_free_configs(modem->configs);
 
 	g_free(modem->driver_type);
 	g_free(modem->name);
