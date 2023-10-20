@@ -38,7 +38,7 @@ void __ofono_carrier_config_free_configs(
 
 ofono_bool_t __ofono_carrier_config_get_configs(const char *mcc,
 				const char *mnc, int mvno_type, const char* mvno_value,
-				struct ofono_carrier_config_data **configs)
+				struct ofono_carrier_config_data *configs)
 {
 	GSList *d;
 

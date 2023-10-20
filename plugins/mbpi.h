@@ -23,7 +23,11 @@ const char *mbpi_ap_type(enum ofono_gprs_context_type type);
 
 void mbpi_ap_free(struct ofono_gprs_provision_data *data);
 
+void mbpi_carrier_config_free(struct ofono_carrier_config_data *cc);
+
 GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
 			gboolean allow_duplicates, GError **error);
+
+void *mbpi_lookup_carrier_config(const char *mcc, const char *mnc, GError **error);
 
 char *mbpi_lookup_cdma_provider_name(const char *sid, GError **error);
