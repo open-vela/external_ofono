@@ -910,10 +910,58 @@ static void initial_status_query_cb(const struct ofono_error *error,
 	}
 }
 
+static void fill_carrier_config_data(struct ofono_modem *modem, DBusMessageIter *iter)
+{
+	DBusMessageIter variant;
+	DBusMessageIter array;
+	char typesig[5];
+	char arraysig[6];
+
+	arraysig[0] = DBUS_TYPE_ARRAY;
+	arraysig[1] = typesig[0] = DBUS_DICT_ENTRY_BEGIN_CHAR;
+	arraysig[2] = typesig[1] = DBUS_TYPE_STRING;
+	arraysig[3] = typesig[2] = DBUS_TYPE_VARIANT;
+	arraysig[4] = typesig[3] = DBUS_DICT_ENTRY_END_CHAR;
+	arraysig[5] = typesig[4] = '\0';
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT,
+						arraysig, &variant);
+
+	dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
+						typesig, &array);
+
+	if (modem->configs) {
+		if (modem->configs->spn_name)
+			ofono_dbus_dict_append(&array, "Spn",
+					DBUS_TYPE_STRING, &modem->configs->spn_name);
+	}
+
+	dbus_message_iter_close_container(&variant, &array);
+
+	dbus_message_iter_close_container(iter, &variant);
+}
+
+static void append_carrier_config_dict(struct ofono_modem *modem, DBusMessageIter *dict)
+{
+	DBusMessageIter entry;
+	const char *key = "CarrierConfig";
+
+	dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY,
+						NULL, &entry);
+
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+	fill_carrier_config_data(modem, &entry);
+
+	dbus_message_iter_close_container(dict, &entry);
+}
+
 static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc,
 				const char *mnc)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	const char *key = "CarrierConfig";
 
 	ofono_info("provision_carrier_configs  mcc = %s; mnc = %s", mcc, mnc);
 	if (modem->configs) {
@@ -928,9 +976,17 @@ static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc
 	}
 
 	if (modem->configs) {
-		if (modem->configs->spn_name)
-			ofono_dbus_signal_property_changed(conn, modem->path, OFONO_MODEM_INTERFACE,
-					"Spn", DBUS_TYPE_STRING, &modem->configs->spn_name);
+		signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
+				"PropertyChanged");
+
+		if (signal == NULL)
+			return;
+
+		dbus_message_iter_init_append(signal, &iter);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
+		fill_carrier_config_data(modem, &iter);
+
+		g_dbus_send_message(conn, signal);
 	}
 }
 
@@ -1044,11 +1100,8 @@ void __ofono_modem_append_properties(struct ofono_modem *modem,
 	ofono_dbus_dict_append(dict, "RadioState", DBUS_TYPE_UINT32,
 				&modem->radio_status);
 
-	if (modem->configs) {
-		if (modem->configs->spn_name)
-			ofono_dbus_dict_append(dict, "Spn", DBUS_TYPE_STRING,
-						&modem->configs->spn_name);
-	}
+	if (modem->configs)
+		append_carrier_config_dict(modem, dict);
 
 	info = __ofono_atom_find(OFONO_ATOM_TYPE_DEVINFO, modem);
 	if (info) {
