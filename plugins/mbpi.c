@@ -36,6 +36,7 @@
 #define OFONO_API_SUBJECT_TO_CHANGE
 #include <ofono/modem.h>
 #include <ofono/gprs-provision.h>
+#include <ofono/carrier-config.h>
 
 #ifndef MBPI_DATABASE
 #define MBPI_DATABASE  "/usr/share/mobile-broadband-provider-info/" \
@@ -54,6 +55,7 @@ struct gsm_data {
 	const char *match_mcc;
 	const char *match_mnc;
 	GSList *apns;
+	struct ofono_carrier_config_data *carrier_config;
 	gboolean match_found;
 	gboolean allow_duplicates;
 };
@@ -96,6 +98,12 @@ void mbpi_ap_free(struct ofono_gprs_provision_data *ap)
 	g_free(ap->message_center);
 
 	g_free(ap);
+}
+
+void mbpi_carrier_config_free(struct ofono_carrier_config_data *cc)
+{
+	g_free(cc->spn_name);
+	g_free(cc);
 }
 
 static void mbpi_g_set_error(GMarkupParseContext *context, GError **error,
@@ -370,6 +378,57 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 	g_markup_parse_context_push(context, &apn_parser, ap);
 }
 
+static void carrier_config_start(GMarkupParseContext *context, const gchar *element_name,
+			const gchar **attribute_names,
+			const gchar **attribute_values,
+			gpointer userdata, GError **error)
+{
+	struct ofono_carrier_config_data *cc_data = userdata;
+
+	if (g_str_equal(element_name, "spn"))
+		g_markup_parse_context_push(context, &text_parser, &cc_data->spn_name);
+}
+
+static void carrier_config_end(GMarkupParseContext *context, const gchar *element_name,
+			gpointer userdata, GError **error)
+{
+	if (g_str_equal(element_name, "spn"))
+		g_markup_parse_context_pop(context);
+}
+
+static void carrier_config_error(GMarkupParseContext *context, GError *error,
+			gpointer userdata)
+{
+	mbpi_carrier_config_free(userdata);
+}
+
+static const GMarkupParser carrier_config_parser = {
+	carrier_config_start,
+	carrier_config_end,
+	NULL,
+	NULL,
+	carrier_config_error,
+};
+
+static void carrier_config_handler(GMarkupParseContext *context,
+			struct gsm_data *gsm,
+			const gchar **attribute_names,
+			const gchar **attribute_values,
+			GError **error)
+{
+	struct ofono_carrier_config_data *cc_data;
+
+	if (gsm->match_found == FALSE) {
+		g_markup_parse_context_push(context, &skip_parser, NULL);
+		return;
+	}
+
+	cc_data = g_new0(struct ofono_carrier_config_data, 1);
+	cc_data->spn_name = NULL;
+
+	g_markup_parse_context_push(context, &carrier_config_parser, cc_data);
+}
+
 static void sid_handler(GMarkupParseContext *context,
 				struct cdma_data *cdma,
 				const gchar **attribute_names,
@@ -417,6 +476,9 @@ static void gsm_start(GMarkupParseContext *context, const gchar *element_name,
 					attribute_values, error);
 	} else if (g_str_equal(element_name, "apn"))
 		apn_handler(context, userdata, attribute_names,
+				attribute_values, error);
+	else if (g_str_equal(element_name, "carrierconfig"))
+		carrier_config_handler(context, userdata, attribute_names,
 				attribute_values, error);
 }
 
@@ -671,6 +733,22 @@ GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
 	}
 
 	return gsm.apns;
+}
+
+void *mbpi_lookup_carrier_config(const char *mcc, const char *mnc, GError **error)
+{
+	struct gsm_data gsm;
+
+	memset(&gsm, 0, sizeof(gsm));
+	gsm.match_mcc = mcc;
+	gsm.match_mnc = mnc;
+
+	if (mbpi_parse(&toplevel_gsm_parser, &gsm, error) == FALSE) {
+		g_free(gsm.carrier_config);
+		gsm.carrier_config = NULL;
+	}
+
+	return gsm.carrier_config;
 }
 
 char *mbpi_lookup_cdma_provider_name(const char *sid, GError **error)
