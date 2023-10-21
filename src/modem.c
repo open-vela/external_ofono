@@ -970,7 +970,7 @@ static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc
 	}
 
 	if (__ofono_carrier_config_get_configs(mcc, mnc, 0, "",
-						modem->configs) == FALSE) {
+						&modem->configs) == FALSE) {
 		ofono_warn("provision_carrier_configs failed");
 		return;
 	}
