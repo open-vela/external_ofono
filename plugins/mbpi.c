@@ -51,9 +51,15 @@ enum MBPI_ERROR {
 	MBPI_ERROR_DUPLICATE,
 };
 
+enum gsm_data_category {
+	GSM_DATA_APN = 0,
+	GSM_DATA_CARRIER_CONFIG,
+};
+
 struct gsm_data {
 	const char *match_mcc;
 	const char *match_mnc;
+	enum gsm_data_category category;
 	GSList *apns;
 	struct ofono_carrier_config_data *carrier_config;
 	gboolean match_found;
@@ -349,7 +355,7 @@ static void apn_handler(GMarkupParseContext *context, struct gsm_data *gsm,
 	const char *apn;
 	int i;
 
-	if (gsm->match_found == FALSE) {
+	if (gsm->category != GSM_DATA_APN || gsm->match_found == FALSE) {
 		g_markup_parse_context_push(context, &skip_parser, NULL);
 		return;
 	}
@@ -418,7 +424,7 @@ static void carrier_config_handler(GMarkupParseContext *context,
 {
 	struct ofono_carrier_config_data *cc_data;
 
-	if (gsm->match_found == FALSE) {
+	if (gsm->category != GSM_DATA_CARRIER_CONFIG || gsm->match_found == FALSE) {
 		g_markup_parse_context_push(context, &skip_parser, NULL);
 		return;
 	}
@@ -488,7 +494,7 @@ static void gsm_end(GMarkupParseContext *context, const gchar *element_name,
 	struct gsm_data *gsm;
 	struct ofono_gprs_provision_data *ap;
 
-	if (!g_str_equal(element_name, "apn"))
+	if (!g_str_equal(element_name, "apn") && !g_str_equal(element_name, "carrierconfig"))
 		return;
 
 	gsm = userdata;
@@ -723,6 +729,7 @@ GSList *mbpi_lookup_apn(const char *mcc, const char *mnc,
 	gsm.match_mcc = mcc;
 	gsm.match_mnc = mnc;
 	gsm.allow_duplicates = allow_duplicates;
+	gsm.category = GSM_DATA_APN;
 
 	if (mbpi_parse(&toplevel_gsm_parser, &gsm, error) == FALSE) {
 		for (l = gsm.apns; l; l = l->next)
@@ -742,6 +749,7 @@ void *mbpi_lookup_carrier_config(const char *mcc, const char *mnc, GError **erro
 	memset(&gsm, 0, sizeof(gsm));
 	gsm.match_mcc = mcc;
 	gsm.match_mnc = mnc;
+	gsm.category = GSM_DATA_CARRIER_CONFIG;
 
 	if (mbpi_parse(&toplevel_gsm_parser, &gsm, error) == FALSE) {
 		g_free(gsm.carrier_config);
