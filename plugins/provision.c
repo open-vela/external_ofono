@@ -102,7 +102,7 @@ static int provision_get_settings(const char *mcc, const char *mnc,
 
 static int provision_get_carrier_configs(const char *mcc, const char *mnc,
 				int mvno_type, const char* mvno_value,
-				struct ofono_carrier_config_data *configs)
+				struct ofono_carrier_config_data **configs)
 {
 	struct ofono_carrier_config_data *lookup_result;
 	GError *error = NULL;
@@ -119,15 +119,15 @@ static int provision_get_carrier_configs(const char *mcc, const char *mnc,
 		return -ENOENT;
 	}
 
-	configs = g_try_new0(struct ofono_carrier_config_data, 1);
-	if (configs == NULL) {
+	*configs = g_try_new0(struct ofono_carrier_config_data, 1);
+	if (*configs == NULL) {
 		ofono_error("Provisioning carrier config failed: %s", g_strerror(errno));
 		mbpi_carrier_config_free(lookup_result);
 
 		return -ENOMEM;
 	}
 
-	memcpy(configs, lookup_result, sizeof(struct ofono_carrier_config_data));
+	memcpy(*configs, lookup_result, sizeof(struct ofono_carrier_config_data));
 	mbpi_carrier_config_free(lookup_result);
 
 	return 0;
