@@ -118,7 +118,7 @@ static void ril_query_call_fwd_cb(struct ril_msg *message, gpointer user_data)
 
 		if (position >= 0)
 			position += g_ril_append_print_buf_with_offset(
-						fd->ril, position, "[%d,%d,%d,%s,%d]",
+						fd->ril, position, "[%d,%d,%d,%.5s***,%d]",
 						list[i].status,
 						list[i].cls,
 						list[i].phone_number.type,
