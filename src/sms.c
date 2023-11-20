@@ -736,6 +736,7 @@ static void tx_finished(const struct ofono_error *error, int mr, void *data)
 	struct tx_queue_entry *entry = g_queue_peek_head(sms->txq);
 	gboolean ok = error->type == OFONO_ERROR_TYPE_NO_ERROR;
 	enum message_state tx_state;
+	struct ofono_uuid entry_uuid;
 
 	ofono_debug("tx_finished %p", entry);
 
@@ -798,6 +799,7 @@ static void tx_finished(const struct ofono_error *error, int mr, void *data)
 	tx_state = MESSAGE_STATE_SENT;
 
 next_q:
+	memcpy(&entry_uuid, &entry->uuid, sizeof(entry->uuid));
 	sms_tx_queue_remove_entry(sms, g_queue_peek_head_link(sms->txq),
 					tx_state);
 
@@ -806,7 +808,7 @@ next_q:
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
 	}
 
-	message_sent_cb(sms, &entry->uuid, error, sms->pending);
+	message_sent_cb(sms, &entry_uuid, error, sms->pending);
 }
 
 static void tx_write_to_sim_finish(const struct ofono_error *error, void *data)
