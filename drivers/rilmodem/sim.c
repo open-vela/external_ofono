@@ -700,8 +700,10 @@ static void ril_imsi_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_append_print_buf(sd->ril, "{%.9s******}", imsi ? imsi : "NULL");
 	g_ril_print_response(sd->ril, message);
 
-	if (imsi == NULL)
+	if (imsi == NULL || strlen(imsi) == 0) {
+		g_free(imsi);
 		goto error;
+	}
 
 	CALLBACK_WITH_SUCCESS(cb, imsi, cbd->data);
 	g_free(imsi);
