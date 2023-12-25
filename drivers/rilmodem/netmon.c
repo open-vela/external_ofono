@@ -310,6 +310,7 @@ static void ril_netmon_remove(struct ofono_netmon *netmon)
 
 	ofono_netmon_set_data(netmon, NULL);
 	g_ril_unref(nmd->ril);
+	g_free(nmd);
 }
 
 static void ril_netmon_request_update(struct ofono_netmon *netmon,
