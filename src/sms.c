@@ -1524,7 +1524,7 @@ static const GDBusMethodTable sms_manager_methods[] = {
 			sms_get_messages) },
 	{ GDBUS_ASYNC_METHOD("InsertMessageToSim",
 			GDBUS_ARGS({ "phone_num", "s" }, { "text", "s" },
-			{ "type", "s" }, { "time_stamp", "s" }),
+			{ "type", "i" }, { "time_stamp", "s" }),
 			NULL, copy_message_to_sim) },
 	{ GDBUS_ASYNC_METHOD("DeleteMessageFromSim",
 			GDBUS_ARGS({ "index", "i" }),
