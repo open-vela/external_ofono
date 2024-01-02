@@ -4719,6 +4719,7 @@ static void ssn_mo_forwarded_notify(struct ofono_voicecall *vc,
 
 static void notify_phone_status_changed(struct ofono_voicecall *vc)
 {
+	DBusConnection *conn = ofono_dbus_get_connection();
 	DBusMessage *signal;
 	DBusMessageIter iter;
 	const char *path;
@@ -4746,6 +4747,9 @@ static void notify_phone_status_changed(struct ofono_voicecall *vc)
 		dbus_message_iter_init_append(signal, &iter);
 		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &vc->status);
 		g_dbus_send_message(ofono_dbus_get_connection(), signal);
+		ofono_dbus_signal_property_changed(conn, path,
+			OFONO_VOICECALL_MANAGER_INTERFACE, "PhoneStatus",
+			DBUS_TYPE_INT32, &vc->status);
 	}
 }
 
