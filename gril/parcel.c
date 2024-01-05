@@ -329,13 +329,15 @@ struct parcel_str_array *parcel_r_str_array(struct parcel *p)
 	if (p->malformed || num_str <= 0)
 		return NULL;
 
-	str_arr = g_try_malloc0(sizeof(*str_arr) + num_str * sizeof(char *));
+	str_arr = g_try_malloc0(sizeof(*str_arr) + (num_str + 1) * sizeof(char *));
 	if (str_arr == NULL)
 		return NULL;
 
 	str_arr->num_str = num_str;
 	for (i = 0; i < num_str; ++i)
 		str_arr->str[i] = parcel_r_string(p);
+
+	str_arr->str[i] = NULL;
 
 	if (p->malformed) {
 		parcel_free_str_array(str_arr);
