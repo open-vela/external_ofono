@@ -309,8 +309,11 @@ char **parcel_r_strv(struct parcel *p)
 
 	strv = g_new0(char *, num_str + 1);
 
-	for (i = 0; i < num_str; i++)
+	for (i = 0; i < num_str; i++) {
 		strv[i] = parcel_r_string(p);
+		if (!strv[i])
+			break;
+	}
 
 	if (p->malformed) {
 		g_strfreev(strv);
