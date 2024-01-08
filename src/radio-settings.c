@@ -210,6 +210,34 @@ static gboolean radio_band_umts_from_string(const char *str,
 	return FALSE;
 }
 
+#ifndef CONFIG_SUPPORT_RADIO_GSM
+/**
+ * @brief Only when network_type contain gsm will be filter out gsm, and return value
+ * will be TRUE, orelse do not change any network_type value and return FALSE.
+ *
+ * @param network_type
+ * @return gboolean: if true, @param network_type filter out gsm, others false.
+ */
+static gboolean network_type_filter_out_gsm(int *network_type) {
+	gboolean is_filter_out_gsm = FALSE;
+
+	switch (*network_type) {
+	case OFONO_RADIO_ACCESS_MODE_UMTS: /* "umts,gsm" -> "umts" */
+		*network_type = OFONO_RADIO_ACCESS_MODE_WCDMA_ONLY;
+		is_filter_out_gsm = TRUE;
+		break;
+	case OFONO_RADIO_ACCESS_MODE_ANY: /* "any" -> "lte,umts" */
+	case OFONO_RADIO_ACCESS_MODE_GSM: /* "gsm" -> "lte,umts" */
+	case OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA: /* "lte,umts,gsm" -> "lte,umts" */
+		*network_type = OFONO_RADIO_ACCESS_MODE_LTE_WCDMA;
+		is_filter_out_gsm = TRUE;
+		break;
+	}
+
+	return is_filter_out_gsm;
+}
+#endif
+
 static DBusMessage *radio_get_properties_reply(DBusMessage *msg,
 						struct ofono_radio_settings *rs)
 {
@@ -917,6 +945,14 @@ static void radio_load_settings(struct ofono_radio_settings *rs)
 		g_key_file_set_integer(rs->settings, SETTINGS_GROUP,
 					"TechnologyPreference", rs->mode);
 	}
+
+	#ifndef CONFIG_SUPPORT_RADIO_GSM
+	if (network_type_filter_out_gsm(&rs->mode)) {
+		ofono_info("TechnologyPreference: %d: filter out gsm", rs->mode);
+		g_key_file_set_integer(rs->settings, SETTINGS_GROUP,
+					"TechnologyPreference", rs->mode);
+	}
+	#endif
 
 	if (error) {
 		g_error_free(error);
