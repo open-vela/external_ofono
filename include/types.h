@@ -173,6 +173,8 @@ enum ofono_gprs_auth_method {
 const char *ofono_uuid_to_str(const struct ofono_uuid *uuid);
 void ofono_call_init(struct ofono_call *call);
 
+#define OFONO_MODEM_PATH_LENGTH 16
+
 #ifdef __cplusplus
 }
 #endif
