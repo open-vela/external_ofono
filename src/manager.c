@@ -34,14 +34,58 @@
 #define SETTINGS_STORE "ofonosetting"
 #define SETTINGS_GROUP "Settings"
 
-#define DEFAULT_SLOT_NOT_SET -1
+#define SLOT_NOT_SET "SLOT_NOT_SET"
 
 struct ofono_manager {
 	GKeyFile *settings;
-	int data_slot;
-	int voicecall_slot;
-	int sms_slot;
+	char data_slot[OFONO_MODEM_PATH_LENGTH];
+	char voicecall_slot[OFONO_MODEM_PATH_LENGTH];
+	char sms_slot[OFONO_MODEM_PATH_LENGTH];
 };
+
+static ofono_bool_t modem_path_compare(struct ofono_modem *modem,
+					void *userdata)
+{
+	const char *path = userdata;
+	const char *value = ofono_modem_get_path(modem);
+
+	return g_str_equal(path, value);
+}
+
+static ofono_bool_t default_modem_can_set(const char *path)
+{
+	struct ofono_modem *modem;
+	struct ofono_sim *sim;
+
+	modem = ofono_modem_find(modem_path_compare, (void *)path);
+	if (modem == NULL || !ofono_modem_get_online(modem))
+		return FALSE;
+
+	sim = ofono_modem_get_sim(modem);
+	if (ofono_sim_get_state(sim) != OFONO_SIM_STATE_READY)
+		return FALSE;
+
+	return TRUE;
+}
+
+static ofono_bool_t modem_active_compare(struct ofono_modem *modem,
+					void *userdata)
+{
+	struct ofono_sim *sim;
+	if (!ofono_modem_get_online(modem))
+		return FALSE;
+
+	sim = ofono_modem_get_sim(modem);
+	if (ofono_sim_get_state(sim) != OFONO_SIM_STATE_READY)
+		return FALSE;
+
+	return TRUE;
+}
+
+static struct ofono_modem *get_active_modem(void)
+{
+	return ofono_modem_find(modem_active_compare, NULL);
+}
 
 static void append_modem(struct ofono_modem *modem, void *userdata)
 {
@@ -94,11 +138,11 @@ static DBusMessage *manager_get_modems(DBusConnection *conn,
 	return reply;
 }
 
-static void append_properties(struct ofono_manager *mgr, DBusMessageIter *dict)
+static void append_properties(char *dds, char *dcs, char *dss, DBusMessageIter *dict)
 {
-	ofono_dbus_dict_append(dict, "DataSlot", DBUS_TYPE_INT32, &mgr->data_slot);
-	ofono_dbus_dict_append(dict, "VoiceCallSlot", DBUS_TYPE_INT32, &mgr->voicecall_slot);
-	ofono_dbus_dict_append(dict, "SmsSlot", DBUS_TYPE_INT32, &mgr->sms_slot);
+	ofono_dbus_dict_append(dict, "DataSlot", DBUS_TYPE_STRING, &dds);
+	ofono_dbus_dict_append(dict, "VoiceCallSlot", DBUS_TYPE_STRING, &dcs);
+	ofono_dbus_dict_append(dict, "SmsSlot", DBUS_TYPE_STRING, &dss);
 }
 
 static DBusMessage *manager_set_property(DBusConnection *conn,
@@ -106,8 +150,7 @@ static DBusMessage *manager_set_property(DBusConnection *conn,
 {
 	struct ofono_manager *manager = data;
 	DBusMessageIter iter, var;
-	const char *name;
-	int new_dds, new_dcs, new_dss;
+	const char *name, *new_dds, *new_dcs, *new_dss;
 
 	if (dbus_message_iter_init(msg, &iter) == FALSE)
 		return __ofono_error_invalid_args(msg);
@@ -124,62 +167,69 @@ static DBusMessage *manager_set_property(DBusConnection *conn,
 	dbus_message_iter_recurse(&iter, &var);
 
 	if (g_str_equal(name, "DataSlot") == TRUE) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_INT32)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
 			return __ofono_error_invalid_args(msg);
 
 		dbus_message_iter_get_basic(&var, &new_dds);
-		if (new_dds == manager->data_slot) {
+		if (!default_modem_can_set(new_dds))
+			return __ofono_error_invalid_args(msg);
+
+		if (g_str_equal(new_dds, manager->data_slot) == TRUE) {
 			return NULL;
 		}
 
-		manager->data_slot = new_dds;
-		g_key_file_set_integer(manager->settings, SETTINGS_GROUP, "DataSlot", new_dds);
+		strlcpy(manager->data_slot, new_dds, sizeof(manager->data_slot));
+		g_key_file_set_string(manager->settings, SETTINGS_GROUP, "DataSlot", new_dds);
 
 		g_dbus_send_reply(conn, msg, DBUS_TYPE_INVALID);
 
 		// Notify all watches of data slot changed.
 		ofono_dbus_signal_property_changed(conn, OFONO_MANAGER_PATH,
-			OFONO_MANAGER_INTERFACE, "DataSlot", DBUS_TYPE_INT32, &new_dds);
+			OFONO_MANAGER_INTERFACE, "DataSlot", DBUS_TYPE_STRING, &new_dds);
 		return NULL;
 	} else if (g_str_equal(name, "VoiceCallSlot")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_INT32)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
 			return __ofono_error_invalid_args(msg);
 
 		dbus_message_iter_get_basic(&var, &new_dcs);
+		if (!default_modem_can_set(new_dcs) && !g_str_equal(new_dcs, SLOT_NOT_SET))
+			return __ofono_error_invalid_args(msg);
 
-		if (new_dcs == manager->voicecall_slot) {
+		if (g_str_equal(new_dcs, manager->voicecall_slot) == TRUE) {
 			return NULL;
 		}
 
-		manager->voicecall_slot = new_dcs;
-		g_key_file_set_integer(manager->settings, SETTINGS_GROUP, "VoiceCallSlot", new_dcs);
+		strlcpy(manager->voicecall_slot, new_dcs, sizeof(manager->voicecall_slot));
+		g_key_file_set_string(manager->settings, SETTINGS_GROUP, "VoiceCallSlot", new_dcs);
 		storage_sync(SETTINGS_KEY, SETTINGS_STORE, manager->settings);
 
 		g_dbus_send_reply(conn, msg, DBUS_TYPE_INVALID);
 
 		// Notify all watches of voicecall slot changed.
 		ofono_dbus_signal_property_changed(conn, OFONO_MANAGER_PATH,
-			OFONO_MANAGER_INTERFACE, "VoiceCallSlot", DBUS_TYPE_INT32, &new_dcs);
+			OFONO_MANAGER_INTERFACE, "VoiceCallSlot", DBUS_TYPE_STRING, &new_dcs);
 		return NULL;
 	} else if (g_str_equal(name, "SmsSlot")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_INT32)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
 			return __ofono_error_invalid_args(msg);
 
 		dbus_message_iter_get_basic(&var, &new_dss);
+		if (!default_modem_can_set(new_dss) && !g_str_equal(new_dss, SLOT_NOT_SET))
+			return __ofono_error_invalid_args(msg);
 
-		if (new_dss == manager->sms_slot) {
+		if (g_str_equal(new_dss, manager->sms_slot) == TRUE) {
 			return NULL;
 		}
 
-		manager->sms_slot = new_dss;
-		g_key_file_set_integer(manager->settings, SETTINGS_GROUP, "SmsSlot", new_dss);
+		strlcpy(manager->sms_slot, new_dss, sizeof(manager->sms_slot));
+		g_key_file_set_string(manager->settings, SETTINGS_GROUP, "SmsSlot", new_dss);
 		storage_sync(SETTINGS_KEY, SETTINGS_STORE, manager->settings);
 
 		g_dbus_send_reply(conn, msg, DBUS_TYPE_INVALID);
 
 		// Notify all watches of sms slot changed.
 		ofono_dbus_signal_property_changed(conn, OFONO_MANAGER_PATH,
-			OFONO_MANAGER_INTERFACE, "SmsSlot", DBUS_TYPE_INT32, &new_dss);
+			OFONO_MANAGER_INTERFACE, "SmsSlot", DBUS_TYPE_STRING, &new_dss);
 
 		return NULL;
 	}
@@ -204,7 +254,7 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
 					OFONO_PROPERTIES_ARRAY_SIGNATURE,
 					&dict);
-	append_properties(manager, &dict);
+	append_properties(manager->data_slot, manager->voicecall_slot, manager->sms_slot, &dict);
 	dbus_message_iter_close_container(&iter, &dict);
 
 	return reply;
@@ -249,34 +299,46 @@ int __ofono_manager_init(void)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_manager *manager;
 	gboolean ret;
-	GError *error;
+	char *data_slot = NULL; 
+	char *voicecall_slot = NULL;
+	char *sms_slot = NULL;
+	struct ofono_modem *modem;
 
 	manager = g_try_malloc0(sizeof(struct ofono_manager));
 	if (manager == NULL)
 		return -ENOMEM;
 
 	manager->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
-	manager->data_slot = g_key_file_get_integer(
+	data_slot = g_key_file_get_string(
 		manager->settings, SETTINGS_GROUP, "DataSlot", NULL);
+	if (data_slot == NULL) {
+		modem = get_active_modem();
+		if (modem)
+			strlcpy(manager->data_slot, ofono_modem_get_path(modem), sizeof(manager->data_slot));
+		else
+			strlcpy(manager->data_slot, SLOT_NOT_SET, sizeof(manager->data_slot));
+	} else
+		strlcpy(manager->data_slot, data_slot, sizeof(manager->data_slot));
 
-	error = NULL;
-	manager->voicecall_slot = g_key_file_get_integer(
-		manager->settings, SETTINGS_GROUP, "VoiceCallSlot", &error);
+	voicecall_slot = g_key_file_get_string(
+		manager->settings, SETTINGS_GROUP, "VoiceCallSlot", NULL);
 
-	if (error) {
-		g_error_free(error);
-		manager->voicecall_slot = DEFAULT_SLOT_NOT_SET;
-	}
+	if (voicecall_slot == NULL)
+		strlcpy(manager->voicecall_slot, SLOT_NOT_SET, sizeof(manager->voicecall_slot));
+	else
+		strlcpy(manager->voicecall_slot, voicecall_slot, sizeof(manager->voicecall_slot));
 
-	error = NULL;
-	manager->sms_slot = g_key_file_get_integer(
-		manager->settings, SETTINGS_GROUP, "SmsSlot", &error);
+	sms_slot = g_key_file_get_string(
+		manager->settings, SETTINGS_GROUP, "SmsSlot", NULL);
 
-	if (error) {
-		g_error_free(error);
-		manager->sms_slot = DEFAULT_SLOT_NOT_SET;
-	}
+	if (sms_slot == NULL)
+		strlcpy(manager->sms_slot, SLOT_NOT_SET, sizeof(manager->sms_slot));
+	else
+		strlcpy(manager->sms_slot, sms_slot, sizeof(manager->sms_slot));
 
+	g_free(data_slot);
+	g_free(voicecall_slot);
+	g_free(sms_slot);
 	ret = g_dbus_register_interface(conn, OFONO_MANAGER_PATH,
 					OFONO_MANAGER_INTERFACE,
 					manager_methods, manager_signals,
