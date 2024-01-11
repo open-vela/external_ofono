@@ -2639,6 +2639,12 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH)
 		return __ofono_error_invalid_format(msg);
 
+	if (protocal < OFONO_GPRS_PROTO_IP || protocal > OFONO_GPRS_PROTO_IPV4V6)
+		return __ofono_error_invalid_args(msg);
+
+	if (authtype < OFONO_GPRS_AUTH_METHOD_CHAP || authtype > OFONO_GPRS_AUTH_METHOD_NONE)
+		return __ofono_error_invalid_args(msg);
+
 	if (name == NULL)
 		name = gprs_context_default_name(type);
 
