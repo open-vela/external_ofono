@@ -210,6 +210,19 @@ static gboolean radio_band_umts_from_string(const char *str,
 	return FALSE;
 }
 
+static int radio_get_default_prefer_type(void) {
+	const char *prefer_type_env;
+	int prefer_type;
+
+	prefer_type_env = getenv("OFONO_PREFER_NETWORK_TYPE");
+	if (prefer_type_env == NULL
+		|| !radio_access_mode_from_string(prefer_type_env, &prefer_type)) {
+		prefer_type = OFONO_RADIO_ACCESS_MODE_LTE_WCDMA;
+	}
+	ofono_info("radio setting get default prefer type=%d", prefer_type);
+	return prefer_type;
+}
+
 #ifndef CONFIG_SUPPORT_RADIO_GSM
 /**
  * @brief Only when network_type contain gsm will be filter out gsm, and return value
@@ -825,7 +838,7 @@ struct ofono_radio_settings *ofono_radio_settings_create(struct ofono_modem *mod
 
 	rs->provisioned = FALSE;
 
-	rs->mode = OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA;
+	rs->mode = radio_get_default_prefer_type();
 
 	rs->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_RADIO_SETTINGS,
 						radio_settings_remove, rs);
@@ -941,7 +954,7 @@ static void radio_load_settings(struct ofono_radio_settings *rs)
 					"TechnologyPreference", &error);
 
 	if (error || radio_access_mode_to_string(rs->mode) == NULL) {
-		rs->mode = OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA;
+		rs->mode = radio_get_default_prefer_type();
 		g_key_file_set_integer(rs->settings, SETTINGS_GROUP,
 					"TechnologyPreference", rs->mode);
 	}
