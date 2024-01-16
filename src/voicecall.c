@@ -134,7 +134,7 @@ static struct ofono_ecc_info cust_ecc_list[] = {
 
 static const char *default_en_list[] = { "911", "112", NULL };
 static const char *default_en_list_no_sim[] = { "119", "118", "999", "110",
-						"08", "000", NULL };
+						"08", "000", "120", "122", NULL };
 static const char *valid_ecc_number_whitelist[] = {"08", NULL};
 
 static void send_ciev_after_swap_callback(const struct ofono_error *error,
