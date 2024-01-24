@@ -110,7 +110,7 @@ void ofono_debug(const char *format, ...)
 
 	va_start(ap, format);
 
-	vsyslog(LOG_DEBUG, format, ap);
+	vsyslog(LOG_INFO, format, ap);
 
 	va_end(ap);
 }
