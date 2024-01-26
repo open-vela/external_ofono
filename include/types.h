@@ -100,6 +100,7 @@ struct ofono_call {
 	int type;
 	int direction;
 	int status;
+	int mpty;
 	struct ofono_phone_number phone_number;
 	struct ofono_phone_number called_number;
 	char name[OFONO_MAX_CALLER_NAME_LENGTH + 1];

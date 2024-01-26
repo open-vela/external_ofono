@@ -2884,6 +2884,8 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 	}
 
 	vc->call_list = g_slist_insert_sorted(vc->call_list, v, call_compare);
+	if (v->call->mpty)
+		vc->multiparty_list = g_slist_insert_sorted(vc->multiparty_list, v, call_compare);
 
 	voicecalls_emit_call_added(vc, v);
 	voicecalls_emit_call_changed(vc, v);
