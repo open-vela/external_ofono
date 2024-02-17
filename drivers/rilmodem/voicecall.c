@@ -93,6 +93,15 @@ struct hold_before_dial_req {
 static void send_one_dtmf(struct ril_voicecall_data *vd);
 static void clear_dtmf_queue(struct ril_voicecall_data *vd);
 
+static void dial_error(struct ril_voicecall_data *vd)
+{
+	struct ofono_error error;
+	decode_ril_error(&error, "ERROR");
+	vd->cb(&error, vd->data);
+	vd->cb = NULL;
+	vd->data = NULL;
+}
+
 static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct lastcause_req *reqdata = user_data;
@@ -218,6 +227,17 @@ no_calls:
 	n = calls;
 	o = vd->calls;
 
+	/*
+	 *  This situation means that the call has been hung up
+	 *  by network before CLCC is issued, and the
+	 *  callback of dial needs to be executed to return an
+	 *  error, otherwise subsequent operations will be blocked.
+	 */
+	if (!n && !o && vd->cb) {
+		ofono_debug("CLCC response empty while dial pending, notify error!");
+		dial_error(vd);
+	}
+
 	while (n || o) {
 		nc = n ? n->data : NULL;
 		oc = o ? o->data : NULL;
@@ -292,8 +312,22 @@ no_calls:
 			 */
 			if (nc->status == CALL_STATUS_INCOMING &&
 					(vd->flags & FLAG_NEED_CLIP)) {
-				if (nc->type)
+				if (nc->type) {
+					/*
+					 * The callback function of dial is set, and
+					 * there is no call corresponding to dial in
+					 * CLCC result, indicating that the call initiated
+					 * by dial has been hung up by network,and
+					 * the callback function of dial needs to
+					 * be executed to return an error, otherwise
+					 * subsequent operations will be blocked.
+					 */
+					if (vd->cb) {
+						ofono_debug("CLCC response empty while dial pending though exist incoming call, notify error");
+						dial_error(vd);
+					}
 					ofono_voicecall_notify(vc, nc);
+				}
 
 				vd->flags &= ~FLAG_NEED_CLIP;
 			} else if (memcmp(nc, oc, sizeof(*nc)) && nc->type)
