@@ -1488,6 +1488,9 @@ static DBusMessage *modem_enable_or_disable(struct ofono_modem *modem, ofono_boo
 	if (!enable && modem->modem_state <= MODEM_STATE_AWARE)
 		return __ofono_error_not_allowed(msg);
 
+	if (!enable && ofono_modem_get_emergency_mode(modem))
+		return __ofono_error_emergency_active(msg);
+
 	modem->pending = dbus_message_ref(msg);
 	modem->driver->enable_modem(modem, enable,
 		enable ? modem_enable_cb : modem_disable_cb, modem);
