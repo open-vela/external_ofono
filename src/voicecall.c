@@ -2754,14 +2754,6 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	if (l) {
 		vc->multiparty_list =
 			g_slist_remove(vc->multiparty_list, call);
-
-		if (vc->multiparty_list->next == NULL) { /* Size == 1 */
-			struct voicecall *v = vc->multiparty_list->data;
-
-			voicecall_emit_multiparty(v, FALSE);
-			g_slist_free(vc->multiparty_list);
-			vc->multiparty_list = NULL;
-		}
 	}
 
 	vc->release_list = g_slist_remove(vc->release_list, call);
