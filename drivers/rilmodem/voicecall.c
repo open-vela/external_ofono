@@ -165,6 +165,9 @@ static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 			message->error != RIL_E_RADIO_NOT_AVAILABLE) {
 		ofono_error("We are polling CLCC and received an error");
 		ofono_error("All bets are off for call management");
+		if (vd->cb)
+			dial_error(vd);
+
 		return;
 	}
 
