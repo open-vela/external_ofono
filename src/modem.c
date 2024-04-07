@@ -99,6 +99,10 @@ struct ofono_modem {
 	char			*name;
 	struct ofono_carrier_config_data	*configs;
 	GKeyFile		*settings;
+	int			enable;
+	int			module_mask;
+	int			from_event_id;
+	int			to_event_id;
 };
 
 struct ofono_devinfo {
@@ -693,6 +697,14 @@ static gboolean modem_is_always_online(struct ofono_modem *modem)
 	return FALSE;
 }
 
+static void enable_modem_abnormal_event_default_cb(const struct ofono_error *error, int status, void *data)
+{
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when enable modem abnormal event.");
+	} else {
+		ofono_debug("set_modem_abnormal_event_report_default_cb:%d", status);
+	}
+}
 static void common_online_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_modem *modem = data;
@@ -833,6 +845,28 @@ static void modem_enable_cb(const struct ofono_error *error, void *data)
 
 	set_radio_power(modem, modem->online,
 			modem->online ? common_online_cb : common_offline_cb);
+}
+
+static void enable_modem_abnormal_event_cb(const struct ofono_error *error, int status, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when setting modem abnormal event.");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+        }
+
+	reply = dbus_message_new_method_return(modem->pending);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
 }
 
 static void modem_disable_cb(const struct ofono_error *error, void *data)
@@ -1514,6 +1548,46 @@ static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
 	return modem_enable_or_disable(modem, FALSE, conn, msg);
 }
 
+static DBusMessage *enable_modem_abnormal_event(DBusConnection *conn,
+						DBusMessage *msg, void *data)
+{
+        struct ofono_modem *modem = data;
+	int enable;
+	int module_mask;
+	int from_event_id;
+	int to_event_id;
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	if (modem->powered != TRUE) {
+		ofono_error("modem is not powered");
+		return __ofono_error_not_allowed(msg);
+	}
+
+	if (modem->driver->enable_modem_abnormal_event == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (dbus_message_get_args(msg, NULL,
+		DBUS_TYPE_INT32, &enable,
+		DBUS_TYPE_INT32, &module_mask,
+		DBUS_TYPE_INT32, &from_event_id,
+		DBUS_TYPE_INT32, &to_event_id,
+		DBUS_TYPE_INVALID) == FALSE)
+			return __ofono_error_invalid_args(msg);
+
+	modem->enable = enable;
+	modem->module_mask = module_mask;
+	modem->from_event_id = from_event_id;
+	modem->to_event_id = to_event_id;
+	modem->pending = dbus_message_ref(msg);
+
+	modem->driver->enable_modem_abnormal_event(modem, enable, module_mask,
+			from_event_id, to_event_id, enable_modem_abnormal_event_cb, modem);
+
+	return NULL;
+}
+
 static DBusMessage *modem_get_status(DBusConnection *conn, DBusMessage *msg,
 					void *data)
 {
@@ -1720,6 +1794,9 @@ static const GDBusMethodTable modem_methods[] = {
 			GDBUS_ARGS({ "request", "as" }),
 			GDBUS_ARGS({ "response", "as" }),
 			modem_invoke_oem_request_strings) },
+	{ GDBUS_ASYNC_METHOD("EnableModemAbnormalEvent",
+			GDBUS_ARGS({ "enable", "i" }, { "module_mask", "i" }, {"from_event_id", "i"}, {"to_event_id", "i"}),
+			GDBUS_ARGS({ "result", "i" }), enable_modem_abnormal_event)},
 	{ GDBUS_METHOD("HandleCommand",
 			GDBUS_ARGS({ "atom", "i" }, { "command", "i" }),
 			NULL, modem_handle_command) },
@@ -2977,6 +3054,12 @@ void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 		break;
 	case 10:
 		modem->radio_status = RADIO_STATUS_ON;
+
+		if (modem->driver->enable_modem_abnormal_event != NULL) {
+			modem->driver->enable_modem_abnormal_event(modem, modem->enable, modem->module_mask,
+								modem->from_event_id, modem->to_event_id,
+								enable_modem_abnormal_event_default_cb, modem);
+		}
 
 		/* if radio state doesn't match user setting, sync it again */
 		if (!modem->online)
