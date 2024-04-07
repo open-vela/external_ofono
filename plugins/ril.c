@@ -56,6 +56,7 @@
 #include <ofono/gprs-context.h>
 #include <ofono/audio-settings.h>
 #include <ofono/types.h>
+#include <ofono/abnormal-event.h>
 
 #include <gril/gril.h>
 
@@ -450,6 +451,20 @@ static void ril_oem_hook_raw(struct ril_msg *message, gpointer user_data)
 	g_free(response);
 }
 
+static void ril_abnormal_event(struct ril_msg *message, gpointer user_data)
+{
+	struct parcel rilp;
+	int type_id;
+	char *data;
+	int data_len;
+
+	g_ril_init_parcel(message, &rilp);
+	type_id = parcel_r_int32(&rilp);
+	data_len = parcel_r_int32(&rilp);
+	data = parcel_r_string(&rilp);
+	ofono_handle_abnormal_event(type_id, data, data_len);
+}
+
 static int create_gril(struct ofono_modem *modem)
 {
 	struct ril_data *rd = ofono_modem_get_data(modem);
@@ -496,6 +511,9 @@ static int create_gril(struct ofono_modem *modem)
 
 	g_ril_register(rd->ril, RIL_UNSOL_OEM_HOOK_RAW,
 			ril_oem_hook_raw, modem);
+
+	g_ril_register(rd->ril, RIL_UNSOL_ABNORMAL_EVENT,
+			ril_abnormal_event, modem);
 
 	return 0;
 }
@@ -622,6 +640,19 @@ static void ril_enable_modem_cb(struct ril_msg *message, gpointer user_data)
 	CALLBACK_WITH_SUCCESS(cb, cbd->data);
 }
 
+static void ril_enable_abnormal_event_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_enable_abnormal_event_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("enable/disable abnormal event fail");
+		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
+	} else {
+		CALLBACK_WITH_SUCCESS(cb, 0, cbd->data);
+	}
+}
+
 static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 		ofono_modem_enable_cb_t cb, void *data)
 {
@@ -642,6 +673,28 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_enable_modem_abnormal_event(struct ofono_modem *modem, ofono_bool_t enable,
+		int module_mask, int from_event_id, int to_event_id, ofono_modem_enable_abnormal_event_cb_t cb, void *data)
+{
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	ofono_debug("enable abnormal event switch,%d,%d,%d,%d", enable, module_mask, from_event_id, to_event_id);
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 4);
+	parcel_w_int32(&rilp, enable);
+	parcel_w_int32(&rilp, module_mask);
+	parcel_w_int32(&rilp, from_event_id);
+	parcel_w_int32(&rilp, to_event_id);
+	if (g_ril_send(rd->ril, RIL_REQUEST_ENABLE_ABNORMAL_EVENT, &rilp,
+			ril_enable_abnormal_event_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, -1, data);
 }
 
 static void ril_query_modem_status_cb(struct ril_msg *message, gpointer user_data)
@@ -812,6 +865,7 @@ static struct ofono_modem_driver ril_driver = {
 	.query_modem_status = ril_query_modem_status,
 	.request_oem_raw = ril_request_oem_hook_raw,
 	.request_oem_strings = ril_request_oem_hook_strings,
+	.enable_modem_abnormal_event = ril_enable_modem_abnormal_event,
 };
 
 /*

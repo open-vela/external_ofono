@@ -451,6 +451,8 @@ const char *ril_request_id_to_string(int req)
 		return "RIL_REQUEST_CONFERENCE_DIAL";
 	case RIL_REQUEST_SET_EMERGENCY_NUMBER:
 		return "RIL_REQUEST_SET_EMERGENCY_NUMBER";
+	case RIL_REQUEST_ENABLE_ABNORMAL_EVENT:
+		return "RIL_REQUEST_ENABLE_ABNORMAL_EVENT";
 	default:
 		return "<INVALID>";
 	}
@@ -541,6 +543,8 @@ const char *ril_unsol_request_to_string(int request)
 		return "RIL_UNSOL_EMERGENCY_NUMBER_LIST";
 	case RIL_UNSOL_UICC_APPLICATIONS_ENABLEMENT_CHANGED:
 		return "RIL_UNSOL_UICC_APPLICATIONS_ENABLEMENT_CHANGED";
+	case RIL_UNSOL_ABNORMAL_EVENT:
+		return "RIL_UNSOL_ABNORMAL_EVENT";
 	default:
 		return "<unknown request>";
 	}
