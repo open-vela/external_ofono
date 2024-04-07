@@ -62,6 +62,9 @@ typedef void (*ofono_modem_oem_req_raw_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_modem_oem_req_str_cb_t)(const struct ofono_error *error,
 		char **resp, int len, void *data);
 
+typedef void (*ofono_modem_enable_abnormal_event_cb_t)(
+		const struct ofono_error *error, int status, void *data);
+
 struct ofono_modem_driver {
 	const char *name;
 	enum ofono_modem_type modem_type;
@@ -115,6 +118,11 @@ struct ofono_modem_driver {
 	/* Request oem strings */
 	void (*request_oem_strings)(struct ofono_modem *modem, char *oem_req[],
 				int req_len, ofono_modem_oem_req_str_cb_t cb, void *data);
+
+	/* Set modem abnormal event report*/
+	void (*enable_modem_abnormal_event)(struct ofono_modem *modem, ofono_bool_t enable,
+			int module_mask, int from_event_id, int to_event_id,
+			ofono_modem_enable_abnormal_event_cb_t cb, void *data);
 };
 
 void ofono_modem_add_interface(struct ofono_modem *modem,
