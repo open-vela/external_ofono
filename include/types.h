@@ -123,10 +123,10 @@ struct ofono_ecc_info {
 	*/
 	unsigned int  category;
 	/* Condition: there are following values:
-	 * 0  emergency call when card absent
-	 * 1  real emergency call
-	 * 2  fake emergency call
-	 * 3  emergency call when card present
+	 * 0  emergency call when card absent,not emergency call when card present
+	 * 1  real emergency call regardless of card present or card absent
+	 * 2  fake emergency call when card present,real emergency call when card absent
+	 * 3  emergency call card present,not emergency call when card absen
 	*/
 	unsigned int condition;
 	char mcc[OFONO_MAX_MCC_LENGTH + 1];
