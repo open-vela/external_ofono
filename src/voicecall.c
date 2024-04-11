@@ -50,6 +50,7 @@
 
 #define SETTINGS_STORE "voicecall"
 #define SETTINGS_GROUP "Settings"
+#define PLMN_GROUP "Plmn"
 
 static GSList *g_drivers = NULL;
 
@@ -3198,21 +3199,63 @@ static void set_cust_ecc_callback(const struct ofono_error *error, void *data)
 	}
 }
 
+char* get_last_used_mnc_mcc(char *type) {
+	char* type_value = NULL;
+	GKeyFile *keyfile =  g_key_file_new();
+
+	if (g_key_file_load_from_file(keyfile,STORAGEDIR "/mccmnc",0,NULL)) {
+		//find saved mcc mnc
+		if(g_key_file_has_key(keyfile,PLMN_GROUP,type,NULL)) {
+			type_value = g_strdup(g_key_file_get_string(keyfile,PLMN_GROUP,type,NULL));
+			ofono_debug("load %s = %s",type,type_value);
+		}
+	}
+	g_key_file_free(keyfile);
+	return type_value;
+}
+
+void save_used_mnc_mcc(const char *mcc, const char *mnc) {
+	GKeyFile *keyfile =  g_key_file_new();
+
+	//find saved mcc mnc
+	g_key_file_set_string(keyfile,PLMN_GROUP,"mcc",mcc);
+	g_key_file_set_string(keyfile,PLMN_GROUP,"mnc",mnc);
+
+	if (!g_key_file_save_to_file(keyfile,STORAGEDIR "/mccmnc",NULL)) {
+		ofono_debug("save mcc,mnc to keyfile fail");
+	}
+	ofono_debug("save mcc=%s,mnc=%s",mcc,mnc);
+	g_key_file_free(keyfile);
+
+}
+
 static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 {
 	struct ofono_ecc_info *ecc;
 	unsigned int ecc_db_len;
 	GSList *current_ecc_list = NULL;
 	GSList *l;
-	const char *mcc;
-	const char *mnc;
+	char *mcc;
+	char *mnc;
+	gboolean load_from_key_file = FALSE;
 
-	mcc = ofono_sim_get_mcc(vc->sim);
-	mnc = ofono_sim_get_mnc(vc->sim);
-	if (mcc == NULL || mnc == NULL) {
-		return;
+	mcc = (char*)ofono_sim_get_mcc(vc->sim);
+	mnc = (char*)ofono_sim_get_mnc(vc->sim);
+	if (mcc == NULL || mnc == NULL || !strcmp(mcc,"") || !strcmp(mnc,"")) {
+		mcc = get_last_used_mnc_mcc("mcc");
+		mnc = get_last_used_mnc_mcc("mnc");
+		if(mcc == NULL || mnc == NULL ||
+			!strcmp(mcc,"") || !strcmp(mnc,"")) {
+			mcc = "460";
+			mnc = "FFF";
+			ofono_debug("use default mcc mnc");
+		} else {
+			load_from_key_file = TRUE;
+		}
+	} else {
+		save_used_mnc_mcc(mcc,mnc);
 	}
-
+	ofono_debug("mcc=%s,mnc=%s",mcc,mnc);
 	free_cust_ecc_numbers(vc);
 
 	ecc_db_len = sizeof(cust_ecc_list) / sizeof(struct ofono_ecc_info);
@@ -3240,6 +3283,12 @@ static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 		}
 	}
 
+	if(load_from_key_file) {
+		g_free(mcc);
+		g_free(mnc);
+	}
+
+	ofono_debug("current_ecc_list len:%d",g_slist_length(current_ecc_list));
 	if (g_slist_length(current_ecc_list) > 0) {
 		vc->cust_ecc_list = current_ecc_list;
 
@@ -3437,6 +3486,15 @@ static void voicecall_remove(struct ofono_atom *atom)
 	g_free(vc);
 }
 
+static void vc_radio_state_change(int state, void *data)
+{
+	struct ofono_atom *atom = data;
+	struct ofono_voicecall *vc = __ofono_atom_get_data(atom);
+	if (state == RADIO_STATUS_ON) {
+		voicecall_load_cust_ecc(vc);
+	}
+}
+
 struct ofono_voicecall *ofono_voicecall_create(struct ofono_modem *modem,
 						unsigned int vendor,
 						const char *driver,
@@ -3458,6 +3516,7 @@ struct ofono_voicecall *ofono_voicecall_create(struct ofono_modem *modem,
 	vc->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_VOICECALL,
 						voicecall_remove, vc);
 
+	__ofono_atom_add_radio_state_watch(vc->atom, vc_radio_state_change);
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_voicecall_driver *drv = l->data;
 
@@ -3519,11 +3578,17 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 		break;
 	case OFONO_SIM_STATE_READY:
 		voicecall_load_settings(vc);
-		voicecall_load_cust_ecc(vc);
+		//voicecall_load_cust_ecc(vc);
 		break;
 	case OFONO_SIM_STATE_LOCKED_OUT:
 		voicecall_close_settings(vc);
 		break;
+	}
+
+	//load cust ecc to modem and make sure fake ecc 120/122 can be dialed when no register
+	ofono_debug("sim state:%d",new_state);
+	if (new_state != OFONO_SIM_STATE_NOT_PRESENT) {
+		voicecall_load_cust_ecc(vc);
 	}
 }
 
