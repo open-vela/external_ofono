@@ -30,6 +30,8 @@
 #include <glib.h>
 #include <gdbus.h>
 
+#include <kvdb.h>
+
 #include "ofono.h"
 
 #include "common.h"
@@ -1276,6 +1278,44 @@ static void set_registration_denial_reason(struct ofono_netreg *netreg, int deni
 					DBUS_TYPE_UINT16, &dbus_denial_reason);
 }
 
+static void set_rat_value_to_env(int tech)
+{
+	char *rat_type = NULL;
+	size_t rat_type_length = 0;
+
+	switch (tech) {
+		case RADIO_TECH_GPRS:
+		case RADIO_TECH_EDGE:
+		case RADIO_TECH_GSM:
+			rat_type = "2g";
+			break;
+		case RADIO_TECH_UMTS:
+		case RADIO_TECH_HSDPA:
+		case RADIO_TECH_HSUPA:
+		case RADIO_TECH_HSPA:
+			rat_type = "3g";
+			break;
+		case RADIO_TECH_LTE:
+		case RADIO_TECH_LTE_CA:
+			rat_type = "4g";
+			break;
+		case RADIO_TECH_NR:
+			rat_type = "5g";
+			break;
+		case RADIO_TECH_UNKNOWN:
+			rat_type = "none";
+			break;
+		default:
+			rat_type = "others";
+			break;
+	}
+
+	rat_type_length = strlen(rat_type);
+	if (property_set_buffer("TELEPHONY_TYPE", rat_type, rat_type_length) != 0) {
+		ofono_error("Failed to set TELEPHONY_TYPE property");
+	}
+}
+
 static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -1290,6 +1330,7 @@ static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
 					"Technology", DBUS_TYPE_INT32,
 					&netreg->technology);
+	set_rat_value_to_env(tech);
 }
 
 static void set_nitz_time(struct ofono_netreg *netreg,
