@@ -274,6 +274,7 @@ static void ril_display_state_cb(struct ril_msg *message, gpointer user_data)
 	struct ofono_radio_settings *rs = cbd->user;
 	struct radio_data *rd = ofono_radio_settings_get_data(rs);
 	ofono_radio_settings_fast_dormancy_set_cb_t cb = cbd->cb;
+	ofono_debug("%s, error_type: %d", __func__, (int)message->error);
 
 	if (message->error == RIL_E_SUCCESS) {
 		g_ril_print_response_no_args(rd->ril, message);
@@ -302,6 +303,7 @@ static void ril_set_fast_dormancy(struct ofono_radio_settings *rs,
 	g_ril_append_print_buf(rd->ril, "(%d)", enable);
 
 	rd->pending_fd = enable;
+	ofono_debug("%s, enable: %d", __func__, (int)enable);
 
 	if (g_ril_send(rd->ril, RIL_REQUEST_SCREEN_STATE, &rilp,
 			ril_display_state_cb, cbd, g_free) > 0)
