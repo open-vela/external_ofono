@@ -339,6 +339,7 @@ static void radio_fast_dormancy_set_callback(const struct ofono_error *error,
 {
 	struct ofono_radio_settings *rs = data;
 	DBusMessage *reply;
+	ofono_debug("%s, error_type: %d", __func__, (int)error->type);
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("Error setting fast dormancy");
@@ -725,6 +726,7 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 		rs->pending = dbus_message_ref(msg);
 		rs->fast_dormancy_pending = target;
 
+		ofono_debug("Set fast_dormancy: %d", target);
 		rs->driver->set_fast_dormancy(rs, target,
 					radio_fast_dormancy_set_callback, rs);
 		return NULL;
