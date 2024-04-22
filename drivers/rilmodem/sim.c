@@ -1561,7 +1561,7 @@ static gboolean ril_sim_register(gpointer user)
 {
 	struct ofono_sim *sim = user;
 
-	ofono_debug("ril_sim_register");
+	DBG("");
 
 	ofono_sim_register(sim);
 

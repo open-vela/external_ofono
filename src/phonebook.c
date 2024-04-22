@@ -65,13 +65,6 @@ struct ofono_phonebook {
 	GTree *fdn_entries;	/* Container of fdn_entry structures */
 };
 
-struct ofono_phonebook_temp_info {
-	struct ofono_modem *modem;
-	unsigned int vendor;
-	const char *driver;
-	void *data;
-};
-
 struct phonebook_number {
 	char *number;
 	int type;
@@ -893,29 +886,12 @@ static void phonebook_remove(struct ofono_atom *atom)
 	g_free(pb);
 }
 
-static void phonebook_probe_retry(struct ofono_atom *atom,
-		enum ofono_atom_watch_condition cond, void *data)
-{
-	ofono_debug("phonebook probe retry");
-	if (cond == OFONO_ATOM_WATCH_CONDITION_REGISTERED) {
-		struct ofono_phonebook_temp_info *temp_info = data;
-		if(temp_info->modem == NULL || temp_info->driver == NULL
-				|| temp_info->data == NULL){
-			ofono_debug("probe retry fail as unexpected NULL value");
-		}
-		ofono_phonebook_create(temp_info->modem,temp_info->vendor,temp_info->driver,temp_info->data);
-		__ofono_modem_remove_atom_watch(temp_info->modem,OFONO_ATOM_TYPE_SIM);
-		g_free(temp_info);
-	}
-}
-
 struct ofono_phonebook *ofono_phonebook_create(struct ofono_modem *modem,
 						unsigned int vendor,
 						const char *driver, void *data)
 {
 	struct ofono_phonebook *pb;
 	GSList *l;
-	struct ofono_phonebook_temp_info  *temp_info;
 
 	/* Check for Phonebook interface support */
 	if (!is_ofono_interface_supported(PHONEBOOK_INTERFACE)) {
@@ -941,22 +917,8 @@ struct ofono_phonebook *ofono_phonebook_create(struct ofono_modem *modem,
 		if (g_strcmp0(drv->name, driver))
 			continue;
 
-		if (drv->probe(pb, vendor, data) < 0) {
-			/*
-			*add phonebook probe retry function to make sure phonebook can be create.
-			*first phonebook probe retry will fail when when
-			*ofono_sim_register(atom_unregister) is execute later than ril_phonebook_probe.
-			 */
-			ofono_debug("phonebook probe fail");
-			temp_info = g_try_new0(struct ofono_phonebook_temp_info, 1);
-			temp_info->modem = modem;
-			temp_info->vendor = vendor;
-			temp_info->driver = driver;
-			temp_info->data =  data;
-			__ofono_modem_add_atom_watch(modem,OFONO_ATOM_TYPE_SIM,
-					phonebook_probe_retry, temp_info, NULL);
+		if (drv->probe(pb, vendor, data) < 0)
 			continue;
-		}
 
 		pb->driver = drv;
 		break;
