@@ -88,6 +88,7 @@ struct ril_data {
 	struct ofono_sim *sim;
 	struct ofono_radio_settings *radio_settings;
 	int rild_connect_retries;
+	unsigned int sim_watch_for_phonebook;
 };
 
 static void ril_debug(const char *str, void *user_data)
@@ -197,6 +198,35 @@ void ril_remove(struct ofono_modem *modem)
 	g_free(rd);
 }
 
+void phonebook_create(struct ofono_atom *atom,
+			enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_modem *modem = data;
+
+	ofono_debug("phonebook create");
+
+	struct ril_data *rd = ofono_modem_get_data(modem);
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_REGISTERED) {
+		ofono_phonebook_create(modem,rd->vendor,RILMODEM,modem);
+	}else {
+		if (rd->sim_watch_for_phonebook) {
+			__ofono_modem_remove_atom_watch(modem,rd->sim_watch_for_phonebook);
+			rd->sim_watch_for_phonebook = 0;
+		}
+	}
+}
+
+void ofono_phonebook_pre_create(struct ofono_modem *modem)
+{
+	ofono_debug("phonebook pre create");
+
+	struct ril_data *rd = ofono_modem_get_data(modem);
+
+	rd->sim_watch_for_phonebook = __ofono_modem_add_atom_watch(modem,OFONO_ATOM_TYPE_SIM,
+							phonebook_create, modem, NULL);
+}
+
 void ril_pre_sim(struct ofono_modem *modem)
 {
 	struct ril_data *rd = ofono_modem_get_data(modem);
@@ -207,6 +237,8 @@ void ril_pre_sim(struct ofono_modem *modem)
 	ofono_devinfo_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_voicecall_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_call_volume_create(modem, rd->vendor, RILMODEM, rd->ril);
+
+	ofono_phonebook_pre_create(modem);
 
 	rd->sim = ofono_sim_create(modem, rd->vendor, RILMODEM, rd->ril);
 }
@@ -229,7 +261,6 @@ void ril_post_sim(struct ofono_modem *modem)
 
 	ofono_call_forwarding_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_stk_create(modem, rd->vendor, RILMODEM, rd->ril);
-	ofono_phonebook_create(modem, rd->vendor, RILMODEM, modem);
 }
 
 void ril_post_online(struct ofono_modem *modem)
