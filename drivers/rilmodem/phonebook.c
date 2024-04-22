@@ -838,15 +838,18 @@ static void fdn_export_and_return(gboolean ok, struct cb_data *cbd)
 	if (l != NULL) {
 		struct pb_ref_rec *ref = l->data;
 		const struct pb_file_info *f_info = fdn_info(ref->pb_files);
+		if(f_info != NULL) {
+			pbd->fdn_entries = ref->phonebook; /*ref->phonebook cannot be recycled here*/
+			ofono_phonebook_set_fdn_data(pb, pbd->fdn_entries);
 
-		pbd->fdn_entries = ref->phonebook; /*ref->phonebook cannot be recycled here*/
-		ofono_phonebook_set_fdn_data(pb, pbd->fdn_entries);
+			pbd->fdn_file_length = f_info->file_length;
+			pbd->fdn_record_length = f_info->record_length;
 
-		pbd->fdn_file_length = f_info->file_length;
-		pbd->fdn_record_length = f_info->record_length;
-
-		g_slist_free_full(ref->pending_records, g_free);
-		g_slist_free_full(ref->pb_files, g_free);
+			g_slist_free_full(ref->pending_records, g_free);
+			g_slist_free_full(ref->pb_files, g_free);
+		} else {
+			ofono_debug("pb_file_info is null");
+		}
 	}
 
 	g_slist_free_full(pbd->pb_fdn_refs, g_free);
