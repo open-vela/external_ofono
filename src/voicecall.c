@@ -3246,6 +3246,8 @@ static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 		mnc = get_last_used_mnc_mcc("mnc");
 		if(mcc == NULL || mnc == NULL ||
 			!strcmp(mcc,"") || !strcmp(mnc,"")) {
+			g_free(mcc);
+			g_free(mnc);
 			mcc = "460";
 			mnc = "FFF";
 			ofono_debug("use default mcc mnc");
