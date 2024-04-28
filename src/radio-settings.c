@@ -59,12 +59,10 @@ struct ofono_radio_settings {
 	void *driver_data;
 	struct ofono_atom *atom;
 	ofono_bool_t provisioned;
-	ofono_bool_t is_set_fast_dormancy;
 };
 
 static void radio_band_set_callback_at_reg(const struct ofono_error *error, void *data);
 static void radio_mode_set_callback_at_reg(const struct ofono_error *error, void *data);
-static void radio_fast_dormancy_set_callback_at_reg(const struct ofono_error *error, void *data);
 static void radio_load_settings(struct ofono_radio_settings *rs);
 static void radio_close_settings(struct ofono_radio_settings *rs);
 
@@ -773,15 +771,6 @@ static void radio_state_change(int state, void *data)
 						radio_mode_set_callback_at_reg, rs);
 		}
 	}
-
-	if ((state == RADIO_STATUS_ON || state == RADIO_STATUS_OFF)
-		&& !rs->is_set_fast_dormancy) {
-		if (rs->driver->set_fast_dormancy != NULL) {
-			rs->driver->set_fast_dormancy(rs, rs->fast_dormancy_pending,
-				radio_fast_dormancy_set_callback_at_reg, rs);
-			rs->is_set_fast_dormancy = TRUE;
-		}
-	}
 }
 
 int ofono_radio_settings_driver_register(const struct ofono_radio_settings_driver *d)
@@ -910,18 +899,6 @@ static void radio_band_set_callback_at_reg(const struct ofono_error *error,
 	 * Continue with atom register even if request fail at modem
 	 * ofono_radio_finish_register called by radio_mode_set_callback_at_reg
 	 */
-}
-
-static void radio_fast_dormancy_set_callback_at_reg(const struct ofono_error *error,
-						void *data)
-{
-	struct ofono_radio_settings *rs = data;
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("Error setting radio fast dormancy register time");
-		return;
-	}
-
-	radio_set_fast_dormancy(rs, rs->fast_dormancy_pending);
 }
 
 static void radio_load_settings(struct ofono_radio_settings *rs)
