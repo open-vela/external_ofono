@@ -720,9 +720,6 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 		dbus_message_iter_get_basic(&var, &value);
 		target = value;
 
-		if (rs->fast_dormancy_pending == target)
-			return dbus_message_new_method_return(msg);
-
 		rs->pending = dbus_message_ref(msg);
 		rs->fast_dormancy_pending = target;
 
