@@ -525,7 +525,7 @@ static void flush_atoms(struct ofono_modem *modem, enum modem_state new_state)
 	GSList *prev;
 	GSList *tmp;
 
-	DBG("");
+	ofono_debug("flush_atoms");
 
 	prev = NULL;
 	cur = modem->atoms;
@@ -1995,6 +1995,7 @@ static void query_svn_cb(const struct ofono_error *error,
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		goto out;
 
+	g_free(info->svn);
 	info->svn = g_strdup(svn);
 
 	ofono_dbus_signal_property_changed(conn, path, OFONO_MODEM_INTERFACE,
@@ -2022,6 +2023,7 @@ static void query_serial_cb(const struct ofono_error *error,
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		goto out;
 
+	g_free(info->serial);
 	info->serial = g_strdup(serial);
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -2050,6 +2052,7 @@ static void query_revision_cb(const struct ofono_error *error,
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		goto out;
 
+	g_free(info->revision);
 	info->revision = g_strdup(revision);
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -2081,6 +2084,7 @@ static void query_model_cb(const struct ofono_error *error,
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		goto out;
 
+	g_free(info->model);
 	info->model = g_strdup(model);
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -2113,6 +2117,7 @@ static void query_manufacturer_cb(const struct ofono_error *error,
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
 		goto out;
 
+	g_free(info->manufacturer);
 	info->manufacturer = g_strdup(manufacturer);
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -2278,6 +2283,7 @@ struct ofono_devinfo *ofono_devinfo_create(struct ofono_modem *modem,
 static void devinfo_unregister(struct ofono_atom *atom)
 {
 	struct ofono_devinfo *info = __ofono_atom_get_data(atom);
+	struct ofono_modem *modem = __ofono_atom_get_modem(atom);
 
 	g_free(info->manufacturer);
 	info->manufacturer = NULL;
@@ -2293,6 +2299,11 @@ static void devinfo_unregister(struct ofono_atom *atom)
 
 	g_free(info->svn);
 	info->svn = NULL;
+
+	if (info->dun_watch) {
+		__ofono_modem_remove_atom_watch(modem, info->dun_watch);
+		info->dun_watch = 0;
+	}
 }
 
 void ofono_devinfo_register(struct ofono_devinfo *info)
