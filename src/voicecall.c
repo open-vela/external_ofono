@@ -3206,7 +3206,9 @@ char* get_last_used_mnc_mcc(char *type) {
 	if (g_key_file_load_from_file(keyfile,STORAGEDIR "/mccmnc",0,NULL)) {
 		//find saved mcc mnc
 		if(g_key_file_has_key(keyfile,PLMN_GROUP,type,NULL)) {
-			type_value = g_strdup(g_key_file_get_string(keyfile,PLMN_GROUP,type,NULL));
+			char* temp = g_key_file_get_string(keyfile,PLMN_GROUP,type,NULL);
+			type_value = g_strdup(temp);
+			g_free(temp);
 			ofono_debug("load %s = %s",type,type_value);
 		}
 	}

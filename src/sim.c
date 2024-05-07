@@ -2263,6 +2263,7 @@ static void sim_imsi_obtained(struct ofono_sim *sim, const char *imsi)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(sim->atom);
 
+	g_free(sim->imsi);
 	sim->imsi = g_strdup(imsi);
 
 	ofono_dbus_signal_property_changed(conn, path,
@@ -2554,6 +2555,7 @@ static void sim_efust_read_cb(int ok, int length, int record,
 		goto out;
 	}
 
+	g_free(sim->efust);
 	sim->efust = g_memdup2(data, length);
 	sim->efust_length = length;
 

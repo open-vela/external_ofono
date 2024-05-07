@@ -178,6 +178,8 @@ static void ims_close_settings_from_imsi(struct ofono_ims *ims)
 		g_free(ims->imsi);
 		ims->imsi = NULL;
 		ims->imsi_settings = NULL;
+		g_free(ims->ph_number_from_setting);
+		ims->ph_number_from_setting = NULL;
 	}
 }
 
