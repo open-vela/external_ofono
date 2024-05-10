@@ -902,6 +902,13 @@ struct ofono_phonebook *ofono_phonebook_create(struct ofono_modem *modem,
 	if (driver == NULL)
 		return NULL;
 
+	if(__ofono_modem_find_atom(modem, OFONO_ATOM_TYPE_PHONEBOOK) != NULL) {
+		//phonebook create when sim atom create,phonebook atom is removed in flush atom with sim atom together
+		ofono_error("unexpected state:OFONO_ATOM_TYPE_PHONEBOOK atom exist");
+		return NULL;
+	}
+
+
 	pb = g_try_new0(struct ofono_phonebook, 1);
 
 	if (pb == NULL)
