@@ -165,6 +165,7 @@ int ril_create(struct ofono_modem *modem, enum ofono_ril_vendor vendor)
 	rd->vendor = vendor;
 	rd->ofono_online = FALSE;
 	rd->radio_state = RADIO_STATE_OFF;
+	rd->sim_watch_for_phonebook = 0;
 
 	lte_cap = getenv("OFONO_RIL_RAT_LTE") ? TRUE : FALSE;
 	ofono_modem_set_boolean(modem, MODEM_PROP_LTE_CAPABLE, lte_cap);
@@ -193,6 +194,11 @@ void ril_remove(struct ofono_modem *modem)
 	if (!rd)
 		return;
 
+	if (rd->sim_watch_for_phonebook) {
+		__ofono_modem_remove_atom_watch(modem, rd->sim_watch_for_phonebook);
+		rd->sim_watch_for_phonebook = 0;
+	}
+
 	g_ril_unref(rd->ril);
 
 	g_free(rd);
@@ -208,12 +214,7 @@ void phonebook_create(struct ofono_atom *atom,
 	struct ril_data *rd = ofono_modem_get_data(modem);
 
 	if (cond == OFONO_ATOM_WATCH_CONDITION_REGISTERED) {
-		ofono_phonebook_create(modem,rd->vendor,RILMODEM,modem);
-	}else {
-		if (rd->sim_watch_for_phonebook) {
-			__ofono_modem_remove_atom_watch(modem,rd->sim_watch_for_phonebook);
-			rd->sim_watch_for_phonebook = 0;
-		}
+		ofono_phonebook_create(modem, rd->vendor, RILMODEM, modem);
 	}
 }
 
@@ -223,7 +224,7 @@ void ofono_phonebook_pre_create(struct ofono_modem *modem)
 
 	struct ril_data *rd = ofono_modem_get_data(modem);
 
-	rd->sim_watch_for_phonebook = __ofono_modem_add_atom_watch(modem,OFONO_ATOM_TYPE_SIM,
+	rd->sim_watch_for_phonebook = __ofono_modem_add_atom_watch(modem, OFONO_ATOM_TYPE_SIM,
 							phonebook_create, modem, NULL);
 }
 
@@ -238,7 +239,8 @@ void ril_pre_sim(struct ofono_modem *modem)
 	ofono_voicecall_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_call_volume_create(modem, rd->vendor, RILMODEM, rd->ril);
 
-	ofono_phonebook_pre_create(modem);
+	if(rd->sim_watch_for_phonebook == 0)
+		ofono_phonebook_pre_create(modem);
 
 	rd->sim = ofono_sim_create(modem, rd->vendor, RILMODEM, rd->ril);
 }
