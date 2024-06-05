@@ -191,6 +191,7 @@ static void ril_write_sms_to_sim_cb(struct ril_msg *message, gpointer user_data)
 	ofono_sms_write_to_sim_cb_t cb = cbd->cb;
 	struct sms_data *sd = cbd->user;
 
+	g_ril_print_response_no_args(sd->ril, message);
 	if (message->error == RIL_E_SUCCESS) {
 		CALLBACK_WITH_SUCCESS(cb, cbd->data);
 	} else {
@@ -439,8 +440,6 @@ static void ril_sms_write_to_sim(struct ofono_sms *sms, const unsigned char *pdu
 		ofono_error("SMSC address specified (smsc_len %d); "
 				"NOT-IMPLEMENTED", smsc_len);
 
-	parcel_w_string(&rilp, NULL); /* SMSC address; NULL == default */
-
 	/*
 	 * TPDU:
 	 *
@@ -451,6 +450,7 @@ static void ril_sms_write_to_sim(struct ofono_sms *sms, const unsigned char *pdu
 	encode_hex_own_buf(pdu + smsc_len, tpdu_len, 0, hexbuf);
 
 	parcel_w_string(&rilp, hexbuf); /*write sms pdu*/
+	parcel_w_string(&rilp, NULL);   /* SMSC address; NULL == default */
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_WRITE_SMS_TO_SIM, &rilp,
 			ril_write_sms_to_sim_cb, cbd, g_free) > 0)
