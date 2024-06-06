@@ -37,7 +37,7 @@
 #include <ofono/log.h>
 #include <ofono/modem.h>
 #include <ofono/voicecall.h>
-
+#include <ofono/dfx.h>
 #include <gril/gril.h>
 
 #include "common.h"
@@ -110,7 +110,10 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 	enum ofono_disconnect_reason reason = OFONO_DISCONNECT_REASON_ERROR;
 	int last_cause = CALL_FAIL_ERROR_UNSPECIFIED;
 	struct parcel rilp;
+	int REASON_DESC_SIZE = 15;
+	char reason_desc[REASON_DESC_SIZE];
 
+	memset(reason_desc, 0, sizeof(reason_desc));
 	g_ril_init_parcel(message, &rilp);
 
 	if (rilp.size < sizeof(int32_t))
@@ -122,8 +125,13 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_append_print_buf(vd->ril, "{%d}", last_cause);
 	g_ril_print_response(vd->ril, message);
 
-	if (last_cause == CALL_FAIL_NORMAL || last_cause == CALL_FAIL_BUSY)
+	if (last_cause == CALL_FAIL_NORMAL || last_cause == CALL_FAIL_BUSY) {
 		reason = OFONO_DISCONNECT_REASON_REMOTE_HANGUP;
+	} else {
+		snprintf(reason_desc, REASON_DESC_SIZE - 1, "modem fail:%d", last_cause);
+		OFONO_DFX_CALL_INFO(OFONO_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
+				OFONO_MEDIA_UNKNOW, OFONO_HANGUP_FAIL, reason_desc);
+	}
 
 done:
 	ofono_debug("Call %d ended with reason %d", reqdata->id, reason);
@@ -256,6 +264,11 @@ no_calls:
 				ofono_voicecall_disconnected(vc, oc->id,
 					OFONO_DISCONNECT_REASON_ERROR,
 					NULL);
+				OFONO_DFX_CALL_INFO(OFONO_TYPE_UNKNOW,
+						oc->direction ? OFONO_TERMINATE : OFONO_ORIGINATE,
+						oc->type ? OFONO_VOICE : OFONO_VIDEO,
+						OFONO_ONGOING_FAIL,
+						"modem fail:RIL_E_RADIO_NOT_AVAILABLE");
 			} else {
 				/* Get disconnect cause before calling core */
 				struct lastcause_req *reqdata =
@@ -397,6 +410,30 @@ out:
 		req->cb(&error, req->data);
 }
 
+static void hangup_generic_cb(struct ril_msg *message, gpointer user_data)
+{
+	OFONO_DFX_CALL_INFO_IF(message->error != RIL_E_SUCCESS, OFONO_TYPE_UNKNOW,
+			OFONO_DIRECTION_UNKNOW, OFONO_VOICE,
+			OFONO_HANGUP_FAIL, "modem fail");
+	generic_cb(message, user_data);
+}
+
+static void answer_generic_cb(struct ril_msg *message, gpointer user_data)
+{
+	OFONO_DFX_CALL_INFO_IF(message->error != RIL_E_SUCCESS, OFONO_NORMAL_CALL,
+			OFONO_TERMINATE, OFONO_VOICE,
+			OFONO_DIAL_FAIL, "modem fail");
+	generic_cb(message, user_data);
+}
+
+static void conference_generic_cb(struct ril_msg *message, gpointer user_data)
+{
+	OFONO_DFX_CALL_INFO_IF(message->error != RIL_E_SUCCESS,
+			OFONO_CONFERENCE_CALL, OFONO_ORIGINATE,
+			OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
+	generic_cb(message, user_data);
+}
+
 static int ril_template(const guint rreq, struct ofono_voicecall *vc,
 			GRilResponseFunc func, unsigned int affected_types,
 			gpointer pdata, ofono_voicecall_cb_t cb, void *data)
@@ -477,6 +514,9 @@ static void rild_conference_cb(struct ril_msg *message, gpointer user_data)
 		decode_ril_error(&error, "OK");
 	} else {
 		decode_ril_error(&error, "FAIL");
+		OFONO_DFX_CALL_INFO(OFONO_CONFERENCE_CALL,
+				OFONO_ORIGINATE, OFONO_VOICE,
+				OFONO_DIAL_FAIL, "modem fail");
 		goto out;
 	}
 
@@ -570,6 +610,11 @@ static void dial(struct ofono_voicecall *vc,
 		return;
 	}
 
+	OFONO_DFX_CALL_INFO(ril_request == RIL_REQUEST_EMERGENCY_DIAL
+			? OFONO_EMERGENCY_CALL : OFONO_NORMAL_CALL,
+			OFONO_ORIGINATE, OFONO_VOICE, OFONO_DIAL_FAIL,
+			"send RIL Request fail");
+
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, data);
 }
@@ -652,6 +697,7 @@ void ril_hangup_all(struct ofono_voicecall *vc, ofono_voicecall_cb_t cb,
 	struct ofono_error error;
 	struct ofono_call *call;
 	GSList *l;
+	int ret = 0;
 
 	for (l = vd->calls; l; l = l->next) {
 		call = l->data;
@@ -664,8 +710,8 @@ void ril_hangup_all(struct ofono_voicecall *vc, ofono_voicecall_cb_t cb,
 			 * right thing for some operators, causing the
 			 * caller to hear a fast busy signal.
 			 */
-			ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND,
-					vc, generic_cb, AFFECTED_STATES_ALL,
+			ret = ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND,
+					vc, hangup_generic_cb, AFFECTED_STATES_ALL,
 					NULL, NULL, NULL);
 		} else {
 			struct parcel rilp;
@@ -679,7 +725,7 @@ void ril_hangup_all(struct ofono_voicecall *vc, ofono_voicecall_cb_t cb,
 			g_ril_append_print_buf(vd->ril, "(%u)", call->id);
 
 			/* Send request to RIL */
-			ril_template(RIL_REQUEST_HANGUP, vc, generic_cb,
+			ret = ril_template(RIL_REQUEST_HANGUP, vc, hangup_generic_cb,
 					AFFECTED_STATES_ALL, &rilp, NULL, NULL);
 		}
 	}
@@ -687,6 +733,8 @@ void ril_hangup_all(struct ofono_voicecall *vc, ofono_voicecall_cb_t cb,
 	/* TODO: Deal in case of an error at hungup */
 	decode_ril_error(&error, "OK");
 	cb(&error, data);
+	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
+			OFONO_VOICE, OFONO_HANGUP_FAIL, "send RIL Request fail");
 }
 
 void ril_hangup_specific(struct ofono_voicecall *vc,
@@ -694,6 +742,7 @@ void ril_hangup_specific(struct ofono_voicecall *vc,
 {
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 	struct parcel rilp;
+	int ret;
 
 	DBG("Hanging up call with id %d", id);
 
@@ -706,8 +755,10 @@ void ril_hangup_specific(struct ofono_voicecall *vc,
 	vd->local_release |= (1 << id);
 
 	/* Send request to RIL */
-	ril_template(RIL_REQUEST_HANGUP, vc, generic_cb,
+	ret = ril_template(RIL_REQUEST_HANGUP, vc, hangup_generic_cb,
 			0, &rilp, cb, data);
+	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
+			OFONO_VOICE, OFONO_HANGUP_FAIL, "send RIL Request fail");
 }
 
 void ril_call_state_notify(struct ril_msg *message, gpointer user_data)
@@ -797,10 +848,14 @@ static void ril_ringback_tone_notify(struct ril_msg *message, gpointer user_data
 
 void ril_answer(struct ofono_voicecall* vc, ofono_voicecall_cb_t cb, void* data)
 {
+	int ret;
+
 	DBG("Answering current call");
 
 	/* Send request to RIL */
-	ril_template(RIL_REQUEST_ANSWER, vc, generic_cb, 0, NULL, cb, data);
+	ret = ril_template(RIL_REQUEST_ANSWER, vc, answer_generic_cb, 0, NULL, cb, data);
+	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_NORMAL_CALL, OFONO_TERMINATE, OFONO_VOICE,
+			OFONO_ANSWER_FAIL, "send RIL Request fail");
 }
 
 static void ril_send_dtmf_cb(struct ril_msg *message, gpointer user_data)
@@ -884,7 +939,11 @@ static void clear_dtmf_queue(struct ril_voicecall_data *vd)
 void ril_create_multiparty(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
-	ril_template(RIL_REQUEST_CONFERENCE, vc, generic_cb, 0, NULL, cb, data);
+	int ret;
+
+	ret = ril_template(RIL_REQUEST_CONFERENCE, vc, conference_generic_cb, 0, NULL, cb, data);
+	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_CONFERENCE_CALL, OFONO_ORIGINATE, OFONO_VOICE,
+			OFONO_DIAL_FAIL, "send RIL Request fail");
 }
 
 void ril_private_chat(struct ofono_voicecall *vc, int id,
@@ -923,15 +982,23 @@ void ril_hold_all_active(struct ofono_voicecall *vc,
 void ril_release_all_held(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
-	ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
-			generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
+	int ret;
+
+	ret = ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
+			hangup_generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
+	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
+			OFONO_VOICE, OFONO_HANGUP_FAIL, "send RIL Request fail");
 }
 
 void ril_release_all_active(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
-	ril_template(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND, vc,
-			generic_cb, AFFECTED_STATES_FG, NULL, cb, data);
+	int ret;
+
+	ret = ril_template(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND, vc,
+			hangup_generic_cb, AFFECTED_STATES_FG, NULL, cb, data);
+	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
+			OFONO_VOICE, OFONO_HANGUP_FAIL, "send RIL Request fail");
 }
 
 void ril_set_udub(struct ofono_voicecall *vc,
@@ -965,6 +1032,8 @@ void ril_conference_request(const guint rreq, struct ofono_voicecall *vc,
 	if (g_ril_send(vd->ril, rreq, &rilp, func, cbd, g_free) == 0) {
 		g_free(cbd);
 		CALLBACK_WITH_FAILURE(cb, data);
+		OFONO_DFX_CALL_INFO(OFONO_CONFERENCE_CALL, OFONO_ORIGINATE,
+				OFONO_VOICE, OFONO_DIAL_FAIL, "send RIL Request fail");
 	}
 }
 

@@ -31,7 +31,7 @@
 
 #include <glib.h>
 #include <gdbus.h>
-
+#include <ofono/dfx.h>
 #include "ofono.h"
 
 #include "common.h"
@@ -1584,8 +1584,14 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 	} else {
 		struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 
-		if (is_emergency_number(vc, number) == TRUE)
+		if (is_emergency_number(vc, number) == TRUE) {
 			__ofono_modem_dec_emergency_mode(modem);
+			OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE,
+					OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
+		} else {
+			OFONO_DFX_CALL_INFO(OFONO_NORMAL_CALL, OFONO_ORIGINATE,
+					OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
+		}
 
 		reply = __ofono_error_failed(vc->pending);
 	}
@@ -1630,8 +1636,11 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
 		return -EBUSY;
 
-	if (is_emergency_number(vc, number) == TRUE)
+	if (is_emergency_number(vc, number) == TRUE) {
 		__ofono_modem_inc_emergency_mode(modem);
+		OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE,
+				OFONO_VOICE, OFONO_NORMAL, "NA");
+	}
 
 	string_to_phone_number(number, &ph);
 
