@@ -2005,8 +2005,10 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 static void ril_enable_uicc_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct sim_data *sd = cbd->user;
 	ofono_sim_enable_uicc_cb_t cb = cbd->cb;
 
+	g_ril_print_response_no_args(sd->ril, message);
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("%s: RIL_REQUEST_ENABLE_UICC_APPLICATIONS reply failure: %s",
 				__func__,
@@ -2026,6 +2028,7 @@ static void ril_enable_uicc(struct ofono_sim *sim, int enable,
 	struct parcel rilp;
 
 	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 1); // count
 	parcel_w_int32(&rilp, enable);
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_ENABLE_UICC_APPLICATIONS, &rilp,
@@ -2041,6 +2044,7 @@ static void ril_query_uicc_enablement_cb(struct ril_msg *message, gpointer user_
 {
 	struct cb_data *cbd = user_data;
 	ofono_sim_uicc_enablement_query_cb_t cb = cbd->cb;
+	struct sim_data *sd = cbd->user;
 	struct parcel rilp;
 	int enabled;
 
@@ -2049,15 +2053,17 @@ static void ril_query_uicc_enablement_cb(struct ril_msg *message, gpointer user_
 				__func__,
 				ril_error_to_string(message->error));
 
-		CALLBACK_WITH_FAILURE(cb, -1, user_data);
+		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
 		return;
 	}
 
 	g_ril_init_parcel(message, &rilp);
-
+	parcel_r_int32(&rilp);
 	enabled = parcel_r_int32(&rilp);
+	g_ril_append_print_buf(sd->ril, "{%d}", enabled);
+	g_ril_print_response(sd->ril, message);
 
-	CALLBACK_WITH_SUCCESS(cb, enabled, user_data);
+	CALLBACK_WITH_SUCCESS(cb, enabled, cbd->data);
 }
 
 static void ril_query_uicc_enablement(struct ofono_sim *sim,
