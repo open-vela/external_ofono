@@ -29,6 +29,7 @@ enum ofono_abnormal_event {
 	OFONO_ABNORMAL_CC,
 	OFONO_ABNORMAL_XCAP,
 	OFONO_ABNORMAL_DATA,
+	OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP,
 
 	OFONO_LIMITED_SERVICE_CAMP_EVENT = 200,
 	OFONO_REDIRECT_EVENT,
@@ -108,6 +109,8 @@ struct ofono_abnormal_oos {
 	1:OOS_TYPE_RESYNC_FAIL
 	2:OOS_TYPE_RESEL_FAIL
 	3:OOS_TYPE_L1_ABN_IND
+	4:OOS_TYPE_MORMAL_TO_OOS
+	5:OOS_TYPE_OOS_DIRECTLY
 	*/
 	unsigned int oos_type;
 };
@@ -275,10 +278,9 @@ struct ofono_abnormal_sip_reject {
 	3：DEBUG_SIP_RE_INVITE
 	4：DEBUG_SIP_PRACK
 	5：DEBUG_SIP_UPDATE
-	6：DEBUG_SIP_CANCEL
-	7：DEBUG_SIP_MESSAGE
-	8：DEBUG_SIP_REFER
-	9：DEBUG_SIP_INFO
+	6：DEBUG_SIP_MESSAGE
+	7：DEBUG_SIP_REFER
+	8：DEBUG_SIP_INFO
 	*/
 	unsigned int sip_method;
 	unsigned int resp_code;
@@ -375,6 +377,20 @@ struct ofono_abnormal_data {
 	1: DEBUG_DL_DATA_INTERRUPTION
 	*/
 	struct ofono_cell_quality cell_quality;
+};
+
+//OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP=22
+struct ofono_abnormal_call_end_reason_from_sip {
+	unsigned int sub;
+	/*
+	2:REASON_RTP_RTCP_TIMEOUT
+	3:REASON_MEDIA_BEARER_LOSS
+	4:REASON_SIP_TIMEOUT_NO_ACK
+	5:REASON_SIP_RESP_TIMEOUT
+	6:REASON_CALL_SETUP_TIMEOUT
+	7:REASON_REDIRECTION_FAILURE
+	*/
+	unsigned int reason_type;
 };
 
 //LIMITED_SERVICE_CAMP_EVENT=200

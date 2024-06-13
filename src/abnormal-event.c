@@ -215,6 +215,12 @@ void ofono_handle_abnormal_event(int type_id, char *data, int data_len)
 					data_data->cell_quality.rsrp, data_data->cell_quality.rsrq, data_data->cell_quality.sinr, data_data->cell_quality.rssi);
 			}
 			break;
+		case OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP:
+			{
+				struct ofono_abnormal_call_end_reason_from_sip *sip_end_reason_data = (struct ofono_abnormal_call_end_reason_from_sip *)covert_data;
+
+				ofono_debug("ofono_handle_abnormal_event,sub=%u,reason_type=%u",sip_end_reason_data->sub, sip_end_reason_data->reason_type);
+			}
 		case OFONO_LIMITED_SERVICE_CAMP_EVENT://200
 			{
 				struct ofono_abnormal_limited_service *limited_service_data = (struct ofono_abnormal_limited_service *)covert_data;
