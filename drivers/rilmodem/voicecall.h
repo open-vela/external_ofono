@@ -19,6 +19,16 @@
  *
  */
 
+struct ofono_voicecall_duration_info {
+	time_t start_time;
+	unsigned int record_level;
+	time_t level1;
+	time_t level2;
+	time_t level3;
+	time_t level4;
+	guint report_time_id;
+};
+
 struct ril_voicecall_data {
 	GSList *calls;
 	/* Call local hangup indicator, one bit per call (1 << call_id) */
@@ -32,6 +42,7 @@ struct ril_voicecall_data {
 	gchar *tone_queue;
 	gboolean tone_pending;
 	gboolean suppress_clcc_poll;
+	struct ofono_voicecall_duration_info call_duration_info;
 };
 
 int ril_voicecall_probe(struct ofono_voicecall *vc, unsigned int vendor,

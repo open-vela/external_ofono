@@ -551,10 +551,14 @@ static void ussd_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_ussd *ussd = data;
 	DBusMessage *reply;
+	char reason_desc[REASON_DESC_SIZE];
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("ussd request failed with error: %s",
 				telephony_error_to_str(error));
+		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
+		OFONO_DFX_SS_INFO("ss:ussd:request", reason_desc);
+	}
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
 		ussd_change_state(ussd, USSD_STATE_ACTIVE);
@@ -624,10 +628,14 @@ static void ussd_response_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_ussd *ussd = data;
 	DBusMessage *reply;
+	char reason_desc[REASON_DESC_SIZE];
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("ussd response failed with error: %s",
 				telephony_error_to_str(error));
+		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
+		OFONO_DFX_SS_INFO("ss:ussd:response", reason_desc);
+	}
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
 		ussd_change_state(ussd, USSD_STATE_RESPONSE_SENT);
@@ -650,8 +658,10 @@ static DBusMessage *ussd_respond(DBusConnection *conn, DBusMessage *msg,
 	unsigned char buf[160];
 	long num_packed;
 
-	if (ussd->pending)
+	if (ussd->pending) {
+		OFONO_DFX_SS_INFO("ss:ussd:response", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	if (ussd->state != USSD_STATE_USER_ACTION)
 		return __ofono_error_not_active(msg);
@@ -681,6 +691,7 @@ static void ussd_cancel_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_ussd *ussd = data;
 	DBusMessage *reply;
+	char reason_desc[REASON_DESC_SIZE];
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("ussd cancel failed with error: %s",
@@ -688,6 +699,8 @@ static void ussd_cancel_callback(const struct ofono_error *error, void *data)
 
 		reply = __ofono_error_failed(ussd->cancel);
 		__ofono_dbus_pending_reply(&ussd->cancel, reply);
+		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
+		OFONO_DFX_SS_INFO("ss:ussd:cancel", "modem fail");
 
 		return;
 	}

@@ -1356,7 +1356,7 @@ static void set_call_waiting_cb(const struct ofono_error *error, void *data)
 
 		__ofono_dbus_pending_reply(&cs->pending,
 					__ofono_error_failed(cs->pending));
-
+		OFONO_DFX_SS_INFO("ss:set call waiting", "modem fail");
 		return;
 	}
 
@@ -1380,6 +1380,7 @@ static void get_call_waiting_cb(const struct ofono_error *error,
 			reply = __ofono_error_failed(cs->pending);
 			__ofono_dbus_pending_reply(&cs->pending, reply);
 		}
+		OFONO_DFX_SS_INFO("ss:get call waiting", "modem fail");
 
 		return;
 	}
@@ -1410,8 +1411,10 @@ static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
 	if (cs->driver == NULL || cs->driver->cw_set == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (cs->pending)
+	if (cs->pending) {
+		OFONO_DFX_SS_INFO("ss:set call waiting", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_INT32, &enable,
@@ -1434,8 +1437,10 @@ static DBusMessage *cs_get_call_waiting(DBusConnection *conn,
 	if (cs->driver == NULL || cs->driver->cw_query == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (cs->pending)
+	if (cs->pending) {
+		OFONO_DFX_SS_INFO("ss:get call waiting", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	cs->pending = dbus_message_ref(msg);
 
@@ -1454,7 +1459,7 @@ static void set_clir_cb(const struct ofono_error *error, void *data)
 
 		__ofono_dbus_pending_reply(&cs->pending,
 					__ofono_error_failed(cs->pending));
-
+		OFONO_DFX_SS_INFO("ss:set clir", "modem fail");
 		return;
 	}
 
@@ -1475,7 +1480,7 @@ static void get_clir_cb(const struct ofono_error *error,
 
 		__ofono_dbus_pending_reply(&cs->pending,
 					__ofono_error_failed(cs->pending));
-
+		OFONO_DFX_SS_INFO("ss:get clir", "modem fail");
 		return;
 	}
 
@@ -1497,8 +1502,10 @@ static DBusMessage *cs_set_clir(DBusConnection *conn,
 	if (cs->driver == NULL || cs->driver->clir_set == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (cs->pending)
+	if (cs->pending) {
+		OFONO_DFX_SS_INFO("ss:set clir", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_STRING, &status,
@@ -1524,8 +1531,10 @@ static DBusMessage *cs_get_clir(DBusConnection *conn,
 	if (cs->driver == NULL || cs->driver->clir_query == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (cs->pending)
+	if (cs->pending) {
+		OFONO_DFX_SS_INFO("ss:get clir", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	cs->pending = dbus_message_ref(msg);
 

@@ -322,12 +322,16 @@ static void cb_ss_set_lock_callback(const struct ofono_error *error,
 		void *data)
 {
 	struct ofono_call_barring *cb = data;
+	char reason_desc[REASON_DESC_SIZE];
 
+	memset(reason_desc, 0, sizeof(reason_desc));
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("Enabling/disabling Call Barring via SS failed with err:%s",
 			telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cb->pending,
 			__ofono_error_from_error(error, cb->pending));
+		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
+		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", reason_desc);
 		return;
 	}
 
@@ -483,6 +487,7 @@ static void cb_set_passwd_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_call_barring *cb = data;
 	DBusMessage *reply;
+	char reason_desc[REASON_DESC_SIZE];
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(cb->pending);
@@ -490,6 +495,8 @@ static void cb_set_passwd_callback(const struct ofono_error *error, void *data)
 		DBG("Changing Call Barring password via SS failed with err: %s",
 				telephony_error_to_str(error));
 		reply = __ofono_error_from_error(error, cb->pending);
+		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
+		OFONO_DFX_SS_INFO("ss:set callbarring:change password", reason_desc);
 	}
 
 	__ofono_dbus_pending_reply(&cb->pending, reply);
@@ -651,6 +658,8 @@ static void get_query_lock_callback(const struct ofono_error *error,
 
 		if (cb->query_next == CB_ALL_END)
 			cb->flags |= CALL_BARRING_FLAG_CACHED;
+	} else {
+		OFONO_DFX_SS_INFO("ss:request callbarring", "modem fail");
 	}
 
 	if (cb->query_next < CB_ALL_END) {
@@ -735,6 +744,7 @@ static void set_lock_callback(const struct ofono_error *error, void *data)
 		DBG("Enabling/disabling a lock failed");
 		__ofono_dbus_pending_reply(&cb->pending,
 					__ofono_error_failed(cb->pending));
+		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", "dbus method fail");
 		return;
 	}
 
@@ -885,6 +895,7 @@ static void disable_all_callback(const struct ofono_error *error, void *data)
 		DBG("Disabling all barring failed");
 		__ofono_dbus_pending_reply(&cb->pending,
 					__ofono_error_failed(cb->pending));
+		OFONO_DFX_SS_INFO("ss:set callbarring:disable all", "modem fail");
 		return;
 	}
 

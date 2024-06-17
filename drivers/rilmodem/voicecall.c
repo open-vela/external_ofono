@@ -110,7 +110,6 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 	enum ofono_disconnect_reason reason = OFONO_DISCONNECT_REASON_ERROR;
 	int last_cause = CALL_FAIL_ERROR_UNSPECIFIED;
 	struct parcel rilp;
-	int REASON_DESC_SIZE = 15;
 	char reason_desc[REASON_DESC_SIZE];
 
 	memset(reason_desc, 0, sizeof(reason_desc));
@@ -128,7 +127,7 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 	if (last_cause == CALL_FAIL_NORMAL || last_cause == CALL_FAIL_BUSY) {
 		reason = OFONO_DISCONNECT_REASON_REMOTE_HANGUP;
 	} else {
-		snprintf(reason_desc, REASON_DESC_SIZE - 1, "modem fail:%d", last_cause);
+		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", last_cause);
 		OFONO_DFX_CALL_INFO(OFONO_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
 				OFONO_MEDIA_UNKNOW, OFONO_HANGUP_FAIL, reason_desc);
 	}
@@ -151,6 +150,64 @@ static int call_compare(gconstpointer a, gconstpointer b)
 		return 1;
 
 	return 0;
+}
+
+void start_record_time(struct ofono_voicecall *vc)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	ofono_debug("start record call time");
+	vd->call_duration_info.record_level = ofono_voicecall_get_signal_level(vc);
+	vd->call_duration_info.start_time = time(NULL);
+}
+
+void stop_record_time(struct ofono_voicecall *vc)
+{
+	time_t stop_time = time(NULL);
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	ofono_debug("stop record time");
+	if(vd->call_duration_info.start_time == 0) {
+		ofono_error("unexpected status");
+		return;
+	}
+	switch (vd->call_duration_info.record_level) {
+		case 1:
+			vd->call_duration_info.level1 = vd->call_duration_info.level1 +
+				stop_time - vd->call_duration_info.start_time;
+			break;
+		case 2:
+                        vd->call_duration_info.level2 = vd->call_duration_info.level2 +
+				stop_time - vd->call_duration_info.start_time;
+                        break;
+		case 3:
+                        vd->call_duration_info.level3 = vd->call_duration_info.level3 +
+				stop_time - vd->call_duration_info.start_time;
+                        break;
+		case 4:
+                        vd->call_duration_info.level4 = vd->call_duration_info.level4 +
+				stop_time - vd->call_duration_info.start_time;
+                        break;
+		default:
+			vd->call_duration_info.start_time = 0;
+			ofono_error("unexpected signal level value");
+	}
+	vd->call_duration_info.start_time = 0;
+	ofono_debug("%d,%d,%d,%d",(int)vd->call_duration_info.level1,
+			(int)vd->call_duration_info.level2,
+			(int)vd->call_duration_info.level3,
+			(int)vd->call_duration_info.level4);
+}
+
+void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc, struct ofono_netreg *netreg)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	if(ofono_netreg_get_signal_strength_level(netreg) !=
+				vd->call_duration_info.record_level) {
+		stop_record_time(vc);
+		vd->call_duration_info.record_level = ofono_netreg_get_signal_strength_level(netreg);
+		vd->call_duration_info.start_time = time(NULL);
+	}
 }
 
 static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
@@ -247,6 +304,12 @@ no_calls:
 	if (!n && !o && vd->cb) {
 		ofono_debug("CLCC response empty while dial pending, notify error!");
 		dial_error(vd);
+	}
+
+	if (n && !o) {
+		start_record_time(vc);//new call added
+	} else if (!n && o) {
+		stop_record_time(vc);//all call is removed
 	}
 
 	while (n || o) {
@@ -1151,6 +1214,27 @@ static gboolean ril_delayed_register(gpointer user_data)
 	return FALSE;
 }
 
+static gboolean report_call_time(gpointer user_data)
+{
+	struct ofono_voicecall *vc = user_data;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	if (vd->call_duration_info.start_time != 0) {
+		stop_record_time(vc);
+	}
+	OFONO_DFX_CALL_TIME_INFO((int)vd->call_duration_info.level1,
+			(int)vd->call_duration_info.level2,
+			(int)vd->call_duration_info.level3,
+			(int)vd->call_duration_info.level4);
+
+	vd->call_duration_info.level1 = 0;
+	vd->call_duration_info.level2 = 0;
+	vd->call_duration_info.level3 = 0;
+	vd->call_duration_info.level4 = 0;
+
+	return TRUE;
+}
+
 int ril_voicecall_probe(struct ofono_voicecall *vc, unsigned int vendor,
 			void *data)
 {
@@ -1162,6 +1246,14 @@ int ril_voicecall_probe(struct ofono_voicecall *vc, unsigned int vendor,
 	vd->cb = NULL;
 	vd->data = NULL;
 	vd->suppress_clcc_poll = FALSE;
+	vd->call_duration_info.start_time = 0;
+	vd->call_duration_info.record_level = 0;
+	vd->call_duration_info.level1 = 0;
+	vd->call_duration_info.level2 = 0;
+	vd->call_duration_info.level3 = 0;
+	vd->call_duration_info.level4 = 0;
+	vd->call_duration_info.report_time_id = g_timeout_add(REPORTING_PERIOD,
+			report_call_time,vc);
 
 	clear_dtmf_queue(vd);
 
@@ -1175,6 +1267,10 @@ int ril_voicecall_probe(struct ofono_voicecall *vc, unsigned int vendor,
 void ril_voicecall_remove(struct ofono_voicecall *vc)
 {
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	report_call_time(vc);
+
+	g_source_remove(vd->call_duration_info.report_time_id);
 
 	if (vd->clcc_source)
 		g_source_remove(vd->clcc_source);

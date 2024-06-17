@@ -29,6 +29,7 @@ extern "C" {
 #include <ofono/types.h>
 
 struct ofono_modem;
+struct ofono_netreg;
 struct ofono_voicecall;
 
 typedef void (*ofono_voicecall_cb_t)(const struct ofono_error *error,
@@ -208,7 +209,8 @@ void ofono_voicecall_ringback_tone_notify(struct ofono_voicecall *vc,
 					unsigned int id, int value);
 ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
 					const char *number);
-
+int ofono_voicecall_get_signal_level(struct ofono_voicecall *vc);
+void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc, struct ofono_netreg *netreg);
 #ifdef __cplusplus
 }
 #endif

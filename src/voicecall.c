@@ -31,7 +31,6 @@
 
 #include <glib.h>
 #include <gdbus.h>
-#include <ofono/dfx.h>
 #include "ofono.h"
 
 #include "common.h"
@@ -1835,6 +1834,16 @@ static DBusMessage *manager_dial_memory(DBusConnection *conn,
        }
 
        return __ofono_error_failed(msg);
+}
+
+int ofono_voicecall_get_signal_level(struct ofono_voicecall *vc)
+{
+	int level;
+	struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
+	struct ofono_netreg *netreg = __ofono_atom_find(OFONO_ATOM_TYPE_NETREG, modem);
+
+	level = ofono_netreg_get_signal_strength_level(netreg);
+	return level;
 }
 
 static DBusMessage *manager_transfer(DBusConnection *conn,

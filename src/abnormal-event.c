@@ -221,6 +221,7 @@ void ofono_handle_abnormal_event(int type_id, char *data, int data_len)
 
 				ofono_debug("ofono_handle_abnormal_event,sub=%u,reason_type=%u",sip_end_reason_data->sub, sip_end_reason_data->reason_type);
 			}
+			break;
 		case OFONO_LIMITED_SERVICE_CAMP_EVENT://200
 			{
 				struct ofono_abnormal_limited_service *limited_service_data = (struct ofono_abnormal_limited_service *)covert_data;

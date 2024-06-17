@@ -897,7 +897,7 @@ static void get_call_forwarding_cb(const struct ofono_error *error, int total,
 
 		reply = __ofono_error_failed(cf->pending);
 		__ofono_dbus_pending_reply(&cf->pending, reply);
-
+		OFONO_DFX_SS_INFO("ss:query call forwarding", "modem fail");
 		return;
 	}
 
@@ -935,7 +935,7 @@ static void set_call_forwarding_cb(const struct ofono_error *error, void *data)
 
 		reply = __ofono_error_failed(cf->pending);
 		__ofono_dbus_pending_reply(&cf->pending, reply);
-
+		OFONO_DFX_SS_INFO("ss:set call forwarding", "modem fail");
 		return;
 	}
 
@@ -954,8 +954,10 @@ static DBusMessage *cf_get_call_forwarding(DBusConnection *conn,
 	if (cf->driver->query == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (cf->pending)
+	if (cf->pending) {
+		OFONO_DFX_SS_INFO("ss:query call forwarding", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_INT32, &type,
@@ -984,8 +986,10 @@ static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
 	if (cf->driver->registration == NULL)
 		return __ofono_error_not_implemented(msg);
 
-	if (cf->pending)
+	if (cf->pending) {
+		OFONO_DFX_SS_INFO("ss:set call forwarding", "busy");
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_INT32, &type,
