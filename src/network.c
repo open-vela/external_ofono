@@ -1812,6 +1812,8 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					notify_emulator_strength,
 					GINT_TO_POINTER(netreg->signal_strength));
+		ofono_voicecall_update_call_duration(__ofono_atom_find(OFONO_ATOM_TYPE_VOICECALL,
+					modem), netreg);
 	}
 }
 
