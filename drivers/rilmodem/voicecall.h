@@ -32,6 +32,7 @@ struct ril_voicecall_data {
 	/* Call local hangup indicator, one bit per call (1 << call_id) */
 	unsigned int local_release;
 	unsigned int clcc_source;
+	unsigned int hold_source;
 	GRil *ril;
 	unsigned int vendor;
 	unsigned char flags;
