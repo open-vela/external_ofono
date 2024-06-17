@@ -273,6 +273,7 @@ gboolean __ofono_call_settings_is_busy(struct ofono_call_settings *cs);
 
 #include <ofono/cbs.h>
 #include <ofono/devinfo.h>
+#include <ofono/dfx.h>
 #include <ofono/phonebook.h>
 #include <ofono/gprs.h>
 #include <ofono/gprs-context.h>
