@@ -668,6 +668,44 @@ static void dial(struct ofono_voicecall *vc,
 	CALLBACK_WITH_FAILURE(cb, data);
 }
 
+static gboolean pending_call_check_held_all(gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	struct hold_before_dial_req *req = cbd->user;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(req->vc);
+	ofono_voicecall_cb_t cb = cbd->cb;
+	int non_held_call = 0;
+	int call_count = 0;
+	struct ofono_call *call;
+	GSList *l;
+	gboolean need_check_again = TRUE;
+
+	/* Check for current calls are held or nothing calls */
+	for (l = vd->calls; l; l = l->next) {
+		call = l->data;
+		call_count++;
+		if (call->status != CALL_STATUS_HELD) {
+			non_held_call = 1;
+			break;
+		}
+	}
+
+	ofono_info("call status:call_count=%d,non_held_call=%d", call_count, non_held_call);
+	if (call_count == 0 || non_held_call == 0) {
+		ofono_info("all calls held: we can dial now");
+		dial(req->vc, &req->dial_ph, req->dial_clir, cb, cbd->data);
+		vd->hold_source = 0;
+		g_free(req);
+		free(cbd);
+		need_check_again = FALSE;
+	} else {
+		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+					clcc_poll_cb, req->vc, NULL);
+	}
+
+	return need_check_again;
+}
+
 static void hold_before_dial_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -683,10 +721,16 @@ static void hold_before_dial_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-	/* Current calls held: we can dial now */
-	dial(req->vc, &req->dial_ph, req->dial_clir, cb, cbd->data);
-
-	g_free(req);
+	ofono_info("need wait calls held: get clcc");
+	/* get clcc respone to check active call held */
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+			clcc_poll_cb, req->vc, NULL);
+	if (!vd->hold_source) {
+		/* same timer with CLCC poll to periodly check all calls status is held */
+		cbd = cb_data_new(cb, cbd->data, req);
+		vd->hold_source = g_timeout_add(POLL_CLCC_INTERVAL,
+				pending_call_check_held_all, cbd);
+	}
 }
 
 void ril_dial(struct ofono_voicecall *vc, const struct ofono_phone_number *ph,
@@ -699,14 +743,12 @@ void ril_dial(struct ofono_voicecall *vc, const struct ofono_phone_number *ph,
 	GSList *l;
 
 	/* Check for current active calls */
-	if (0) { //Unisoc modem will hold call by itsself before dial
-		for (l = vd->calls; l; l = l->next) {
-			call = l->data;
+	for (l = vd->calls; l; l = l->next) {
+		call = l->data;
 
-			if (call->status == CALL_STATUS_ACTIVE) {
-				current_active = 1;
-				break;
-			}
+		if (call->status == CALL_STATUS_ACTIVE) {
+			current_active = 1;
+			break;
 		}
 	}
 
@@ -1262,6 +1304,9 @@ void ril_voicecall_remove(struct ofono_voicecall *vc)
 
 	if (vd->clcc_source)
 		g_source_remove(vd->clcc_source);
+
+	if (vd->hold_source)
+		g_source_remove(vd->hold_source);
 
 	g_slist_free_full(vd->calls, g_free);
 
