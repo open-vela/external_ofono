@@ -1071,8 +1071,11 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 	int err;
 	struct ofono_uuid uuid;
 
-	if (sms->pending)
+	if (sms->pending) {
+		OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_CS_SMS,
+			OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		return __ofono_error_busy(msg);
+	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
 					DBUS_TYPE_STRING, &text,
@@ -1136,8 +1139,11 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	int err;
 	struct ofono_uuid uuid;
 
-	if (sms->pending)
+	if (sms->pending) {
+		OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_IMS_SMS,
+				OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		return __ofono_error_busy(msg);
+	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
 					DBUS_TYPE_UINT32, &port,
