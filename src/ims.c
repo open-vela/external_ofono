@@ -60,6 +60,9 @@ struct ofono_ims {
 	char *imsi;
 	char *ph_number_from_setting;
 	char ph_number[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
+	time_t ims_register_start_time;
+	time_t ims_register_duration;
+	int ims_reigster_report_time_id;
 };
 
 static GSList *g_drivers = NULL;
@@ -319,6 +322,38 @@ static void notify_status_watches(struct ofono_ims *ims)
 	}
 }
 
+void update_ims_register_duration(struct ofono_ims *ims, int reg_info)
+{
+	if (reg_info) {
+		if (ims->ims_register_start_time == 0) {
+			ims->ims_register_start_time = time(NULL);
+		} else {
+			ofono_error("unexpect status");
+		}
+	} else {
+		if (ims->ims_register_start_time != 0) {
+			ims->ims_register_duration = time(NULL) -
+				ims->ims_register_start_time +
+				ims->ims_register_duration;
+			ims->ims_register_start_time = 0;
+		}
+	}
+}
+
+static gboolean report_ims_register_duration(gpointer user_data)
+{
+	struct ofono_ims *ims = user_data;
+	if (ims->ims_register_start_time != 0) {
+		ims->ims_register_duration = time(NULL) -
+			ims->ims_register_start_time +
+			ims->ims_register_duration;
+		ims->ims_register_start_time = time(NULL);
+	}
+	OFONO_DFX_IMS_DURATION((int)ims->ims_register_duration);
+
+	return TRUE;
+}
+
 void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 				int ext_info, char *subscriber_uri)
 {
@@ -336,6 +371,8 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 
 	new_reg_info = reg_info ? TRUE : FALSE;
 	ims_set_registered(ims, new_reg_info);
+
+	update_ims_register_duration(ims, new_reg_info);
 
 	extract_number_from_uris(subscriber_uri, ims->ph_number);
 
@@ -438,6 +475,7 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 					OFONO_IMS_INTERFACE,
 					"ImsSwitchStatus", DBUS_TYPE_BOOLEAN, &ims->user_setting);
 
+	report_ims_register_duration(ims);
 	return NULL;
 }
 
@@ -740,6 +778,9 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 
 	ofono_modem_add_interface(modem, OFONO_IMS_INTERFACE);
 	__ofono_atom_register(ims->atom, ims_atom_unregister);
+
+	ims->ims_reigster_report_time_id = g_timeout_add(REPORTING_PERIOD,
+			report_ims_register_duration, ims);
 }
 
 static void registration_init_cb(const struct ofono_error *error,

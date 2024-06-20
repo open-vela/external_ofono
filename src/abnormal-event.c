@@ -214,6 +214,7 @@ void ofono_handle_abnormal_event(int type_id, char *data, int data_len)
 				ofono_debug("ofono_handle_abnormal_event,sub=%u,event=%u,rsrp=%d,rsrq=%d,sinr=%d,rssi=%d", data_data->sub, data_data->event,
 					data_data->cell_quality.rsrp, data_data->cell_quality.rsrq, data_data->cell_quality.sinr, data_data->cell_quality.rssi);
 			}
+			OFONO_DFX_DATA_INTERRUPTION_INFO();
 			break;
 		case OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP:
 			{
@@ -283,6 +284,7 @@ void ofono_handle_abnormal_event(int type_id, char *data, int data_len)
 				ofono_debug("ofono_handle_abnormal_event,sub=%u,plmn=%u,tac=%u,cell_id=%u,band=%u,earfcn=%u,pci=%u", ue_camp_cell_data->sub,
 					ue_camp_cell_data->plmn, ue_camp_cell_data->tac, ue_camp_cell_data->cell_id, ue_camp_cell_data->band,
 					ue_camp_cell_data->earfcn, ue_camp_cell_data->pci);
+				OFONO_DFX_BAND_INFO(ue_camp_cell_data->band);
 			}
 			break;
 		case OFONO_UE_SIM_INFO:
