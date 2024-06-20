@@ -4864,3 +4864,13 @@ ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
 {
 	return is_emergency_number(vc, number);
 }
+
+void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc,
+					struct ofono_netreg *netreg)
+{
+	int signal_level = ofono_netreg_get_signal_strength_level(netreg);
+
+	if (vc->driver->update_call_duration) {
+		vc->driver->update_call_duration(vc, signal_level);
+	}
+}
