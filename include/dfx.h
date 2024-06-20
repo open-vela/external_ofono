@@ -56,16 +56,19 @@ typedef enum {
 				"fail_reason", fail_reason);                                   \
 	} while (0)
 
-#define OFONO_DFX_CALL_TIME_INFO(level1_duration, level2_duration,                             \
-		level3_duration, level4_duration)                                              \
+#define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration,                             \
+		level2_duration, level3_duration, level4_duration, level5_duration)            \
 	do {                                                                                   \
-		ofono_debug("OFONO_DFX:%d,%d,%d,%d,", level1_duration, level2_duration,        \
-				level3_duration, level3_duration);                             \
-		sendEventMisightF(915200012, "%s:%d,%s:%d,%s:%d,%s:%d",                        \
+		ofono_debug("OFONO_DFX:%d,%d,%d,%d,%d,%d", level0_duration, level1_duration,   \
+				level2_duration, level3_duration, level4_duration,             \
+				level5_duration);                                              \
+		sendEventMisightF(915200012, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d",            \
+				"level0_time_value", level0_duration,                          \
 				"level1_time_value", level1_duration,                          \
 				"level2_time_value", level2_duration,                          \
 				"level3_time_value", level3_duration,                          \
-				"level4_time_value", level4_duration);                         \
+				"level4_time_value", level4_duration,                          \
+				"level5_time_value", level5_duration);                         \
 	} while (0)
 #else
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                \
@@ -75,10 +78,10 @@ typedef enum {
 #define OFONO_DFX_SS_INFO(type, fail_reason)                                                   \
 	ofono_debug("OFONO_DFX:%s,%s", type, fail_reason);
 
-#define OFONO_DFX_CALL_TIME_INFO(level1_duration, level2_duration,                             \
-		level3_duration, level4_duration)                                              \
-		ofono_debug("OFONO_DFX:%d,%d,%d,%d,", level1_duration, level2_duration,        \
-				level3_duration, level3_duration);
+#define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration,                             \
+		level2_duration, level3_duration, level4_duration, level5_duration)            \
+		ofono_debug("OFONO_DFX:%d,%d,%d,%d,%d,%d", level0_duration, level1_duration,   \
+			level2_duration, level3_duration, level4_duration, level5_duration);
 #endif
 
 #define OFONO_DFX_CALL_INFO_IF(flag, type, direction, media, fail_scenario, fail_reason)       \
