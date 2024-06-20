@@ -34,6 +34,7 @@
 #include <gril.h>
 #include <parcel.h>
 
+#include <ofono/dfx.h>
 #include <ofono/log.h>
 #include <ofono/modem.h>
 #include <ofono/sms.h>
@@ -164,6 +165,8 @@ static void ril_submit_sms_cb(struct ril_msg *message, gpointer user_data)
 	int error;
 
 	if (message->error != RIL_E_SUCCESS) {
+		OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW,
+				OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		CALLBACK_WITH_FAILURE(cb, 0, cbd->data);
 		return;
 	}
@@ -407,6 +410,8 @@ static void ril_cmgs(struct ofono_sms *sms, const unsigned char *pdu,
 			ril_submit_sms_cb, cbd, g_free) > 0)
 		return;
 
+	OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW,
+			OFONO_SMS_SEND, OFONO_SMS_FAIL);
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, -1, user_data);
 }
@@ -517,6 +522,8 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	unsigned char pdu[176];
 
 	ofono_debug("req: %d; data_len: %d", message->req, (int) message->buf_len);
+	OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
+						OFONO_SMS_NORMAL);
 
 	g_ril_init_parcel(message, &rilp);
 
@@ -561,6 +568,8 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	ril_ack_delivery(sms);
 
 fail:
+	OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
+					OFONO_SMS_FAIL);
 	g_free(ril_pdu);
 }
 

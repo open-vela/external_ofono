@@ -103,6 +103,10 @@ struct ofono_modem {
 	int			module_mask;
 	int			from_event_id;
 	int			to_event_id;
+	time_t			modem_duration[2];
+	int			modem_status;
+	time_t			modem_start_time;
+	int			modem_duration_report_id;
 };
 
 struct ofono_devinfo {
@@ -1537,6 +1541,12 @@ static DBusMessage *modem_enable(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_modem *modem = data;
 
+	modem->modem_duration[modem->modem_status] = time(NULL) -
+		modem->modem_start_time +
+		modem->modem_duration[modem->modem_status];
+	modem->modem_status = 1;
+	modem->modem_start_time = time(NULL);
+
 	return modem_enable_or_disable(modem, TRUE, conn, msg);
 }
 
@@ -1544,6 +1554,12 @@ static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
 				void *data)
 {
 	struct ofono_modem *modem = data;
+
+	modem->modem_duration[modem->modem_status] = time(NULL) -
+		modem->modem_start_time +
+		modem->modem_duration[modem->modem_status];
+	modem->modem_status = 0;
+	modem->modem_start_time = time(NULL);
 
 	return modem_enable_or_disable(modem, FALSE, conn, msg);
 }
@@ -2582,6 +2598,21 @@ void ofono_modem_set_driver(struct ofono_modem *modem, const char *type)
 	modem->driver_type = g_strdup(type);
 }
 
+static gboolean report_modem_duration(gpointer user_data)
+{
+	struct ofono_modem *modem = user_data;
+
+	modem->modem_duration[modem->modem_status] = time(NULL) -
+		modem->modem_start_time +
+		modem->modem_duration[modem->modem_status];
+	OFONO_DFX_MODEM_DURATION_INFO((int)modem->modem_duration[0],
+			(int)modem->modem_duration[1]);
+	modem->modem_start_time = time(NULL);
+	memset(modem->modem_duration, 0, sizeof(modem->modem_duration));
+
+	return TRUE;
+}
+
 struct ofono_modem *ofono_modem_create(const char *name, const char *type)
 {
 	struct ofono_modem *modem;
@@ -2619,6 +2650,12 @@ struct ofono_modem *ofono_modem_create(const char *name, const char *type)
 
 	if (name == NULL)
 		next_modem_id += 1;
+
+	modem->modem_start_time = time(NULL);
+	modem->modem_status = 0;
+	memset(modem->modem_duration, 0, sizeof(modem->modem_duration));
+	modem->modem_duration_report_id = g_timeout_add(REPORTING_PERIOD,
+		report_modem_duration, modem);
 
 	return modem;
 }
@@ -2885,6 +2922,9 @@ void ofono_modem_remove(struct ofono_modem *modem)
 
 	if (modem->configs)
 		__ofono_carrier_config_free_configs(modem->configs);
+
+	g_source_remove(modem->modem_duration_report_id);
+	report_modem_duration(modem);
 
 	g_free(modem->driver_type);
 	g_free(modem->name);

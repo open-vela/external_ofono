@@ -95,6 +95,9 @@ struct ofono_gprs {
 	unsigned int sim_state_watch;
 	unsigned int spn_watch;
 	unsigned int radio_online_watch;
+	time_t internet_start_time;
+	time_t internet_active_duration;
+	int report_data_active_time_id;
 };
 
 struct ipv4_settings {
@@ -951,6 +954,32 @@ static DBusMessage *pri_get_properties(DBusConnection *conn,
 	return reply;
 }
 
+void start_record_active_data_time(struct ofono_gprs *gprs)
+{
+	gprs->internet_start_time = time(NULL);
+}
+
+void stop_record_active_data_time(struct ofono_gprs *gprs)
+{
+	gprs->internet_active_duration = gprs->internet_active_duration +
+		time(NULL) - gprs->internet_start_time;
+	gprs->internet_start_time = 0;
+}
+
+static gboolean report_data_active_duration(gpointer user_data)
+{
+	struct ofono_gprs *gprs = user_data;
+
+	if (gprs->internet_start_time != 0) {
+		stop_record_active_data_time(gprs);
+		start_record_active_data_time(gprs);
+	}
+	OFONO_DFX_DATA_ACTIVE_DURATION((int)gprs->internet_active_duration);
+	gprs->internet_active_duration = 0;
+
+	return TRUE;
+}
+
 static void pri_activate_callback(const struct ofono_error *error, void *data)
 {
 	struct pri_context *ctx = data;
@@ -1005,6 +1034,9 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 			&& g_strcmp0(gprs->preferred_apn, "") == 0) {
 		update_preferred_context(gprs, ctx->path);
 	}
+	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		start_record_active_data_time(gprs);
+	}
 }
 
 static void pri_deactivate_callback(const struct ofono_error *error, void *data)
@@ -1012,6 +1044,7 @@ static void pri_deactivate_callback(const struct ofono_error *error, void *data)
 	struct pri_context *ctx = data;
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t value;
+	struct ofono_gprs *gprs = ctx->gprs;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Deactivating context failed with error: %s",
@@ -1031,6 +1064,10 @@ static void pri_deactivate_callback(const struct ofono_error *error, void *data)
 	if (ctx->pending != NULL) {
 		__ofono_dbus_pending_reply(&ctx->pending,
 					dbus_message_new_method_return(ctx->pending));
+	}
+
+	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		stop_record_active_data_time(gprs);
 	}
 
 	pri_reset_context_settings(ctx);
@@ -3726,6 +3763,8 @@ static void gprs_unregister(struct ofono_atom *atom)
 					OFONO_CONNECTION_MANAGER_INTERFACE);
 	g_dbus_unregister_interface(conn, path,
 					OFONO_CONNECTION_MANAGER_INTERFACE);
+	g_source_remove(gprs->report_data_active_time_id);
+	report_data_active_duration(gprs);
 }
 
 static void gprs_handle_command(int command_id, void *data)
@@ -4276,6 +4315,10 @@ void ofono_gprs_register(struct ofono_gprs *gprs)
 	gprs->radio_online_watch = __ofono_modem_add_online_watch(modem,
 					radio_online_watch_cb,
 					gprs, NULL);
+	gprs->internet_start_time = 0;
+	gprs->internet_active_duration = 0;
+	gprs->report_data_active_time_id = g_timeout_add(REPORTING_PERIOD,
+			report_data_active_duration, gprs);
 }
 
 void ofono_gprs_remove(struct ofono_gprs *gprs)

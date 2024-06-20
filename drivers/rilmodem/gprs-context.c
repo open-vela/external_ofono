@@ -382,6 +382,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 				__func__, gcd->apn,
 				ril_error_to_string(message->error));
 		set_context_disconnected(gcd);
+		OFONO_DFX_DATA_ACTIVE_FAIL("modem fail");
 		goto error;
 	}
 
@@ -600,6 +601,7 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 		return;
 	}
 
+	OFONO_DFX_DATA_ACTIVE_FAIL("ril send fail");
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, data);
 }
