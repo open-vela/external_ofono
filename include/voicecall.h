@@ -166,6 +166,11 @@ struct ofono_voicecall_driver {
 	 */
 	void (*play_dtmf)(struct ofono_voicecall *vc, int flag,
 			unsigned char digit, ofono_voicecall_cb_t cb, void *data);
+
+	/*
+	 * update call duration when signal level change
+	 */
+	void (*update_call_duration)(struct ofono_voicecall *vc, int signal_level);
 };
 
 void ofono_voicecall_en_list_notify(struct ofono_voicecall *vc,
@@ -210,7 +215,8 @@ void ofono_voicecall_ringback_tone_notify(struct ofono_voicecall *vc,
 ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
 					const char *number);
 int ofono_voicecall_get_signal_level(struct ofono_voicecall *vc);
-void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc, struct ofono_netreg *netreg);
+void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc,
+					struct ofono_netreg *netreg);
 #ifdef __cplusplus
 }
 #endif

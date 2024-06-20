@@ -166,46 +166,32 @@ void stop_record_time(struct ofono_voicecall *vc)
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
 	ofono_debug("stop record time");
-	if(vd->call_duration_info.start_time == 0) {
+	if (vd->call_duration_info.start_time == 0) {
 		ofono_error("unexpected status");
 		return;
 	}
-	switch (vd->call_duration_info.record_level) {
-		case 1:
-			vd->call_duration_info.level1 = vd->call_duration_info.level1 +
-				stop_time - vd->call_duration_info.start_time;
-			break;
-		case 2:
-                        vd->call_duration_info.level2 = vd->call_duration_info.level2 +
-				stop_time - vd->call_duration_info.start_time;
-                        break;
-		case 3:
-                        vd->call_duration_info.level3 = vd->call_duration_info.level3 +
-				stop_time - vd->call_duration_info.start_time;
-                        break;
-		case 4:
-                        vd->call_duration_info.level4 = vd->call_duration_info.level4 +
-				stop_time - vd->call_duration_info.start_time;
-                        break;
-		default:
-			vd->call_duration_info.start_time = 0;
-			ofono_error("unexpected signal level value");
+
+	if (vd->call_duration_info.record_level >= SIGNAL_LEVEL_COUNT ||
+			vd->call_duration_info.record_level < 0) {
+		ofono_error("unexpected record_level");
+		vd->call_duration_info.start_time = 0;
+		return;
 	}
+
+	vd->call_duration_info.level[vd->call_duration_info.record_level] =
+		vd->call_duration_info.level[vd->call_duration_info.record_level] +
+		stop_time - vd->call_duration_info.start_time;
+
 	vd->call_duration_info.start_time = 0;
-	ofono_debug("%d,%d,%d,%d",(int)vd->call_duration_info.level1,
-			(int)vd->call_duration_info.level2,
-			(int)vd->call_duration_info.level3,
-			(int)vd->call_duration_info.level4);
 }
 
-void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc, struct ofono_netreg *netreg)
+void ril_update_call_duration(struct ofono_voicecall *vc, int signal_level)
 {
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
-	if(ofono_netreg_get_signal_strength_level(netreg) !=
-				vd->call_duration_info.record_level) {
+	if(signal_level != vd->call_duration_info.record_level) {
 		stop_record_time(vc);
-		vd->call_duration_info.record_level = ofono_netreg_get_signal_strength_level(netreg);
+		vd->call_duration_info.record_level = signal_level;
 		vd->call_duration_info.start_time = time(NULL);
 	}
 }
@@ -1221,16 +1207,20 @@ static gboolean report_call_time(gpointer user_data)
 
 	if (vd->call_duration_info.start_time != 0) {
 		stop_record_time(vc);
+		start_record_time(vc);
 	}
-	OFONO_DFX_CALL_TIME_INFO((int)vd->call_duration_info.level1,
-			(int)vd->call_duration_info.level2,
-			(int)vd->call_duration_info.level3,
-			(int)vd->call_duration_info.level4);
 
-	vd->call_duration_info.level1 = 0;
-	vd->call_duration_info.level2 = 0;
-	vd->call_duration_info.level3 = 0;
-	vd->call_duration_info.level4 = 0;
+	if (SIGNAL_LEVEL_COUNT == 6) {
+		OFONO_DFX_CALL_TIME_INFO((int)vd->call_duration_info.level[0],
+				(int)vd->call_duration_info.level[1],
+				(int)vd->call_duration_info.level[2],
+				(int)vd->call_duration_info.level[3],
+				(int)vd->call_duration_info.level[4],
+				(int)vd->call_duration_info.level[5]);
+	}
+
+		memset(vd->call_duration_info.level, 0,
+				sizeof(vd->call_duration_info.level));
 
 	return TRUE;
 }
@@ -1248,10 +1238,8 @@ int ril_voicecall_probe(struct ofono_voicecall *vc, unsigned int vendor,
 	vd->suppress_clcc_poll = FALSE;
 	vd->call_duration_info.start_time = 0;
 	vd->call_duration_info.record_level = 0;
-	vd->call_duration_info.level1 = 0;
-	vd->call_duration_info.level2 = 0;
-	vd->call_duration_info.level3 = 0;
-	vd->call_duration_info.level4 = 0;
+	memset(vd->call_duration_info.level, 0,
+			sizeof(vd->call_duration_info.level));
 	vd->call_duration_info.report_time_id = g_timeout_add(REPORTING_PERIOD,
 			report_call_time,vc);
 
@@ -1304,6 +1292,7 @@ static const struct ofono_voicecall_driver driver = {
 	.invite_participants	= ril_invite_participants,
 	.set_cust_ecc		= ril_set_emergency_number,
 	.play_dtmf		= ril_play_dtmf,
+	.update_call_duration   = ril_update_call_duration,
 };
 
 void ril_voicecall_init(void)

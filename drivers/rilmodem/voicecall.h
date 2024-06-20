@@ -18,14 +18,12 @@
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
+#define SIGNAL_LEVEL_COUNT 6
 
 struct ofono_voicecall_duration_info {
 	time_t start_time;
 	unsigned int record_level;
-	time_t level1;
-	time_t level2;
-	time_t level3;
-	time_t level4;
+	time_t level[SIGNAL_LEVEL_COUNT];
 	guint report_time_id;
 };
 
