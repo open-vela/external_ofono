@@ -1059,6 +1059,11 @@ static void call_barring_remove(struct ofono_atom *atom)
 	if (cb == NULL)
 		return;
 
+	if (cb->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(cb->pending);
+		__ofono_dbus_pending_reply(&cb->pending, reply);
+	}
+
 	if (cb->driver != NULL && cb->driver->remove != NULL)
 		cb->driver->remove(cb);
 

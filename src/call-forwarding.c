@@ -1607,6 +1607,11 @@ static void call_forwarding_remove(struct ofono_atom *atom)
 	if (cf == NULL)
 		return;
 
+	if (cf->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(cf->pending);
+		__ofono_dbus_pending_reply(&cf->pending, reply);
+	}
+
 	if (cf->driver && cf->driver->remove)
 		cf->driver->remove(cf);
 

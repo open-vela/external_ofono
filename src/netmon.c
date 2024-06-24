@@ -543,6 +543,11 @@ static void netmon_remove(struct ofono_atom *atom)
 	if (netmon == NULL)
 		return;
 
+	if (netmon->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(netmon->pending);
+		__ofono_dbus_pending_reply(&netmon->pending, reply);
+	}
+
 	if (netmon->driver && netmon->driver->remove)
 		netmon->driver->remove(netmon);
 

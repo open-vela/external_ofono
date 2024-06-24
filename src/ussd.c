@@ -866,6 +866,11 @@ static void ussd_remove(struct ofono_atom *atom)
 	if (ussd == NULL)
 		return;
 
+	if (ussd->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(ussd->pending);
+		__ofono_dbus_pending_reply(&ussd->pending, reply);
+	}
+
 	if (ussd->driver && ussd->driver->remove)
 		ussd->driver->remove(ussd);
 

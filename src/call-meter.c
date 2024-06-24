@@ -720,6 +720,11 @@ static void call_meter_remove(struct ofono_atom *atom)
 	if (cm == NULL)
 		return;
 
+	if (cm->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(cm->pending);
+		__ofono_dbus_pending_reply(&cm->pending, reply);
+	}
+
 	if (cm->driver && cm->driver->remove)
 		cm->driver->remove(cm);
 

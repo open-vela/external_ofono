@@ -4008,6 +4008,11 @@ static void sim_remove(struct ofono_atom *atom)
 	if (sim == NULL)
 		return;
 
+	if (sim->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(sim->pending);
+		__ofono_dbus_pending_reply(&sim->pending, reply);
+	}
+
 	if (sim->driver != NULL && sim->driver->remove != NULL)
 		sim->driver->remove(sim);
 

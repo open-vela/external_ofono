@@ -3752,6 +3752,11 @@ static void gprs_remove(struct ofono_atom *atom)
 	if (gprs == NULL)
 		return;
 
+	if (gprs->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(gprs->pending);
+		__ofono_dbus_pending_reply(&gprs->pending, reply);
+	}
+
 	if (gprs->suspend_timeout)
 		g_source_remove(gprs->suspend_timeout);
 

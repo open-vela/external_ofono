@@ -358,6 +358,11 @@ static void lte_atom_remove(struct ofono_atom *atom)
 	if (lte == NULL)
 		return;
 
+	if (lte->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(lte->pending);
+		__ofono_dbus_pending_reply(&lte->pending, reply);
+	}
+
 	if (lte->settings) {
 		storage_close(lte->imsi, SETTINGS_STORE, lte->settings, TRUE);
 		lte->settings = NULL;

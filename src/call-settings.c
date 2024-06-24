@@ -1616,6 +1616,11 @@ static void call_settings_remove(struct ofono_atom *atom)
 	if (cs == NULL)
 		return;
 
+	if (cs->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(cs->pending);
+		__ofono_dbus_pending_reply(&cs->pending, reply);
+	}
+
 	if (cs->driver != NULL && cs->driver->remove != NULL)
 		cs->driver->remove(cs);
 

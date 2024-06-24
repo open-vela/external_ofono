@@ -308,6 +308,11 @@ static void location_reporting_remove(struct ofono_atom *atom)
 	if (lr == NULL)
 		return;
 
+	if (lr->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(lr->pending);
+		__ofono_dbus_pending_reply(&lr->pending, reply);
+	}
+
 	if (lr->driver && lr->driver->remove)
 		lr->driver->remove(lr);
 

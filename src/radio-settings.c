@@ -814,6 +814,11 @@ static void radio_settings_remove(struct ofono_atom *atom)
 	if (rs == NULL)
 		return;
 
+	if (rs->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(rs->pending);
+		__ofono_dbus_pending_reply(&rs->pending, reply);
+	}
+
 	if (rs->driver && rs->driver->remove)
 		rs->driver->remove(rs);
 
