@@ -2159,6 +2159,11 @@ static void sms_remove(struct ofono_atom *atom)
 	if (sms == NULL)
 		return;
 
+	if (sms->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(sms->pending);
+		__ofono_dbus_pending_reply(&sms->pending, reply);
+	}
+
 	if (sms->driver && sms->driver->remove)
 		sms->driver->remove(sms);
 

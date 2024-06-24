@@ -879,6 +879,11 @@ static void phonebook_remove(struct ofono_atom *atom)
 	if (pb == NULL)
 		return;
 
+	if (pb->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(pb->pending);
+		__ofono_dbus_pending_reply(&pb->pending, reply);
+	}
+
 	if (pb->driver && pb->driver->remove)
 		pb->driver->remove(pb);
 

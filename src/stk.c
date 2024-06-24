@@ -3189,6 +3189,11 @@ static void stk_remove(struct ofono_atom *atom)
 	if (stk == NULL)
 		return;
 
+	if (stk->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(stk->pending);
+		__ofono_dbus_pending_reply(&stk->pending, reply);
+	}
+
 	if (stk->driver && stk->driver->remove)
 		stk->driver->remove(stk);
 

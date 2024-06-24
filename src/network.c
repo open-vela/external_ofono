@@ -2264,6 +2264,11 @@ static void netreg_remove(struct ofono_atom *atom)
 	if (netreg == NULL)
 		return;
 
+	if (netreg->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(netreg->pending);
+		__ofono_dbus_pending_reply(&netreg->pending, reply);
+	}
+
 	if (netreg->driver != NULL && netreg->driver->remove != NULL)
 		netreg->driver->remove(netreg);
 

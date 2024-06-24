@@ -605,6 +605,11 @@ static void ims_atom_remove(struct ofono_atom *atom)
 	if (ims == NULL)
 		return;
 
+	if (ims->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(ims->pending);
+		__ofono_dbus_pending_reply(&ims->pending, reply);
+	}
+
 	if (ims->driver && ims->driver->remove)
 		ims->driver->remove(ims);
 
