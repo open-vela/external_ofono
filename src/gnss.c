@@ -267,6 +267,11 @@ static void gnss_remove(struct ofono_atom *atom)
 	if (gnss == NULL)
 		return;
 
+	if (gnss->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(gnss->pending);
+		__ofono_dbus_pending_reply(&gnss->pending, reply);
+	}
+
 	if (gnss->driver && gnss->driver->remove)
 		gnss->driver->remove(gnss);
 

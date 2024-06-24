@@ -326,6 +326,11 @@ static void call_volume_remove(struct ofono_atom *atom)
 	if (cv == NULL)
 		return;
 
+	if (cv->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(cv->pending);
+		__ofono_dbus_pending_reply(&cv->pending, reply);
+	}
+
 	if (cv->driver != NULL && cv->driver->remove != NULL)
 		cv->driver->remove(cv);
 

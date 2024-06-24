@@ -3488,6 +3488,11 @@ static void voicecall_remove(struct ofono_atom *atom)
 	if (vc == NULL)
 		return;
 
+	if (vc->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(vc->pending);
+		__ofono_dbus_pending_reply(&vc->pending, reply);
+	}
+
 	if (vc->driver && vc->driver->remove)
 		vc->driver->remove(vc);
 

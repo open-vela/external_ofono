@@ -656,6 +656,11 @@ static void cbs_remove(struct ofono_atom *atom)
 	if (cbs == NULL)
 		return;
 
+	if (cbs->pending != NULL) {
+		DBusMessage *reply = __ofono_error_failed(cbs->pending);
+		__ofono_dbus_pending_reply(&cbs->pending, reply);
+	}
+
 	if (cbs->driver != NULL && cbs->driver->remove != NULL)
 		cbs->driver->remove(cbs);
 
