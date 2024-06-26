@@ -159,7 +159,7 @@ static void gprs_context_changed(struct pri_context *context);
 static void gprs_set_data_profile_callback(const struct ofono_error *error,
 						int status, void *data);
 static void gprs_set_data_profile(struct ofono_gprs *gprs);
-static void spn_read_cb(const char *spn, const char *dc, void *data);
+static void gprs_sim_ready(struct ofono_gprs *gprs);
 
 static GSList *g_drivers = NULL;
 static GSList *g_context_drivers = NULL;
@@ -4156,13 +4156,11 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 		break;
 	case OFONO_SIM_STATE_READY:
 		gprs_load_settings(gprs, ofono_sim_get_imsi(gprs->sim));
-		ofono_sim_add_spn_watch(gprs->sim, &gprs->spn_watch,
-						spn_read_cb, gprs, NULL);
-
 		path = __ofono_atom_get_path(gprs->atom);
 		ofono_dbus_signal_property_changed(conn, path,
 						OFONO_CONNECTION_MANAGER_INTERFACE,
 						"DataOn", DBUS_TYPE_BOOLEAN, &gprs->data_on);
+		gprs_sim_ready(gprs);
 		break;
 	case OFONO_SIM_STATE_LOCKED_OUT:
 		break;
@@ -4189,9 +4187,8 @@ static void sim_watch(struct ofono_atom *atom,
 	sim_state_watch(ofono_sim_get_state(sim), gprs);
 }
 
-static void spn_read_cb(const char *spn, const char *dc, void *data)
+static void gprs_sim_ready(struct ofono_gprs *gprs)
 {
-	struct ofono_gprs *gprs	= data;
 	struct ofono_modem *modem = __ofono_atom_get_modem(gprs->atom);
 	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
 	const struct ofono_gprs_driver *driver = gprs->driver;
@@ -4203,12 +4200,7 @@ static void spn_read_cb(const char *spn, const char *dc, void *data)
 			gprs->provisioned);
 
 		provision_contexts(gprs, ofono_sim_get_mcc(sim),
-					ofono_sim_get_mnc(sim), spn);
-	}
-
-	if (gprs->spn_watch) {
-		ofono_sim_remove_spn_watch(sim, &gprs->spn_watch);
-		gprs->spn_watch = 0;
+					ofono_sim_get_mnc(sim), NULL);
 	}
 
 	if (driver == NULL)
