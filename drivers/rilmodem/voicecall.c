@@ -171,8 +171,7 @@ void stop_record_time(struct ofono_voicecall *vc)
 		return;
 	}
 
-	if (vd->call_duration_info.record_level >= SIGNAL_LEVEL_COUNT ||
-			vd->call_duration_info.record_level < 0) {
+	if (vd->call_duration_info.record_level >= SIGNAL_LEVEL_COUNT) {
 		ofono_error("unexpected record_level");
 		vd->call_duration_info.start_time = 0;
 		return;
