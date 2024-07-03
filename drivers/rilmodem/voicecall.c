@@ -188,6 +188,7 @@ void ril_update_call_duration(struct ofono_voicecall *vc, int signal_level)
 {
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
+	ofono_debug("ril_update_call_duration,signal_level:%d", signal_level);
 	if(signal_level != vd->call_duration_info.record_level) {
 		stop_record_time(vc);
 		vd->call_duration_info.record_level = signal_level;

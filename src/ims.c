@@ -737,6 +737,8 @@ static void ims_atom_unregister(struct ofono_atom *atom)
 		ims->radio_online_watch = 0;
 	}
 
+	report_ims_register_duration(ims);
+
 	ofono_modem_remove_interface(modem, OFONO_IMS_INTERFACE);
 	g_dbus_unregister_interface(conn, path, OFONO_IMS_INTERFACE);
 }
