@@ -956,11 +956,13 @@ static DBusMessage *pri_get_properties(DBusConnection *conn,
 
 void start_record_active_data_time(struct ofono_gprs *gprs)
 {
+	ofono_debug("start_record_active_data_time");
 	gprs->internet_start_time = time(NULL);
 }
 
 void stop_record_active_data_time(struct ofono_gprs *gprs)
 {
+	ofono_debug("stop_record_active_data_time");
 	gprs->internet_active_duration = gprs->internet_active_duration +
 		time(NULL) - gprs->internet_start_time;
 	gprs->internet_start_time = 0;
