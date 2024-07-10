@@ -1659,8 +1659,10 @@ void start_record_oos_time(struct ofono_netreg *netreg)
 
 void stop_record_oos_time(struct ofono_netreg *netreg)
 {
-	netreg->oos_duration = netreg->oos_duration + time(NULL) - netreg->oos_start_time;
-	netreg->oos_start_time = 0;
+	if (netreg->oos_start_time != 0) {
+		netreg->oos_duration = netreg->oos_duration + time(NULL) - netreg->oos_start_time;
+		netreg->oos_start_time = 0;
+	}
 }
 
 static gboolean report_oos_duration(gpointer user_data)
@@ -1689,6 +1691,14 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 	if (netreg->status != status) {
 		struct ofono_modem *modem;
 
+		if (netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
+				netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) {
+			OFONO_DFX_OOS_INFO();
+			start_record_oos_time(netreg);
+		} else {
+			stop_record_oos_time(netreg);
+		}
+
 		set_registration_status(netreg, status);
 
 		modem = __ofono_atom_get_modem(netreg->atom);
@@ -1712,7 +1722,6 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 
 	if (netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
 		netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) {
-		stop_record_oos_time(netreg);
 		if (netreg->driver->current_operator != NULL)
 			netreg->driver->current_operator(netreg,
 					current_operator_callback, netreg);
@@ -1724,8 +1733,6 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 		error.type = OFONO_ERROR_TYPE_NO_ERROR;
 		error.error = 0;
 
-		OFONO_DFX_OOS_INFO();
-		start_record_oos_time(netreg);
 		current_operator_callback(&error, NULL, netreg);
 		__ofono_netreg_set_base_station_name(netreg, NULL);
 
