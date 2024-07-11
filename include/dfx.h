@@ -9,6 +9,8 @@
 
 #define REPORTING_PERIOD 1000*60*60*24
 #define REASON_DESC_SIZE 20
+#define MAX_MCC_LENGTH 3
+#define MAX_MNC_LENGTH 3
 
 typedef enum {
 	OFONO_NORMAL_CALL = 1,
@@ -75,6 +77,12 @@ typedef enum {
 	OFONO_SMS_NORMAL = 0,
 	OFONO_SMS_FAIL
 } ofono_sms_fail_scenario;
+
+struct ofono_plmn_op_code {
+    char mcc[MAX_MCC_LENGTH + 1];
+    char mnc[MAX_MNC_LENGTH + 1];
+    int op_code;
+};
 
 #if defined(CONFIG_DFX) && defined(CONFIG_DFX_EVENT)
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                \
