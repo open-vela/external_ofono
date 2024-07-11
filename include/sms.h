@@ -67,6 +67,8 @@ struct ofono_sms_driver {
 			ofono_sms_write_to_sim_cb_t cb, void *data);
 	void (*sms_delete_on_sim)(struct ofono_sms *sms, int index,
 				ofono_sms_delete_on_sim_cb_t cb, void *user_data);
+	int (*get_op_code)(void *driver_data);
+	void (*save_mcc_mnc)(void *driver_data, const char *mcc, const char *mnc);
 };
 
 void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,

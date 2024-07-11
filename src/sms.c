@@ -884,6 +884,13 @@ static void netreg_status_watch(int status, int lac, int ci, int tech,
 
 	if (g_queue_get_length(sms->txq))
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
+
+	if (sms->driver_data != NULL) {
+		if (sms->driver->save_mcc_mnc) {
+			sms->driver->save_mcc_mnc(sms->driver_data,
+					mcc, mnc);
+		}
+	}
 }
 
 static void netreg_watch(struct ofono_atom *atom,
@@ -1070,10 +1077,14 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 	gboolean use_16bit_ref = FALSE;
 	int err;
 	struct ofono_uuid uuid;
+	int op_code = OFONO_OPERATOR_UNKNOW;
 
 	if (sms->pending) {
-		OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_CS_SMS,
-			OFONO_SMS_SEND, OFONO_SMS_FAIL);
+		if (sms->driver != NULL && sms->driver->get_op_code) {
+			op_code = sms->driver->get_op_code(sms->driver_data);
+		}
+		OFONO_DFX_SMS_INFO(op_code, OFONO_CS_SMS,
+				OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1138,9 +1149,13 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	gboolean use_16bit_ref = FALSE;
 	int err;
 	struct ofono_uuid uuid;
+	int op_code = OFONO_OPERATOR_UNKNOW;
 
 	if (sms->pending) {
-		OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_IMS_SMS,
+                if (sms->driver != NULL && sms->driver->get_op_code) {
+			op_code = sms->driver->get_op_code(sms->driver_data);
+		}
+		OFONO_DFX_SMS_INFO(op_code, OFONO_IMS_SMS,
 				OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		return __ofono_error_busy(msg);
 	}

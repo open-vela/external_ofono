@@ -48,6 +48,8 @@
 struct sms_data {
 	GRil *ril;
 	unsigned int vendor;
+	char mcc[OFONO_MAX_MCC_LENGTH + 1];
+	char mnc[OFONO_MAX_MNC_LENGTH + 1];
 };
 
 static void ril_csca_set_cb(struct ril_msg *message, gpointer user_data)
@@ -154,6 +156,61 @@ static void ril_csca_query(struct ofono_sms *sms, ofono_sms_sca_query_cb_t cb,
 	}
 }
 
+static int ril_get_op_code(void *driver_data)
+{
+	struct sms_data *sd = (struct sms_data *)driver_data;
+	int i;
+	int list_len;
+	struct ofono_plmn_op_code op_info_list[] = {
+		{ "460", "00", OFONO_CMCC },
+		{ "460", "02", OFONO_CMCC },
+		{ "460", "04", OFONO_CMCC },
+		{ "460", "07", OFONO_CMCC },
+		{ "460", "08", OFONO_CMCC },
+		{ "460", "03", OFONO_CT },
+		{ "460", "05", OFONO_CT },
+		{ "460", "11", OFONO_CT },
+		{ "460", "01", OFONO_CU },
+		{ "460", "06", OFONO_CU },
+		{ "460", "09", OFONO_CU },
+		{ "460", "15", OFONO_CBN },
+	};
+
+	if (sd == NULL) {
+		return OFONO_OPERATOR_UNKNOW;
+	}
+
+	if (sd->mcc[0] == '\0' || sd->mnc[0] == '\0' ) {
+		return OFONO_OPERATOR_UNKNOW;
+	}
+	list_len = sizeof(op_info_list) / sizeof(struct ofono_plmn_op_code);
+	for (i = 0; i < list_len; i++) {
+		if (!strcmp(sd->mcc, op_info_list[i].mcc) &&
+				!strcmp(sd->mnc, op_info_list[i].mnc)) {
+			return op_info_list[i].op_code;
+		}
+	}
+	return OFONO_OPERATOR_UNKNOW;
+}
+
+void ril_save_mcc_mnc(void *driver_data, const char *mcc, const char *mnc)
+{
+	struct sms_data *sd = (struct sms_data *)driver_data;
+	if (sd != NULL) {
+		if (mcc != NULL) {
+			strncpy(sd->mcc, mcc, OFONO_MAX_MCC_LENGTH);
+		} else {
+			sd->mcc[0] = '\0';
+		}
+		if (mnc != NULL) {
+			strncpy(sd->mnc, mnc, OFONO_MAX_MCC_LENGTH);
+		} else {
+			sd->mnc[0] = '\0';
+		}
+	}
+}
+
+
 static void ril_submit_sms_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
@@ -165,7 +222,8 @@ static void ril_submit_sms_cb(struct ril_msg *message, gpointer user_data)
 	int error;
 
 	if (message->error != RIL_E_SUCCESS) {
-		OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW,
+
+		OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
 				OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		CALLBACK_WITH_FAILURE(cb, 0, cbd->data);
 		return;
@@ -410,7 +468,7 @@ static void ril_cmgs(struct ofono_sms *sms, const unsigned char *pdu,
 			ril_submit_sms_cb, cbd, g_free) > 0)
 		return;
 
-	OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW,
+	OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
 			OFONO_SMS_SEND, OFONO_SMS_FAIL);
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, -1, user_data);
@@ -520,10 +578,11 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	char *ril_pdu;
 	size_t ril_pdu_len;
 	unsigned char pdu[176];
+	gboolean fail_flag = FALSE;
 
 	ofono_debug("req: %d; data_len: %d", message->req, (int) message->buf_len);
-	OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
-						OFONO_SMS_NORMAL);
+	OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
+			OFONO_SMS_RECEIVE, OFONO_SMS_NORMAL);
 
 	g_ril_init_parcel(message, &rilp);
 
@@ -538,12 +597,14 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 
 	if (ril_pdu_len > sizeof(pdu) * 2) {
 		ofono_error("invalid pdu, return !");
+		fail_flag = TRUE;
 		goto fail;
 	}
 
 	if (decode_hex_own_buf(ril_pdu, ril_pdu_len,
 					&ril_buf_len, -1, pdu) == NULL) {
 		ofono_error("decoded pdu failed !");
+		fail_flag = TRUE;
 		goto fail;
 	}
 
@@ -568,8 +629,10 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	ril_ack_delivery(sms);
 
 fail:
-	OFONO_DFX_SMS_INFO(OFONO_OPERATOR_UNKNOW, OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
-					OFONO_SMS_FAIL);
+	if (fail_flag) {
+		OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
+				OFONO_SMS_RECEIVE, OFONO_SMS_FAIL);
+	}
 	g_free(ril_pdu);
 }
 
@@ -626,6 +689,8 @@ static const struct ofono_sms_driver driver = {
 	.bearer_set	= ril_sms_bearer_set,
 	.sms_write_to_sim   = ril_sms_write_to_sim,
 	.sms_delete_on_sim  = ril_sms_delete_on_sim,
+	.get_op_code    = ril_get_op_code,
+	.save_mcc_mnc   = ril_save_mcc_mnc,
 };
 
 void ril_sms_init(void)
