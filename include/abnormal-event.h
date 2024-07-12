@@ -43,28 +43,29 @@ enum ofono_abnormal_event {
 };
 
 #pragma pack(1)
+
 struct ofono_cell_quality {
-	//0X7FFF will be reported if param is invalid
+	// 0X7FFF will be reported if param is invalid
 	int16_t rsrp;
 	int16_t rsrq;
 	int16_t sinr;
 	int16_t rssi;
 };
 
-//ABNORMAL_EF_FILE=2
+// ABNORMAL_EF_FILE=2
 struct ofono_abnormal_ef_file {
 	unsigned int sub;
-	uint16_t ef_id;//ref TS 31.102
-	uint8_t  sw1;//sw1 sw2 ref TS 31.102
-	uint8_t  sw2;
+	uint16_t ef_id; // ref TS 31.102
+	uint8_t sw1;	// sw1 sw2 ref TS 31.102
+	uint8_t sw2;
 };
 
-//ABNORMAL_PROFILE=3
+// ABNORMAL_PROFILE=3
 struct ofono_abnormal_profile {
 	unsigned int sub;
 };
 
-//ABNORMAL_RLF=4
+// ABNORMAL_RLF=4
 struct ofono_abnormal_reest {
 	unsigned int sub;
 	unsigned int earfcn;
@@ -86,7 +87,7 @@ struct ofono_abnormal_reest {
 	unsigned int reest_cause;
 };
 
-//ABNORMAL_RACH_ACCESS=5
+// ABNORMAL_RACH_ACCESS=5
 struct ofono_abnormal_rach_access {
 	unsigned int sub;
 	unsigned int earfcn;
@@ -99,7 +100,7 @@ struct ofono_abnormal_rach_access {
 	unsigned int fail_reason;
 };
 
-//ABNORMAL_OOS=6
+// ABNORMAL_OOS=6
 struct ofono_abnormal_oos {
 	unsigned int sub;
 	unsigned int earfcn;
@@ -115,7 +116,7 @@ struct ofono_abnormal_oos {
 	unsigned int oos_type;
 };
 
-//ABNORMAL_NAS_TIMEOUT=7
+// ABNORMAL_NAS_TIMEOUT=7
 struct ofono_abnormal_timer_exp {
 	unsigned int sub;
 	/*
@@ -137,7 +138,7 @@ struct ofono_abnormal_timer_exp {
 	struct ofono_cell_quality cell_quality;
 };
 
-//ABNORMAL_SIP_TIMEOUT=8
+// ABNORMAL_SIP_TIMEOUT=8
 struct ofono_abnormal_sip_timeout {
 	unsigned int sub;
 	/*
@@ -163,7 +164,7 @@ struct ofono_abnormal_sip_timeout {
 	unsigned int sip_method;
 };
 
-//ABNORMAL_TIMEOUT_IN_RRC=9
+// ABNORMAL_TIMEOUT_IN_RRC=9
 struct ofono_abnormal_timeout_in_rrc {
 	unsigned int sub;
 	unsigned int earfcn;
@@ -178,7 +179,7 @@ struct ofono_abnormal_timeout_in_rrc {
 	unsigned int timer;
 };
 
-//ABNORMAL_ECC_CALL_FAIL=10
+// ABNORMAL_ECC_CALL_FAIL=10
 struct ofono_abnormal_ecc_call_fail {
 	unsigned int sub;
 	/*
@@ -191,7 +192,7 @@ struct ofono_abnormal_ecc_call_fail {
 	unsigned int cause;
 };
 
-//ABNORMAL_RTP_RTCP=11
+// ABNORMAL_RTP_RTCP=11
 struct ofono_abnormal_rtp_rtcp {
 	unsigned int sub;
 	/*
@@ -202,7 +203,7 @@ struct ofono_abnormal_rtp_rtcp {
 	unsigned int error_type;
 };
 
-//ABNORMAL_PAGING_DECODE=12
+// ABNORMAL_PAGING_DECODE=12
 struct ofono_abnormal_paging_decode {
 	unsigned int sub;
 	unsigned int earfcn;
@@ -210,23 +211,27 @@ struct ofono_abnormal_paging_decode {
 	struct ofono_cell_quality cell_quality;
 };
 
-//ABNORMAL_CALL_QUALITY=13
+// ABNORMAL_CALL_QUALITY=13
 struct ofono_abnormal_call_quality {
 	unsigned int sub;
 	unsigned int pkt_lost;
-	unsigned int fraction_lost;//RTP downlink packet loss rate (threshold:50%)
-	unsigned int jitter_buffer_size;//Jitter buffer size, indicating the delay situation
+	unsigned int
+		fraction_lost; // RTP downlink packet loss rate (threshold:50%)
+	unsigned int jitter_buffer_size; // Jitter buffer size, indicating the
+					 // delay situation
 };
 
-//ABNORMAL_PDCP=14
+// ABNORMAL_PDCP=14
 struct ofono_abnormal_pdcp {
 	unsigned int sub;
-	unsigned int dl_loss_rate;//PDCP downlink packet loss rate(threshold:20%)
-	unsigned int ul_loss_rate;//PDCP uplink packet loss rate(threshold:20%)
+	unsigned int
+		dl_loss_rate; // PDCP downlink packet loss rate(threshold:20%)
+	unsigned int ul_loss_rate; // PDCP uplink packet loss
+				   // rate(threshold:20%)
 	struct ofono_cell_quality cell_quality;
 };
 
-//ABNORMAL_NAS_REJECT=15
+// ABNORMAL_NAS_REJECT=15
 struct ofono_abnormal_nas_reject {
 	unsigned int sub;
 	/*
@@ -240,7 +245,7 @@ struct ofono_abnormal_nas_reject {
 	100: EPS_ESM_PDN_CONN_REJECT
 	101: EPS_ESM_BEARER_MT_DEACT
 	*/
-	unsigned int procedure_type;//ref 24.301
+	unsigned int procedure_type; // ref 24.301
 	/*
 	1. ATTACH/TAU/SR/MT Detach, reject_cause ref 24301
 	2. EPS_IDENTITY，reject_cause
@@ -259,7 +264,7 @@ struct ofono_abnormal_nas_reject {
 	struct ofono_cell_quality cell_quality;
 };
 
-//ABNORMAL_SIP_REJECT=16
+// ABNORMAL_SIP_REJECT=16
 struct ofono_abnormal_sip_reject {
 	unsigned int sub;
 	/*
@@ -286,9 +291,9 @@ struct ofono_abnormal_sip_reject {
 	unsigned int resp_code;
 };
 
-//ABNORMAL_RRC_REJECT=17
+// ABNORMAL_RRC_REJECT=17
 struct ofono_abnormal_rrc_reject {
-	unsigned int sub;//0,1
+	unsigned int sub; // 0,1
 	unsigned int earfcn;
 	unsigned int pci;
 	/*
@@ -298,7 +303,7 @@ struct ofono_abnormal_rrc_reject {
 	unsigned int error_scenario_id;
 };
 
-//ABNORMAL_PING_PONG=18
+// ABNORMAL_PING_PONG=18
 struct ofono_abnormal_ping_pong {
 	unsigned int sub;
 	unsigned int pcell_pci;
@@ -309,16 +314,16 @@ struct ofono_abnormal_ping_pong {
 	unsigned int ncell_rsrp;
 };
 
-//ABNORMAL_CC=19
+// ABNORMAL_CC=19
 struct ofono_cc_abnormal_fail {
-      unsigned int sub;
-      unsigned int cause;//ref 24.008
-      unsigned int error_scenario_id;
-    /*0:internal error event*/
-    /*1:network send disconnect/release*/
+	unsigned int sub;
+	unsigned int cause; // ref 24.008
+	unsigned int error_scenario_id;
+	/*0:internal error event*/
+	/*1:network send disconnect/release*/
 };
 
-//ABNORMAL_XCAP=20
+// ABNORMAL_XCAP=20
 struct ofono_abnormal_xcap {
 	unsigned int sub;
 	/*
@@ -367,7 +372,7 @@ struct ofono_abnormal_xcap {
 	unsigned int error_type;
 };
 
-//ABNORMAL_DATA=21
+// ABNORMAL_DATA=21
 struct ofono_abnormal_data {
 	unsigned int sub;
 	unsigned int event;
@@ -379,7 +384,7 @@ struct ofono_abnormal_data {
 	struct ofono_cell_quality cell_quality;
 };
 
-//OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP=22
+// OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP=22
 struct ofono_abnormal_call_end_reason_from_sip {
 	unsigned int sub;
 	/*
@@ -393,7 +398,7 @@ struct ofono_abnormal_call_end_reason_from_sip {
 	unsigned int reason_type;
 };
 
-//LIMITED_SERVICE_CAMP_EVENT=200
+// LIMITED_SERVICE_CAMP_EVENT=200
 struct ofono_abnormal_limited_service {
 	unsigned int sub;
 	/*
@@ -411,32 +416,32 @@ struct ofono_abnormal_limited_service {
 	unsigned int cause;
 };
 
-//REDIRECT_EVENT=201
+// REDIRECT_EVENT=201
 struct ofono_redirect_event {
 	unsigned int sub;
 };
 
-//HANDOVER_EVENT=202
+// HANDOVER_EVENT=202
 struct ofono_abnormal_handover_event {
 	unsigned int sub;
 };
 
-//RESELECT_EVENT=203
+// RESELECT_EVENT=203
 struct ofono_abnormal_reselect_event {
 	unsigned int sub;
 };
 
-//CSFB_EVENT=204
+// CSFB_EVENT=204
 struct ofono_csfb_event {
 	unsigned int sub;
 };
 
-//SRVCC_EVENT=205
+// SRVCC_EVENT=205
 struct ofono_srvcc_event {
 	unsigned int sub;
 };
 
-//UE_CAP_INFO =206
+// UE_CAP_INFO =206
 struct ofono_ue_cap_info {
 	unsigned int sub;
 	unsigned int support_band_num;
@@ -445,7 +450,7 @@ struct ofono_ue_cap_info {
 	unsigned int category;
 };
 
-//UE_CAMP_CELL_INFO=207
+// UE_CAMP_CELL_INFO=207
 struct ofono_ue_camp_cell_info {
 	unsigned int sub;
 	unsigned int plmn;
@@ -456,16 +461,17 @@ struct ofono_ue_camp_cell_info {
 	unsigned int pci;
 };
 
-//UE_SIM_INFO=208
+// UE_SIM_INFO=208
 struct ofono_ue_sim_info {
 	unsigned int sub;
 	unsigned int hplmn;
 	unsigned int ehplmn_num;
 	unsigned int ehplmn[16];
 };
+
 #pragma pack()
 
-void ofono_handle_abnormal_event(int type_id, char* data, int data_len);
+void ofono_handle_abnormal_event(int type_id, char *data, int data_len);
 
 #ifdef __cplusplus
 }
