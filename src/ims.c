@@ -324,6 +324,7 @@ static void notify_status_watches(struct ofono_ims *ims)
 
 void update_ims_register_duration(struct ofono_ims *ims, int reg_info)
 {
+	ofono_debug("update_ims_register_duration,reg_info=%d", reg_info);
 	if (reg_info) {
 		if (ims->ims_register_start_time == 0) {
 			ims->ims_register_start_time = time(NULL);
@@ -348,9 +349,14 @@ static gboolean report_ims_register_duration(gpointer user_data)
 			ims->ims_register_start_time +
 			ims->ims_register_duration;
 		ims->ims_register_start_time = time(NULL);
+	} else {
+		ofono_debug("ims is not active currently");
 	}
-	OFONO_DFX_IMS_DURATION((int)ims->ims_register_duration);
 
+	if (ims->ims_register_duration != 0) {
+		OFONO_DFX_IMS_DURATION(( int ) ims->ims_register_duration);
+	}
+	ims->ims_register_duration = 0;
 	return TRUE;
 }
 
@@ -474,7 +480,7 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_IMS_INTERFACE,
 					"ImsSwitchStatus", DBUS_TYPE_BOOLEAN, &ims->user_setting);
-
+	ofono_debug("ofono_ims_unregister");
 	report_ims_register_duration(ims);
 	return NULL;
 }
@@ -737,7 +743,9 @@ static void ims_atom_unregister(struct ofono_atom *atom)
 		ims->radio_online_watch = 0;
 	}
 
+	ofono_debug("ims_atom_unregister");
 	report_ims_register_duration(ims);
+	g_source_remove(ims->ims_reigster_report_time_id);
 
 	ofono_modem_remove_interface(modem, OFONO_IMS_INTERFACE);
 	g_dbus_unregister_interface(conn, path, OFONO_IMS_INTERFACE);
