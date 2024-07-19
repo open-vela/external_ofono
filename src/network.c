@@ -1885,6 +1885,8 @@ static gboolean report_signal_level_info(gpointer user_data)
 			(int)netreg->signal_level_duration[3],
 			(int)netreg->signal_level_duration[4],
 			(int)netreg->signal_level_duration[5]);
+	memset(netreg->signal_level_duration, 0,
+	       sizeof(netreg->signal_level_duration));
 	return TRUE;
 }
 
@@ -1900,7 +1902,7 @@ static gboolean report_rat_info(gpointer user_data)
 			(int)netreg->rat_duration[1],
 			(int)netreg->rat_duration[2],
 			(int)netreg->rat_duration[3]);
-
+	memset(netreg->rat_duration, 0, sizeof(netreg->rat_duration));
 	return TRUE;
 }
 
