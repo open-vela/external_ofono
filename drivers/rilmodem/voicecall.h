@@ -23,7 +23,7 @@
 struct ofono_voicecall_duration_info {
 	time_t start_time;
 	unsigned int record_level;
-	time_t level[SIGNAL_LEVEL_COUNT];
+	int level[SIGNAL_LEVEL_COUNT];
 	guint report_time_id;
 };
 

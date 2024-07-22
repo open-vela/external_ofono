@@ -96,7 +96,7 @@ struct ofono_gprs {
 	unsigned int spn_watch;
 	unsigned int radio_online_watch;
 	time_t internet_start_time;
-	time_t internet_active_duration;
+	int internet_active_duration;
 	int report_data_active_time_id;
 };
 
@@ -976,7 +976,9 @@ static gboolean report_data_active_duration(gpointer user_data)
 		stop_record_active_data_time(gprs);
 		start_record_active_data_time(gprs);
 	}
-	OFONO_DFX_DATA_ACTIVE_DURATION((int)gprs->internet_active_duration);
+	if (gprs->internet_active_duration != 0) {
+		OFONO_DFX_DATA_ACTIVE_DURATION(gprs->internet_active_duration);
+	}
 	gprs->internet_active_duration = 0;
 
 	return TRUE;
