@@ -260,6 +260,20 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	return reply;
 }
 
+void __ofono_manager_data_log(char *data)
+{
+	DBusMessage *signal;
+	DBusMessageIter iter;
+	signal = dbus_message_new_signal(OFONO_MANAGER_PATH,
+					 OFONO_MANAGER_INTERFACE, "DataLogInd");
+	if (signal == NULL)
+		return;
+
+	dbus_message_iter_init_append(signal, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &data);
+	g_dbus_send_message(ofono_dbus_get_connection(), signal);
+}
+
 static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_METHOD("GetModems",
 				NULL, GDBUS_ARGS({ "modems", "a(oa{sv})" }),
@@ -280,6 +294,8 @@ static const GDBusSignalTable manager_signals[] = {
 		GDBUS_ARGS({ "path", "o" })) },
 	{ GDBUS_SIGNAL("PropertyChanged",
 			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
+	{ GDBUS_SIGNAL("DataLogInd",
+			GDBUS_ARGS({ "name", "s" }))},
 	{ }
 };
 
