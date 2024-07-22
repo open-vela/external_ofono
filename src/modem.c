@@ -103,7 +103,7 @@ struct ofono_modem {
 	int			module_mask;
 	int			from_event_id;
 	int			to_event_id;
-	time_t			modem_duration[2];
+	int			modem_duration[2];
 	int			modem_status;
 	time_t			modem_start_time;
 	int			modem_duration_report_id;
@@ -1541,6 +1541,7 @@ static DBusMessage *modem_enable(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_modem *modem = data;
 
+	ofono_debug("modem_enable");
 	modem->modem_duration[modem->modem_status] = time(NULL) -
 		modem->modem_start_time +
 		modem->modem_duration[modem->modem_status];
@@ -1555,6 +1556,7 @@ static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_modem *modem = data;
 
+	ofono_debug("modem_disable");
 	modem->modem_duration[modem->modem_status] = time(NULL) -
 		modem->modem_start_time +
 		modem->modem_duration[modem->modem_status];
@@ -2605,8 +2607,8 @@ static gboolean report_modem_duration(gpointer user_data)
 	modem->modem_duration[modem->modem_status] = time(NULL) -
 		modem->modem_start_time +
 		modem->modem_duration[modem->modem_status];
-	OFONO_DFX_MODEM_DURATION_INFO((int)modem->modem_duration[0],
-			(int)modem->modem_duration[1]);
+	OFONO_DFX_MODEM_DURATION_INFO(modem->modem_duration[0],
+				      modem->modem_duration[1]);
 	modem->modem_start_time = time(NULL);
 	memset(modem->modem_duration, 0, sizeof(modem->modem_duration));
 

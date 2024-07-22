@@ -1255,12 +1255,20 @@ static gboolean report_call_time(gpointer user_data)
 	}
 
 	if (SIGNAL_LEVEL_COUNT == 6) {
-		OFONO_DFX_CALL_TIME_INFO((int)vd->call_duration_info.level[0],
-				(int)vd->call_duration_info.level[1],
-				(int)vd->call_duration_info.level[2],
-				(int)vd->call_duration_info.level[3],
-				(int)vd->call_duration_info.level[4],
-				(int)vd->call_duration_info.level[5]);
+		if (vd->call_duration_info.level[0] != 0 ||
+		    vd->call_duration_info.level[1] != 0 ||
+		    vd->call_duration_info.level[2] != 0 ||
+		    vd->call_duration_info.level[3] != 0 ||
+		    vd->call_duration_info.level[4] != 0 ||
+		    vd->call_duration_info.level[5] != 0) {
+			OFONO_DFX_CALL_TIME_INFO(
+				vd->call_duration_info.level[0],
+				vd->call_duration_info.level[1],
+				vd->call_duration_info.level[2],
+				vd->call_duration_info.level[3],
+				vd->call_duration_info.level[4],
+				vd->call_duration_info.level[5]);
+		}
 	}
 
 		memset(vd->call_duration_info.level, 0,

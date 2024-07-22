@@ -61,7 +61,7 @@ struct ofono_ims {
 	char *ph_number_from_setting;
 	char ph_number[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
 	time_t ims_register_start_time;
-	time_t ims_register_duration;
+	int ims_register_duration;
 	int ims_reigster_report_time_id;
 };
 
@@ -354,9 +354,10 @@ static gboolean report_ims_register_duration(gpointer user_data)
 	}
 
 	if (ims->ims_register_duration != 0) {
-		OFONO_DFX_IMS_DURATION(( int ) ims->ims_register_duration);
+		OFONO_DFX_IMS_DURATION(ims->ims_register_duration);
 	}
 	ims->ims_register_duration = 0;
+
 	return TRUE;
 }
 
