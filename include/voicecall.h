@@ -28,6 +28,12 @@ extern "C" {
 
 #include <ofono/types.h>
 
+/*
+ *  category 0 means default category,condition 1 means real ecc in no sim or
+ *  sim
+ */
+#define DEFAULT_CATEGORY_CONDITION_FOR_ECC "0,1"
+
 struct ofono_modem;
 struct ofono_netreg;
 struct ofono_voicecall;
@@ -217,6 +223,11 @@ ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
 int ofono_voicecall_get_signal_level(struct ofono_voicecall *vc);
 void ofono_voicecall_update_call_duration(struct ofono_voicecall *vc,
 					struct ofono_netreg *netreg);
+char *ofono_voicecall_get_last_used_mnc_mcc(char *type);
+GSList *ofono_voicecall_load_cust_ecc_with_mcc_mnc(const char *mcc,
+						   const char *mnc);
+const char **ofono_voicecall_get_default_en_list(void);
+const char **ofono_voicecall_get_default_en_list_no_sim(void);
 #ifdef __cplusplus
 }
 #endif
