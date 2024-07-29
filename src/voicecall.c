@@ -82,6 +82,10 @@ struct ofono_voicecall {
 	struct ofono_emulator *pending_em;
 	unsigned int pending_id;
 	enum phone_status status;
+	GHashTable *dialing_ecc_info;
+	struct ofono_netreg *netreg;
+	unsigned int netreg_watch;
+	unsigned int netreg_status_watch;
 };
 
 struct voicecall {
@@ -192,7 +196,9 @@ static void add_to_en_list(struct ofono_voicecall *vc, char **list)
 	int i = 0;
 
 	while (list[i])
-		g_hash_table_insert(vc->en_list, g_strdup(list[i++]), NULL);
+		g_hash_table_insert(
+			vc->en_list, g_strdup(list[i++]),
+			g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
 }
 
 static const char *disconnect_reason_to_string(enum ofono_disconnect_reason r)
@@ -428,6 +434,49 @@ static void tone_request_finish(struct ofono_voicecall *vc,
 
 	g_free(entry->tone_str);
 	g_free(entry);
+}
+
+static gboolean query_dialing_ecc_info(struct ofono_voicecall *vc,
+				       const char *number)
+{
+	return g_hash_table_lookup_extended(vc->dialing_ecc_info, number, NULL,
+					    NULL);
+}
+
+static void remove_dialing_ecc_info(struct ofono_voicecall *vc,
+				    const char *number)
+{
+	int count = 0;
+	gpointer value = NULL;
+
+	if (g_hash_table_lookup_extended(vc->dialing_ecc_info, number, NULL,
+					 &value)) {
+		g_hash_table_remove(vc->dialing_ecc_info, number);
+		count = GPOINTER_TO_INT(value);
+		if (count > 1) {
+			count -= 1;
+			g_hash_table_insert(vc->dialing_ecc_info,
+					    g_strdup(number),
+					    GINT_TO_POINTER(count));
+		}
+	} else {
+		ofono_debug("unexpected,no %s exist in dialing_ecc_info",
+			    number);
+	}
+}
+
+static void save_dialing_ecc_info(struct ofono_voicecall *vc,
+				  const char *number)
+{
+	int count = 1;
+	gpointer value = NULL;
+
+	if (g_hash_table_lookup_extended(vc->dialing_ecc_info, number, NULL,
+					 &value)) {
+		count += GPOINTER_TO_INT(value);
+	}
+	g_hash_table_insert(vc->dialing_ecc_info, g_strdup(number),
+			    GINT_TO_POINTER(count));
 }
 
 static gboolean is_emergency_number(struct ofono_voicecall *vc,
@@ -1460,11 +1509,14 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 					&dict);
 
 	/* property EmergencyNumbers */
-	list = g_new0(char *, g_hash_table_size(vc->en_list) + 1);
+	list = g_new0(char *, g_hash_table_size(vc->en_list) * 2 + 1);
 	g_hash_table_iter_init(&ht_iter, vc->en_list);
 
-	for (i = 0; g_hash_table_iter_next(&ht_iter, &key, &value); i++)
+	for (i = 0; g_hash_table_iter_next(&ht_iter, &key, &value); i++) {
 		list[i] = key;
+		i++;
+		list[i] = value;
+	}
 
 	ofono_dbus_dict_append_array(&dict, "EmergencyNumbers",
 					DBUS_TYPE_STRING, &list);
@@ -1643,8 +1695,9 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 	} else {
 		struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 
-		if (is_emergency_number(vc, number) == TRUE) {
+		if (query_dialing_ecc_info(vc, number) == TRUE) {
 			__ofono_modem_dec_emergency_mode(modem);
+			remove_dialing_ecc_info(vc, number);
 			OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE,
 					OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
 		} else {
@@ -1709,6 +1762,7 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 
 	if (is_emergency_number(vc, number) == TRUE) {
 		__ofono_modem_inc_emergency_mode(modem);
+		save_dialing_ecc_info(vc, number);
 		OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE,
 				OFONO_VOICE, OFONO_NORMAL, "NA");
 	}
@@ -2862,8 +2916,10 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	}
 
 	number = phone_number_to_string(&call->call->phone_number);
-	if (is_emergency_number(vc, number) == TRUE)
+	if (query_dialing_ecc_info(vc, number) == TRUE) {
 		__ofono_modem_dec_emergency_mode(modem);
+		remove_dialing_ecc_info(vc, number);
+	}
 
 	voicecall_set_call_status(call, CALL_STATUS_DISCONNECTED);
 
@@ -2937,8 +2993,10 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 		struct dial_request *req = vc->dial_req;
 		const char *phone_number = phone_number_to_string(&req->ph);
 
-		if (!strcmp(phone_number, "112"))
+		if (!strcmp(phone_number, "112")) {
 			__ofono_modem_inc_emergency_mode(modem);
+			save_dialing_ecc_info(vc, phone_number);
+		}
 
 		if (v->call->clip_validity == CLIP_VALIDITY_NOT_AVAILABLE) {
 			char *number = v->call->phone_number.number;
@@ -3120,11 +3178,15 @@ static void emit_en_list_changed(struct ofono_voicecall *vc)
 	GHashTableIter iter;
 	gpointer key, value;
 
-	list = g_new0(char *, g_hash_table_size(vc->en_list) + 1);
+	list = g_new0(char *, g_hash_table_size(vc->en_list) * 2 + 1);
+
 	g_hash_table_iter_init(&iter, vc->en_list);
 
-	for (i = 0; g_hash_table_iter_next(&iter, &key, &value); i++)
+	for (i = 0; g_hash_table_iter_next(&iter, &key, &value); i++) {
 		list[i] = key;
+		i++;
+		list[i] = value;
+	}
 
 	ofono_dbus_signal_array_property_changed(conn, path,
 				OFONO_VOICECALL_MANAGER_INTERFACE,
@@ -3145,9 +3207,12 @@ static void set_new_ecc(struct ofono_voicecall *vc)
 		GSList *el;
 		struct ofono_ecc_info *ecc;
 
-		for(el = vc->cust_ecc_list; el; el = el->next) {
+		for (el = vc->cust_ecc_list; el; el = el->next) {
+			char buf[5];
 			ecc = el->data;
-			g_hash_table_insert(vc->en_list, g_strdup(ecc->number), NULL);
+			snprintf(buf, sizeof(buf), "%u,%u", ecc->category,
+				 ecc->condition);
+			g_hash_table_insert(vc->en_list, g_strdup(ecc->number), buf);
 		}
 	}
 
@@ -3160,8 +3225,9 @@ static void set_new_ecc(struct ofono_voicecall *vc)
 		GSList *l;
 
 		for (l = vc->sim_en_list; l; l = l->next)
-			g_hash_table_insert(vc->en_list, g_strdup(l->data),
-							NULL);
+			g_hash_table_insert(
+				vc->en_list, g_strdup(l->data),
+				g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
 	} else
 		add_to_en_list(vc, (char **) default_en_list_no_sim);
 
@@ -3298,7 +3364,7 @@ static void set_cust_ecc_callback(const struct ofono_error *error, void *data)
 	set_new_ecc(vc);
 }
 
-char* get_last_used_mnc_mcc(char *type) {
+char *ofono_voicecall_get_last_used_mnc_mcc(char *type) {
 	char* type_value = NULL;
 	GKeyFile *keyfile =  g_key_file_new();
 
@@ -3327,15 +3393,61 @@ void save_used_mnc_mcc(const char *mcc, const char *mnc) {
 	}
 	ofono_debug("save mcc=%s,mnc=%s",mcc,mnc);
 	g_key_file_free(keyfile);
+}
 
+const char **ofono_voicecall_get_default_en_list()
+{
+	return default_en_list;
+}
+
+const char **ofono_voicecall_get_default_en_list_no_sim()
+{
+	return default_en_list_no_sim;
+}
+
+GSList *ofono_voicecall_load_cust_ecc_with_mcc_mnc(const char *mcc,
+						   const char *mnc)
+{
+	GSList *current_ecc_list = NULL;
+	GSList *l;
+	unsigned int ecc_db_len;
+	struct ofono_ecc_info *ecc;
+
+	ecc_db_len = sizeof(cust_ecc_list) / sizeof(struct ofono_ecc_info);
+	ofono_debug("mcc:%s,mnc=%s", mcc, mnc);
+
+	for (int i = 0; i < ecc_db_len; i++) {
+		if (strcmp(cust_ecc_list[i].mcc, mcc) == 0 &&
+		    (strcmp(cust_ecc_list[i].mnc, mnc) == 0 ||
+		     strcmp(cust_ecc_list[i].mnc, "FFF") == 0)) {
+			l = g_slist_find_custom(current_ecc_list,
+						cust_ecc_list + i,
+						ecc_compare_by_number);
+			if (l) {
+				ecc = l->data;
+				// same ecc number, use special mnc value
+				// replace common mnc
+				if (strcmp(cust_ecc_list[i].mnc, mnc) == 0) {
+					current_ecc_list = g_slist_remove(
+						current_ecc_list, ecc);
+					current_ecc_list = g_slist_prepend(
+						current_ecc_list,
+						cust_ecc_list + i);
+				}
+
+			} else {
+				current_ecc_list = g_slist_prepend(
+					current_ecc_list, cust_ecc_list + i);
+			}
+		}
+	}
+
+	return current_ecc_list;
 }
 
 static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 {
-	struct ofono_ecc_info *ecc;
-	unsigned int ecc_db_len;
 	GSList *current_ecc_list = NULL;
-	GSList *l;
 	char *mcc;
 	char *mnc;
 	gboolean load_from_key_file = FALSE;
@@ -3343,8 +3455,8 @@ static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 	mcc = (char*)ofono_sim_get_mcc(vc->sim);
 	mnc = (char*)ofono_sim_get_mnc(vc->sim);
 	if (mcc == NULL || mnc == NULL || !strcmp(mcc,"") || !strcmp(mnc,"")) {
-		mcc = get_last_used_mnc_mcc("mcc");
-		mnc = get_last_used_mnc_mcc("mnc");
+		mcc = ofono_voicecall_get_last_used_mnc_mcc("mcc");
+		mnc = ofono_voicecall_get_last_used_mnc_mcc("mnc");
 		if(mcc == NULL || mnc == NULL ||
 			!strcmp(mcc,"") || !strcmp(mnc,"")) {
 			g_free(mcc);
@@ -3358,40 +3470,17 @@ static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 	} else {
 		save_used_mnc_mcc(mcc,mnc);
 	}
-	ofono_debug("mcc=%s,mnc=%s",mcc,mnc);
 	free_cust_ecc_numbers(vc);
 
-	ecc_db_len = sizeof(cust_ecc_list) / sizeof(struct ofono_ecc_info);
+	current_ecc_list = ofono_voicecall_load_cust_ecc_with_mcc_mnc(mcc, mnc);
 
-	for (int i = 0; i < ecc_db_len; i++) {
-		if (strcmp(cust_ecc_list[i].mcc, mcc) == 0 &&
-				(strcmp(cust_ecc_list[i].mnc, mnc) == 0 ||
-				strcmp(cust_ecc_list[i].mnc, "FFF") == 0)) {
-
-			l = g_slist_find_custom(current_ecc_list, cust_ecc_list+i,
-								ecc_compare_by_number);
-			if (l) {
-				ecc = l->data;
-
-				//same ecc number, use special mnc value replace common mnc
-				if (strcmp(cust_ecc_list[i].mnc, mnc) == 0) {
-					current_ecc_list= g_slist_remove(current_ecc_list, ecc);
-					current_ecc_list = g_slist_prepend(current_ecc_list,
-										cust_ecc_list+i);
-				}
-			} else {
-				current_ecc_list = g_slist_prepend(current_ecc_list,
-									cust_ecc_list+i);
-			}
-		}
-	}
-
-	if(load_from_key_file) {
+	if (load_from_key_file) {
 		g_free(mcc);
 		g_free(mnc);
 	}
 
-	ofono_debug("current_ecc_list len:%d",g_slist_length(current_ecc_list));
+	ofono_debug("current_ecc_list len:%d",
+		    g_slist_length(current_ecc_list));
 	if (g_slist_length(current_ecc_list) > 0) {
 		vc->cust_ecc_list = current_ecc_list;
 
@@ -3523,6 +3612,19 @@ static void voicecall_unregister(struct ofono_atom *atom)
 
 	voicecall_close_settings(vc);
 
+	if (vc->netreg_status_watch) {
+		__ofono_netreg_remove_status_watch(vc->netreg,
+						   vc->netreg_status_watch);
+		vc->netreg_status_watch = 0;
+	}
+
+	if (vc->netreg_watch) {
+		__ofono_modem_remove_atom_watch(modem, vc->netreg_watch);
+		vc->netreg_watch = 0;
+	}
+
+	vc->netreg = NULL;
+
 	if (vc->sim_state_watch) {
 		ofono_sim_remove_state_watch(vc->sim, vc->sim_state_watch);
 		vc->sim_state_watch = 0;
@@ -3545,6 +3647,9 @@ static void voicecall_unregister(struct ofono_atom *atom)
 
 	g_hash_table_destroy(vc->en_list);
 	vc->en_list = NULL;
+
+	g_hash_table_destroy(vc->dialing_ecc_info);
+	vc->dialing_ecc_info = NULL;
 
 	if (vc->dial_req)
 		dial_request_finish(vc);
@@ -4185,8 +4290,10 @@ static void emulator_dial_callback(const struct ofono_error *error, void *data)
 	if (v == NULL) {
 		struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 
-		if (is_emergency_number(vc, number) == TRUE)
+		if (query_dialing_ecc_info(vc, number) == TRUE) {
 			__ofono_modem_dec_emergency_mode(modem);
+			remove_dialing_ecc_info(vc, number);
+		}
 	}
 
 	if (vc->pending_em)
@@ -4355,6 +4462,67 @@ static void emulator_hfp_watch(struct ofono_atom *atom,
 	ofono_emulator_add_handler(em, "+BLDN", emulator_bldn_cb, vc, NULL);
 }
 
+static void netreg_status_watch(int status, int lac, int ci, int tech,
+				const char *mcc, const char *mnc, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	GSList *current_ecc_list = NULL;
+	GSList *iter, *l;
+	bool updated_flag = false;
+
+	ofono_debug("network status:%d", status);
+
+	if (mcc != NULL && mnc != NULL &&
+	    status == NETWORK_REGISTRATION_STATUS_ROAMING) {
+		char *sim_mcc = ( char * ) ofono_sim_get_mcc(vc->sim);
+		char *sim_mnc = ( char * ) ofono_sim_get_mnc(vc->sim);
+		ofono_debug("net mcc:%s,net mnc:%s,sim mcc:%s,sim mnc:%s", mcc,
+			    mnc, sim_mcc, sim_mnc);
+		if (sim_mcc == NULL || strcmp(mcc, sim_mcc) ||
+		    strcmp(mnc, sim_mnc)) {
+			current_ecc_list =
+				ofono_voicecall_load_cust_ecc_with_mcc_mnc(mcc,
+									   mnc);
+		}
+	}
+
+	if (current_ecc_list != NULL && g_slist_length(current_ecc_list) > 0) {
+		for (iter = current_ecc_list; iter != NULL; iter = iter->next) {
+			struct ofono_ecc_info *ecc = iter->data;
+
+			l = g_slist_find_custom(vc->cust_ecc_list, ecc,
+						ecc_compare_by_number);
+			if (!l) {
+				// drop if number has been added early by sim
+				vc->cust_ecc_list =
+					g_slist_prepend(vc->cust_ecc_list, ecc);
+				updated_flag = true;
+			}
+		}
+		g_slist_free(current_ecc_list);
+
+		if (updated_flag && vc->driver->set_cust_ecc != NULL) {
+			vc->driver->set_cust_ecc(vc, vc->cust_ecc_list,
+						 set_cust_ecc_callback, vc);
+		}
+	}
+}
+
+static void netreg_watch(struct ofono_atom *atom,
+			 enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		vc->netreg_status_watch = 0;
+		vc->netreg = NULL;
+		return;
+	}
+
+	vc->netreg = __ofono_atom_get_data(atom);
+	vc->netreg_status_watch = __ofono_netreg_add_status_watch(
+		vc->netreg, netreg_status_watch, vc, NULL);
+}
+
 void ofono_voicecall_register(struct ofono_voicecall *vc)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -4373,6 +4541,9 @@ void ofono_voicecall_register(struct ofono_voicecall *vc)
 
 	ofono_modem_add_interface(modem, OFONO_VOICECALL_MANAGER_INTERFACE);
 
+	vc->netreg_watch = __ofono_modem_add_atom_watch(
+		modem, OFONO_ATOM_TYPE_NETREG, netreg_watch, vc, NULL);
+
 	vc->en_list = g_hash_table_new_full(g_str_hash, g_str_equal,
 							g_free, NULL);
 
@@ -4382,6 +4553,9 @@ void ofono_voicecall_register(struct ofono_voicecall *vc)
 	 */
 	add_to_en_list(vc, (char **) default_en_list_no_sim);
 	add_to_en_list(vc, (char **) default_en_list);
+
+	vc->dialing_ecc_info =
+		g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
 	vc->sim_watch = __ofono_modem_add_atom_watch(modem,
 						OFONO_ATOM_TYPE_SIM,
@@ -4463,11 +4637,12 @@ static void dial_request_cb(const struct ofono_error *error, void *data)
 	v = dial_handle_result(vc, error, number, &need_to_emit);
 
 	if (v == NULL) {
-		if (is_emergency_number(vc, number) == TRUE) {
+		if (query_dialing_ecc_info(vc, number) == TRUE) {
 			struct ofono_modem *modem =
 				__ofono_atom_get_modem(vc->atom);
 
 			__ofono_modem_dec_emergency_mode(modem);
+			remove_dialing_ecc_info(vc, number);
 		}
 
 		dial_request_finish(vc);
@@ -4504,6 +4679,7 @@ static void dial_request(struct ofono_voicecall *vc)
 		struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 
 		__ofono_modem_inc_emergency_mode(modem);
+		save_dialing_ecc_info(vc, number);
 	}
 
 	vc->driver->dial(vc, &vc->dial_req->ph, OFONO_CLIR_OPTION_DEFAULT,
