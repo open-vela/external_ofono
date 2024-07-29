@@ -108,6 +108,7 @@ struct ofono_modem {
 	time_t			modem_start_time;
 	int			modem_duration_report_id;
 	GHashTable		*camp_band_info;
+	GHashTable		*en_list; /* emergency number list */
 };
 
 struct ofono_devinfo {
@@ -158,6 +159,112 @@ static const char *modem_type_to_string(enum ofono_modem_type type)
 	}
 
 	return "unknown";
+}
+
+static void emit_en_list_changed(struct ofono_modem *modem)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	char **list;
+	int i;
+	GHashTableIter iter;
+	gpointer key, value;
+
+	list = g_new0(char *, g_hash_table_size(modem->en_list) * 2 + 1);
+	g_hash_table_iter_init(&iter, modem->en_list);
+
+	for (i = 0; g_hash_table_iter_next(&iter, &key, &value); i++) {
+		list[i] = key;
+		i++;
+		list[i] = value;
+	}
+
+	ofono_dbus_signal_array_property_changed(
+		conn, modem->path, OFONO_MODEM_INTERFACE, "EmergencyNumbers",
+		DBUS_TYPE_STRING, &list);
+	g_free(list);
+}
+
+static void set_new_ecc(struct ofono_modem *modem, GSList *cust_ecc_list)
+{
+	GSList *el;
+	struct ofono_ecc_info *ecc;
+	int i = 0;
+	const char **default_en_list = ofono_voicecall_get_default_en_list();
+	const char **default_en_list_no_sim =
+		ofono_voicecall_get_default_en_list_no_sim();
+
+	g_hash_table_destroy(modem->en_list);
+	modem->en_list =
+		g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	for (el = cust_ecc_list; el; el = el->next) {
+		char buf[5];
+		ecc = el->data;
+		snprintf(buf, sizeof(buf), "%u,%u", ecc->category,
+			 ecc->condition);
+		g_hash_table_insert(modem->en_list, g_strdup(ecc->number), buf);
+	}
+	while (default_en_list_no_sim[i])
+		g_hash_table_insert(
+			modem->en_list, g_strdup(default_en_list_no_sim[i++]),
+			g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
+	i = 0;
+	while (default_en_list[i])
+		g_hash_table_insert(
+			modem->en_list, g_strdup(default_en_list[i++]),
+			g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
+
+	emit_en_list_changed(modem);
+}
+
+static DBusMessage *modem_load_ecc_list(DBusConnection *conn, DBusMessage *msg,
+					void *data)
+{
+	gboolean load_from_key_file = FALSE;
+	struct ofono_modem *modem = data;
+	GSList *iter;
+	GSList *cust_ecc_list;
+
+	if (modem->modem_state == MODEM_STATE_ALIVE) {
+		goto end;
+	}
+
+	char *mcc = ofono_voicecall_get_last_used_mnc_mcc("mcc");
+	char *mnc = ofono_voicecall_get_last_used_mnc_mcc("mnc");
+	if (!g_strcmp0(mcc, "") || !g_strcmp0(mnc, "")) {
+		g_free(mcc);
+		g_free(mnc);
+		mcc = "460";
+		mnc = "FFF";
+		ofono_debug("use default mcc mnc when modem disable");
+	} else {
+		load_from_key_file = TRUE;
+	}
+	ofono_debug("modem_load_ecc_list modem mcc=%s,mnc=%s", mcc, mnc);
+
+	cust_ecc_list = ofono_voicecall_load_cust_ecc_with_mcc_mnc(mcc, mnc);
+	if (g_slist_length(cust_ecc_list) > 0) {
+		for (iter = cust_ecc_list; iter != NULL; iter = iter->next) {
+			struct ofono_ecc_info *ecc = iter->data;
+			ofono_debug("modem_load_ecc_list modem "
+				    "current_ecc_list num:%s,%u,%u",
+				    ecc->number, ecc->condition, ecc->category);
+		}
+	} else {
+		if (cust_ecc_list == NULL) {
+			ofono_debug("modem_load_ecc_list cust_ecc_list null");
+		} else {
+			ofono_debug("modem_load_ecc_list len:%d",
+				    g_slist_length(cust_ecc_list));
+		}
+	}
+	if (load_from_key_file) {
+		g_free(mcc);
+		g_free(mnc);
+	}
+
+	set_new_ecc(modem, cust_ecc_list);
+end:
+	return dbus_message_new_method_return(msg);
 }
 
 static void modem_load_settings(struct ofono_modem *modem)
@@ -1832,6 +1939,8 @@ static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_METHOD("HandleCommand",
 			GDBUS_ARGS({ "atom", "i" }, { "command", "i" }),
 			NULL, modem_handle_command) },
+	{ GDBUS_ASYNC_METHOD("LoadModemEccList", NULL, NULL,
+			     modem_load_ecc_list) },
 	{ }
 };
 
@@ -2926,6 +3035,9 @@ static void modem_unregister(struct ofono_modem *modem)
 
 	emit_modem_removed(modem);
 	call_modemwatches(modem, FALSE);
+
+	g_hash_table_destroy(modem->en_list);
+	modem->en_list = NULL;
 }
 
 void ofono_modem_remove(struct ofono_modem *modem)
@@ -3066,6 +3178,7 @@ void __ofono_modem_inc_emergency_mode(struct ofono_modem *modem)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t emergency = TRUE;
 
+	ofono_debug("__ofono_modem_inc_emergency_mode:%d", modem->emergency);
 	if (++modem->emergency > 1)
 		return;
 
@@ -3080,6 +3193,7 @@ void __ofono_modem_dec_emergency_mode(struct ofono_modem *modem)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t emergency = FALSE;
 
+	ofono_debug("__ofono_modem_dec_emergency_mode:%d",modem->emergency);
 	if (modem->emergency == 0) {
 		ofono_error("emergency mode is already deactivated!!!");
 		return;
