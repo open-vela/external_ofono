@@ -955,6 +955,8 @@ static void ril_send_dtmf_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct ril_voicecall_data *vd = user_data;
 
+	g_ril_print_response_no_args(vd->ril, message);
+
 	if (message->error == RIL_E_SUCCESS) {
 		/* Remove sent DTMF character from queue */
 		gchar *tmp_tone_queue = g_strdup(vd->tone_queue + 1);
