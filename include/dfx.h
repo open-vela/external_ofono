@@ -8,7 +8,7 @@
 #endif
 #include <syslog.h>
 
-#define REPORTING_PERIOD 1000 * 60 * 60 * 24
+#define REPORTING_PERIOD 1000 * 60 * 60 * 5.5
 #define REASON_DESC_SIZE 20
 #define MAX_MCC_LENGTH 3
 #define MAX_MNC_LENGTH 3
