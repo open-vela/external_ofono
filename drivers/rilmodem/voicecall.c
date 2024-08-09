@@ -128,8 +128,9 @@ static void lastcause_cb(struct ril_msg *message, gpointer user_data)
 		reason = OFONO_DISCONNECT_REASON_REMOTE_HANGUP;
 	} else {
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", last_cause);
-		OFONO_DFX_CALL_INFO(OFONO_CALL_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
-				OFONO_MEDIA_UNKNOW, OFONO_HANGUP_FAIL, reason_desc);
+		OFONO_DFX_CALL_INFO(OFONO_CALL_TYPE_UNKNOW,
+				    OFONO_DIRECTION_UNKNOW, OFONO_MEDIA_UNKNOW,
+				    OFONO_CALL_UNKNOW_FAIL, reason_desc);
 	}
 
 done:
@@ -348,6 +349,12 @@ no_calls:
 					vd->cb = NULL;
 					vd->data = NULL;
 				}
+			}
+			if (nc->direction) {
+				OFONO_DFX_CALL_INFO(OFONO_CALL_TYPE_UNKNOW,
+						    OFONO_TERMINATE,
+						    OFONO_MEDIA_UNKNOW,
+						    OFONO_LISTEN_NORMAL, "NA");
 			}
 
 			n = n->next;

@@ -374,6 +374,8 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	char *type = NULL, *ifname = NULL, *raw_addrs = NULL, *pcscf_addrs = NULL;
 	char *raw_dns = NULL, *raw_gws = NULL;
 	int protocol;
+	struct ofono_gprs_primary_context *ctx =
+		ofono_gprs_get_pri_context_by_name(gc, gcd->apn);
 
 	DBG("*gc: %p", gc);
 
@@ -382,7 +384,10 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 				__func__, gcd->apn,
 				ril_error_to_string(message->error));
 		set_context_disconnected(gcd);
-		OFONO_DFX_DATA_ACTIVE_FAIL("modem fail");
+		if (ctx != NULL &&
+		    OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+			OFONO_DFX_DATA_ACTIVE_FAIL("modem fail");
+		}
 		goto error;
 	}
 
@@ -424,6 +429,13 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 
 			set_context_disconnected(gcd);
 			goto error;
+		}
+		if (ctx != NULL &&
+		    OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+			char reason_desc[REASON_DESC_SIZE];
+			snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d",
+				 status);
+			OFONO_DFX_DATA_ACTIVE_FAIL(reason_desc);
 		}
 	}
 
@@ -600,8 +612,9 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 
 		return;
 	}
-
-	OFONO_DFX_DATA_ACTIVE_FAIL("ril send fail");
+	if (OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+		OFONO_DFX_DATA_ACTIVE_FAIL("ril send fail");
+	}
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, data);
 }
@@ -661,9 +674,12 @@ static gboolean retry_activate(gpointer user_data)
 			ctx->username, ctx->password, ctx->auth_method, ctx->proto, user_data);
 
 	if (g_ril_send(gcd->ril, RIL_REQUEST_SETUP_DATA_CALL, &rilp,
-			ril_setup_data_call_cb, cbd, g_free) == 0) {
+		       ril_setup_data_call_cb, cbd, g_free) == 0) {
 		ofono_error("%s: send ACTIVATE_DATA_CALL failed for apn: %s",
-				__func__, gcd->apn);
+			    __func__, gcd->apn);
+		if (OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+			OFONO_DFX_DATA_ACTIVE_FAIL("ril send fail");
+		}
 		if (cb)
 			CALLBACK_WITH_FAILURE(cb, cbd->data);
 
