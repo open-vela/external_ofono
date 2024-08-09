@@ -100,6 +100,7 @@ struct ofono_netreg {
 	time_t rat_start_time;
 	int current_rat;
 	int  rat_report_time_id;
+	int radio_status;
 };
 
 struct network_operator_data {
@@ -1291,12 +1292,21 @@ static void set_registration_denial_reason(struct ofono_netreg *netreg, int deni
 
 void update_rat_duration(struct ofono_netreg *netreg, int rat_value)
 {
+	ofono_debug("update_rat_duration:%d,%d,%d", netreg->rat_start_time != 0,
+		    netreg->status, netreg->radio_status);
 	if (netreg->rat_start_time != 0) {
-		netreg->rat_duration[netreg->current_rat] = time(NULL) - netreg->rat_start_time +
+		netreg->rat_duration[netreg->current_rat] =
+			time(NULL) - netreg->rat_start_time +
 			netreg->rat_duration[netreg->current_rat];
 	}
-	netreg->rat_start_time = time(NULL);
-	netreg->current_rat = rat_value;
+	if ((netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
+	     netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
+	    netreg->radio_status == RADIO_STATUS_ON) {
+		netreg->rat_start_time = time(NULL);
+		netreg->current_rat = rat_value;
+	} else {
+		netreg->rat_start_time = 0;
+	}
 }
 
 static void set_rat_value_to_env(int tech, struct ofono_netreg *netreg)
@@ -1350,6 +1360,8 @@ static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(netreg->atom);
 
+	set_rat_value_to_env(tech, netreg);
+
 	if (netreg->technology == tech)
 		return;
 
@@ -1359,7 +1371,6 @@ static void set_registration_technology(struct ofono_netreg *netreg, int tech)
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
 					"Technology", DBUS_TYPE_INT32,
 					&netreg->technology);
-	set_rat_value_to_env(tech, netreg);
 }
 
 static void set_nitz_time(struct ofono_netreg *netreg,
@@ -1654,11 +1665,15 @@ static void notify_emulator_status(struct ofono_atom *atom, void *data)
 
 void start_record_oos_time(struct ofono_netreg *netreg)
 {
-	netreg->oos_start_time = time(NULL);
+	ofono_debug("start_record_oos_time");
+	if (netreg->oos_start_time == 0) {
+		netreg->oos_start_time = time(NULL);
+	}
 }
 
 void stop_record_oos_time(struct ofono_netreg *netreg)
 {
+	ofono_debug("stop_record_oos_time:%d", netreg->oos_start_time != 0);
 	if (netreg->oos_start_time != 0) {
 		netreg->oos_duration = netreg->oos_duration + time(NULL) - netreg->oos_start_time;
 		netreg->oos_start_time = 0;
@@ -1669,6 +1684,8 @@ static gboolean report_oos_duration(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
 
+	ofono_debug("report_oos_duration:%d,%d", netreg->oos_start_time != 0,
+		    netreg->oos_duration != 0);
 	if (netreg->oos_start_time != 0) {
 		stop_record_oos_time(netreg);
 		start_record_oos_time(netreg);
@@ -1680,9 +1697,37 @@ static gboolean report_oos_duration(gpointer user_data)
 	return TRUE;
 }
 
+void update_signal_level_duration(struct ofono_netreg *netreg)
+{
+	int current_signal_level;
+
+	ofono_debug("update_signal_level_duration:%d,%d", netreg->status,
+		    netreg->current_signal_level);
+	if ((netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
+	     netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
+	    netreg->radio_status == RADIO_STATUS_ON) {
+		current_signal_level =
+			ofono_netreg_get_signal_strength_level(netreg);
+	} else {
+		current_signal_level = SIGNAL_STRENGTH_UNKNOWN;
+	}
+	time_t update_time = time(NULL);
+
+	if (netreg->current_signal_level != SIGNAL_STRENGTH_UNKNOWN) {
+		netreg->signal_level_duration[netreg->current_signal_level] =
+			update_time - netreg->signal_level_start_time +
+			netreg->signal_level_duration
+				[netreg->current_signal_level];
+	}
+	netreg->signal_level_start_time = update_time;
+	netreg->current_signal_level = current_signal_level;
+}
+
 void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 			int lac, int ci, int tech, int denial)
 {
+	int old_status = netreg->status;
+
 	if (netreg == NULL)
 		return;
 
@@ -1692,15 +1737,26 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 	if (netreg->status != status) {
 		struct ofono_modem *modem;
 
-		if (netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
-				netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) {
-			OFONO_DFX_OOS_INFO();
-			start_record_oos_time(netreg);
-		} else {
+		if ((status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
+		     status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
+		    (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED ||
+		     netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING)) {
 			stop_record_oos_time(netreg);
+		} else {
+			if ((netreg->status ==
+				     NETWORK_REGISTRATION_STATUS_REGISTERED ||
+			     netreg->status ==
+				     NETWORK_REGISTRATION_STATUS_ROAMING) &&
+			    (status != NETWORK_REGISTRATION_STATUS_REGISTERED ||
+			     status != NETWORK_REGISTRATION_STATUS_ROAMING)) {
+				OFONO_DFX_OOS_INFO();
+				start_record_oos_time(netreg);
+			}
 		}
 
 		set_registration_status(netreg, status);
+
+		update_signal_level_duration(netreg);
 
 		modem = __ofono_atom_get_modem(netreg->atom);
 		__ofono_modem_foreach_registered_atom(modem,
@@ -1718,7 +1774,7 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 	if (netreg->cellid != ci)
 		set_registration_cellid(netreg, ci);
 
-	if (netreg->technology != tech)
+	if (netreg->technology != tech || old_status != status)
 		set_registration_technology(netreg, tech);
 
 	if (netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
@@ -1864,29 +1920,25 @@ static void notify_emulator_strength(struct ofono_atom *atom, void *data)
 	ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_SIGNAL, val);
 }
 
-void update_signal_level_duration(struct ofono_netreg *netreg)
-{
-	int current_signal_level = ofono_netreg_get_signal_strength_level(netreg);
-	time_t update_time = time(NULL);
-
-	netreg->signal_level_duration[netreg->current_signal_level] =
-		update_time - netreg->signal_level_start_time +
-	netreg->signal_level_duration[netreg->current_signal_level];
-	netreg->signal_level_start_time = update_time;
-	netreg->current_signal_level = current_signal_level;
-}
-
 static gboolean report_signal_level_info(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
 
 	update_signal_level_duration(netreg);
-	OFONO_DFX_SIGNAL_LEVEL_DURATION(netreg->signal_level_duration[0],
-					netreg->signal_level_duration[1],
-					netreg->signal_level_duration[2],
-					netreg->signal_level_duration[3],
-					netreg->signal_level_duration[4],
-					netreg->signal_level_duration[5]);
+	if (netreg->signal_level_duration[0] != 0 ||
+	    netreg->signal_level_duration[1] != 0 ||
+	    netreg->signal_level_duration[2] != 0 ||
+	    netreg->signal_level_duration[3] != 0 ||
+	    netreg->signal_level_duration[4] != 0 ||
+	    netreg->signal_level_duration[5] != 0) {
+		OFONO_DFX_SIGNAL_LEVEL_DURATION(
+			netreg->signal_level_duration[0],
+			netreg->signal_level_duration[1],
+			netreg->signal_level_duration[2],
+			netreg->signal_level_duration[3],
+			netreg->signal_level_duration[4],
+			netreg->signal_level_duration[5]);
+	}
 	memset(netreg->signal_level_duration, 0,
 	       sizeof(netreg->signal_level_duration));
 	return TRUE;
@@ -1895,6 +1947,8 @@ static gboolean report_signal_level_info(gpointer user_data)
 static gboolean report_rat_info(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
+
+	ofono_debug("report_rat_info");
 	if (netreg->rat_start_time != 0) {
 		netreg->rat_duration[netreg->current_rat] =
 			time(NULL) - netreg->rat_start_time +
@@ -1909,6 +1963,29 @@ static gboolean report_rat_info(gpointer user_data)
 	}
 	memset(netreg->rat_duration, 0, sizeof(netreg->rat_duration));
 	return TRUE;
+}
+
+static void netreg_radio_state_change(int state, void *data)
+{
+	struct ofono_atom *atom = data;
+	struct ofono_netreg *netreg = __ofono_atom_get_data(atom);
+	int old_state = netreg->radio_status;
+
+	netreg->radio_status = state;
+
+	ofono_debug("netreg_radio_state_change:%d", state);
+
+	if (state == RADIO_STATUS_ON) {
+		start_record_oos_time(netreg);
+	}
+	if ((state == RADIO_STATUS_OFF || state == RADIO_STATUS_UNAVAILABLE) &&
+	    old_state != RADIO_STATUS_UNKNOWN) {
+		update_rat_duration(netreg, netreg->current_rat);
+		update_signal_level_duration(netreg);
+	}
+	if (state == RADIO_STATUS_OFF && old_state != RADIO_STATUS_UNKNOWN) {
+		stop_record_oos_time(netreg);
+	}
 }
 
 void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
@@ -2441,6 +2518,9 @@ struct ofono_netreg *ofono_netreg_create(struct ofono_modem *modem,
 	netreg->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_NETREG,
 						netreg_remove, netreg);
 
+	__ofono_atom_add_radio_state_watch(netreg->atom,
+					   netreg_radio_state_change);
+
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_netreg_driver *drv = l->data;
 
@@ -2807,8 +2887,8 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 			= g_new0(struct ofono_lte_signal_strength, 1);
 	}
 
-	netreg->oos_start_time = 0;
 	netreg->oos_duration = 0;
+	netreg->radio_status = RADIO_STATUS_UNKNOWN;
 	netreg->report_oos_time_id = g_timeout_add(REPORTING_PERIOD,
 				report_oos_duration, netreg);
 
