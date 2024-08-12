@@ -1600,8 +1600,21 @@ static DBusMessage *enable_modem_abnormal_event(DBusConnection *conn,
 	modem->to_event_id = to_event_id;
 	modem->pending = dbus_message_ref(msg);
 
-	modem->driver->enable_modem_abnormal_event(modem, enable, module_mask,
-			from_event_id, to_event_id, enable_modem_abnormal_event_cb, modem);
+	if (modem->radio_status == RADIO_STATUS_ON) {
+		modem->driver->enable_modem_abnormal_event(
+			modem, enable, module_mask, from_event_id, to_event_id,
+			enable_modem_abnormal_event_cb, modem);
+	} else {
+		DBusMessage *reply;
+		DBusMessageIter iter;
+		int status = 0;
+
+		reply = dbus_message_new_method_return(modem->pending);
+		dbus_message_iter_init_append(reply, &iter);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &status);
+
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
 
 	return NULL;
 }
