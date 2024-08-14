@@ -3211,10 +3211,10 @@ static void set_cust_ecc_callback(const struct ofono_error *error, void *data)
 	if (error->type == OFONO_ERROR_TYPE_FAILURE) {
 		ofono_error("command failed with error: %s",
 				telephony_error_to_str(error));
-	} else if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
-		vc->flags |= VOICECALL_FLAG_CUST_ECC_READY;
-		set_new_ecc(vc);
 	}
+
+	vc->flags |= VOICECALL_FLAG_CUST_ECC_READY;
+	set_new_ecc(vc);
 }
 
 char* get_last_used_mnc_mcc(char *type) {
