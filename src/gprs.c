@@ -963,9 +963,12 @@ void start_record_active_data_time(struct ofono_gprs *gprs)
 void stop_record_active_data_time(struct ofono_gprs *gprs)
 {
 	ofono_debug("stop_record_active_data_time");
-	gprs->internet_active_duration = gprs->internet_active_duration +
-		time(NULL) - gprs->internet_start_time;
-	gprs->internet_start_time = 0;
+	if (gprs->internet_start_time > 0) {
+		gprs->internet_active_duration =
+			gprs->internet_active_duration + time(NULL) -
+			gprs->internet_start_time;
+		gprs->internet_start_time = 0;
+	}
 }
 
 static gboolean report_data_active_duration(gpointer user_data)
@@ -1949,6 +1952,10 @@ static void release_active_contexts(struct ofono_gprs *gprs)
 		if (gc->driver->detach_shutdown != NULL)
 			gc->driver->detach_shutdown(gc, ctx->context.cid);
 
+		if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+			stop_record_active_data_time(gprs);
+		}
+
 		/* Make sure the context is properly cleared */
 		pri_reset_context_settings(ctx);
 		release_context(ctx);
@@ -2550,6 +2557,10 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 					OFONO_CONNECTION_CONTEXT_INTERFACE,
 					"Active", DBUS_TYPE_BOOLEAN, &value);
 
+	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		stop_record_active_data_time(gprs);
+	}
+
 	if (gprs->settings) {
 		g_key_file_remove_group(gprs->settings, ctx->key, NULL);
 		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
@@ -2766,6 +2777,10 @@ static void gprs_deactivate_for_all(const struct ofono_error *error,
 		__ofono_dbus_pending_reply(&gprs->pending,
 					__ofono_error_failed(gprs->pending));
 		return;
+	}
+
+	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+		stop_record_active_data_time(gprs);
 	}
 
 	pri_reset_context_settings(ctx);
