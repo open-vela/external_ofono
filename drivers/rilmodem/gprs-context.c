@@ -411,6 +411,14 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	ofono_debug("%s - [status=%d,retry=%d]", __func__, status, retry);
 
 	if (status != PDP_FAIL_NONE) {
+		if (ctx != NULL &&
+		    OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+			char reason_desc[REASON_DESC_SIZE];
+			snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d",
+				 status);
+			OFONO_DFX_DATA_ACTIVE_FAIL(reason_desc);
+		}
+
 		int delay_s = get_next_activate_retry_delay(gcd, status, retry / 1000);
 
 		if (delay_s > 0) {
@@ -429,13 +437,6 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 
 			set_context_disconnected(gcd);
 			goto error;
-		}
-		if (ctx != NULL &&
-		    OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
-			char reason_desc[REASON_DESC_SIZE];
-			snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d",
-				 status);
-			OFONO_DFX_DATA_ACTIVE_FAIL(reason_desc);
 		}
 	}
 
