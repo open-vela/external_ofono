@@ -1739,7 +1739,7 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 
 		if ((status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
 		     status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
-		    (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED ||
+		    (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
 		     netreg->status != NETWORK_REGISTRATION_STATUS_ROAMING)) {
 			stop_record_oos_time(netreg);
 		} else {
@@ -1747,7 +1747,7 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 				     NETWORK_REGISTRATION_STATUS_REGISTERED ||
 			     netreg->status ==
 				     NETWORK_REGISTRATION_STATUS_ROAMING) &&
-			    (status != NETWORK_REGISTRATION_STATUS_REGISTERED ||
+			    (status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
 			     status != NETWORK_REGISTRATION_STATUS_ROAMING)) {
 				OFONO_DFX_OOS_INFO();
 				start_record_oos_time(netreg);
