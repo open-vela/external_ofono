@@ -120,6 +120,7 @@ static struct sim_ef_info ef_db[] = {
  * the dictionary order of mcc and mnc.
  */
 static struct sim_spn_override_info spn_override_db[] = {
+{	"310", "260", "T-Mobile" },
 {	"454", "07", "China Unicom" },
 {	"460", "00", "China Mobile" },
 {	"460", "01", "China Unicom" },
