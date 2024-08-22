@@ -556,19 +556,14 @@ static void ussd_callback(const struct ofono_error *error, void *data)
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		DBG("ussd request failed with error: %s",
 				telephony_error_to_str(error));
+		reply = __ofono_error_failed(ussd->pending);
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
 		OFONO_DFX_SS_INFO("ss:ussd:request", reason_desc);
-	}
-
-	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
+	} else {
 		ussd_change_state(ussd, USSD_STATE_ACTIVE);
-		return;
+		reply = dbus_message_new_method_return(ussd->pending);
 	}
 
-	if (ussd->pending == NULL)
-		return;
-
-	reply = __ofono_error_failed(ussd->pending);
 	__ofono_dbus_pending_reply(&ussd->pending, reply);
 }
 
