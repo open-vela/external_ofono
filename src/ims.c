@@ -58,7 +58,7 @@ struct ofono_ims {
 	enum ofono_sim_state sim_state;
 	struct ofono_sim *sim;
 	char *imsi;
-	char *ph_number_from_setting;
+	char ph_number_from_setting[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
 	char ph_number[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
 	time_t ims_register_start_time;
 	int ims_register_duration;
@@ -134,8 +134,8 @@ static void ims_load_settings_from_imsi(struct ofono_ims *ims)
 {
 	struct ofono_modem *modem = __ofono_atom_get_modem(ims->atom);
 	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-	GError *error;
 	const char *imsi;
+	char *value;
 
 	ims->sim = sim;
 
@@ -151,15 +151,23 @@ static void ims_load_settings_from_imsi(struct ofono_ims *ims)
 
 	ims->imsi = g_strdup(imsi);
 
-	error = NULL;
-	ims->ph_number_from_setting = g_key_file_get_string(ims->imsi_settings, SETTINGS_GROUP,
-					"ImsNumber", &error);
+	value = g_key_file_get_string(ims->imsi_settings, SETTINGS_GROUP,
+					"ImsNumber", NULL);
 
-	if (error) {
-		ofono_error("ims number storage read failed");
+	if (value == NULL) {
+		if (strlen(ims->ph_number) > 0) {
+			strcpy(ims->ph_number_from_setting, ims->ph_number);
+			g_key_file_set_string(ims->imsi_settings, SETTINGS_GROUP,
+						"ImsNumber", ims->ph_number_from_setting);
+		}
+	} else {
+		strcpy(ims->ph_number_from_setting, value);
+		g_free(value);
+		if (strlen(ims->ph_number) > 0 &&
+			g_strcmp0(ims->ph_number_from_setting, ims->ph_number) != 0) {
+			strcpy(ims->ph_number_from_setting, ims->ph_number);
+		}
 
-		g_error_free(error);
-		ims->ph_number_from_setting = ims->ph_number;
 		g_key_file_set_string(ims->imsi_settings, SETTINGS_GROUP,
 						"ImsNumber", ims->ph_number_from_setting);
 	}
@@ -181,9 +189,6 @@ static void ims_close_settings_from_imsi(struct ofono_ims *ims)
 		g_free(ims->imsi);
 		ims->imsi = NULL;
 		ims->imsi_settings = NULL;
-		if (ims->ph_number_from_setting != ims->ph_number)
-			g_free(ims->ph_number_from_setting);
-		ims->ph_number_from_setting = NULL;
 	}
 }
 
@@ -364,8 +369,11 @@ static gboolean report_ims_register_duration(gpointer user_data)
 void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 				int ext_info, char *subscriber_uri)
 {
+	const char *path = __ofono_atom_get_path(ims->atom);
+	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t new_reg_info;
 	dbus_bool_t new_voice_capable, new_sms_capable;
+	char *number;
 
 	if (ims == NULL)
 		return;
@@ -392,10 +400,25 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 	new_sms_capable = ext_info & SMS_CAPABLE_FLAG ? TRUE: FALSE;
 	ims_set_sms_capable(ims, new_sms_capable);
 
+	if (strlen(ims->ph_number) > 0 &&
+		g_strcmp0(ims->ph_number_from_setting, ims->ph_number) != 0) {
+		strcpy(ims->ph_number_from_setting, ims->ph_number);
+		if (ims->imsi_settings) {
+			g_key_file_set_string(ims->imsi_settings, SETTINGS_GROUP,
+						"ImsNumber", ims->ph_number_from_setting);
+		}
+
+		number = ims->ph_number_from_setting;
+		ofono_dbus_signal_property_changed(conn, path,
+						OFONO_IMS_INTERFACE,
+						"SubscriberUriNumber",
+						DBUS_TYPE_STRING,
+						&number);
+	}
+
 skip:
 	ims->reg_info = reg_info;
 	ims->ext_info = ext_info;
-	ims->ph_number_from_setting = NULL;
 
 	notify_status_watches(ims);
 }
@@ -681,12 +704,6 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 	__ofono_atom_add_radio_state_watch(ims->atom, ims_radio_state_change);
 	__ofono_atom_add_sim_state_watch(ims->atom, ims_sim_state_change);
 
-	ims->reg_info = 0;
-	ims->ext_info = 0;
-	ims->ph_number[0] = '\0';
-	ims->ph_number_from_setting = NULL;
-	ims->settings = NULL;
-	ims->imsi_settings = NULL;
 	ims->sim_state = OFONO_SIM_STATE_NOT_PRESENT;
 
 	for (l = g_drivers; l; l = l->next) {
