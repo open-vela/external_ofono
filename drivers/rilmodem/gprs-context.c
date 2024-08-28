@@ -385,7 +385,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 				ril_error_to_string(message->error));
 		set_context_disconnected(gcd);
 		if (ctx != NULL &&
-		    OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+		    ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 			OFONO_DFX_DATA_ACTIVE_FAIL("modem fail");
 		}
 		goto error;
@@ -412,7 +412,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 
 	if (status != PDP_FAIL_NONE) {
 		if (ctx != NULL &&
-		    OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+		    ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 			char reason_desc[REASON_DESC_SIZE];
 			snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d",
 				 status);
@@ -613,7 +613,7 @@ static void ril_gprs_context_activate_primary(struct ofono_gprs_context *gc,
 
 		return;
 	}
-	if (OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 		OFONO_DFX_DATA_ACTIVE_FAIL("ril send fail");
 	}
 	g_free(cbd);
@@ -678,7 +678,7 @@ static gboolean retry_activate(gpointer user_data)
 		       ril_setup_data_call_cb, cbd, g_free) == 0) {
 		ofono_error("%s: send ACTIVATE_DATA_CALL failed for apn: %s",
 			    __func__, gcd->apn);
-		if (OFONO_GPRS_CONTEXT_TYPE_INTERNET == ctx->type) {
+		if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 			OFONO_DFX_DATA_ACTIVE_FAIL("ril send fail");
 		}
 		if (cb)

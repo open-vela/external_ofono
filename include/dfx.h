@@ -46,7 +46,7 @@ typedef enum {
 	OFONO_ONGOING_FAIL,
 	OFONO_CALL_UNKNOW_FAIL,
 	OFONO_LISTEN_NORMAL
-} ofono_call_fail_scenario;
+} ofono_call_scenario;
 
 typedef enum {
 	OFONO_CU = 1,
