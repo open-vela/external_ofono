@@ -39,6 +39,7 @@
 #include "storage.h"
 #include "missing.h"
 
+#define MAX_DTMF_BUFFER 32
 #define MAX_VOICE_CALLS 16
 #define MAX_IMS_CONFERENCE_CALLS 5
 
@@ -114,6 +115,7 @@ struct tone_queue_entry {
 	void *user_data;
 	ofono_destroy_func destroy;
 	int id;
+	int call_id;
 };
 
 struct emulator_status {
@@ -356,9 +358,16 @@ static gboolean voicecalls_can_dtmf(struct ofono_voicecall *vc)
 	return FALSE;
 }
 
+static void tone_request_start(struct ofono_voicecall *vc)
+{
+	ofono_debug("Tone request start %d ", g_queue_get_length(vc->toneq));
+	if (g_queue_get_length(vc->toneq) == 1)
+		g_timeout_add(0, tone_request_run, vc);
+}
+
 static int tone_queue(struct ofono_voicecall *vc, const char *tone_str,
 			ofono_voicecall_tone_cb_t cb, void *data,
-			ofono_destroy_func destroy)
+			ofono_destroy_func destroy, gboolean tone_start)
 {
 	struct tone_queue_entry *entry;
 	int id = 1;
@@ -389,12 +398,13 @@ static int tone_queue(struct ofono_voicecall *vc, const char *tone_str,
 	entry->cb = cb;
 	entry->user_data = data;
 	entry->destroy = destroy;
+	entry->call_id = -1;
 	entry->id = id;
 
 	g_queue_push_tail(vc->toneq, entry);
 
-	if (g_queue_get_length(vc->toneq) == 1)
-		g_timeout_add(0, tone_request_run, vc);
+	if (tone_start)
+		tone_request_start(vc);
 
 	return id;
 }
@@ -403,10 +413,15 @@ static void tone_request_finish(struct ofono_voicecall *vc,
 				struct tone_queue_entry *entry,
 				int error, gboolean callback)
 {
+	if (!entry) {
+		return;
+	}
+
 	g_queue_remove(vc->toneq, entry);
 
 	if (callback)
-		entry->cb(error, entry->user_data);
+		if (entry->cb)
+			entry->cb(error, entry->user_data);
 
 	if (entry->destroy)
 		entry->destroy(entry->user_data);
@@ -449,11 +464,16 @@ static void append_voicecall_properties(struct voicecall *v,
 
 	ofono_dbus_dict_append(dict, "State", DBUS_TYPE_STRING, &status);
 
-	if (call->direction == CALL_DIRECTION_MOBILE_TERMINATED)
+	if (call->direction == CALL_DIRECTION_MOBILE_TERMINATED) {
 		callerid = phone_and_clip_to_string(&call->phone_number,
 							call->clip_validity);
-	else
-		callerid = phone_number_to_string(&call->phone_number);
+        } else {
+		if (strlen(call->original_number.number) > 0) {
+			callerid = phone_number_to_string(&call->original_number);
+		} else {
+			callerid = phone_number_to_string(&call->phone_number);
+		}
+	}
 
 	ofono_dbus_dict_append(dict, "LineIdentification",
 					DBUS_TYPE_STRING, &callerid);
@@ -953,9 +973,11 @@ static void notify_emulator_call_status(struct ofono_voicecall *vc)
 static void voicecall_set_call_status(struct voicecall *call, int status)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
+	struct tone_queue_entry *entry = NULL;
 	const char *path;
 	const char *status_str;
 	int old_status;
+	int call_id;
 
 	if (call->call->status == status)
 		return;
@@ -963,6 +985,8 @@ static void voicecall_set_call_status(struct voicecall *call, int status)
 	old_status = call->call->status;
 
 	call->call->status = status;
+
+	call_id = call->call->id;
 
 	status_str = call_status_to_string(status);
 	path = voicecall_build_path(call->vc, call->call);
@@ -997,11 +1021,17 @@ static void voicecall_set_call_status(struct voicecall *call, int status)
 			call == call->vc->dial_req->call)
 		dial_request_finish(call->vc);
 
-	if (!voicecalls_can_dtmf(call->vc)) {
-		struct tone_queue_entry *entry;
-
-		while ((entry = g_queue_peek_head(call->vc->toneq)))
-			tone_request_finish(call->vc, entry, ENOENT, TRUE);
+	if (call->vc->toneq) {
+		entry = g_queue_peek_head(call->vc->toneq);
+		if (entry && (call_id == entry->call_id)) {
+			if (status == CALL_STATUS_ACTIVE) {
+				tone_request_start(call->vc);
+			} else if (status != CALL_STATUS_DIALING && status != CALL_STATUS_ALERTING) {
+				do {
+		 			tone_request_finish(call->vc, entry, ENOENT, TRUE);
+		 		} while ((entry = g_queue_peek_head(call->vc->toneq)));
+			}
+		}
 	}
 }
 
@@ -1037,10 +1067,15 @@ static void voicecall_set_call_lineid(struct voicecall *v,
 
 	path = voicecall_build_path(v->vc, call);
 
-	if (call->direction == CALL_DIRECTION_MOBILE_TERMINATED)
+	if (call->direction == CALL_DIRECTION_MOBILE_TERMINATED) {
 		lineid_str = phone_and_clip_to_string(ph, clip_validity);
-	else
-		lineid_str = phone_number_to_string(ph);
+	} else {
+		if (strlen(call->original_number.number) > 0) {
+			lineid_str = phone_number_to_string(&call->original_number);
+		} else {
+			lineid_str = phone_number_to_string(ph);
+		}
+	}
 
 	ofono_dbus_signal_property_changed(conn, path,
 						OFONO_VOICECALL_INTERFACE,
@@ -1460,6 +1495,24 @@ static ofono_bool_t clir_string_to_clir(const char *clirstr,
 	}
 }
 
+void ofonocall_set_original_number(struct voicecall **v, struct ofono_voicecall *vc)
+{
+	char *number = NULL;
+
+	if (!vc->pending)
+		return;
+
+	if (dbus_message_get_args(vc->pending, NULL, DBUS_TYPE_STRING, &number,
+				DBUS_TYPE_INVALID) == FALSE)
+		return;
+
+	if ((*v)->call->direction == CALL_DIRECTION_MOBILE_ORIGINATED
+		&& number && strlen(number) > 0) {
+		g_strlcpy((*v)->call->original_number.number, number,
+			sizeof((*v)->call->original_number.number));
+	}
+}
+
 static struct voicecall *synthesize_outgoing_call(struct ofono_voicecall *vc,
 					const char *number)
 {
@@ -1502,6 +1555,8 @@ static struct voicecall *synthesize_outgoing_call(struct ofono_voicecall *vc,
 		ofono_error("Unable to register voice call");
 		return NULL;
 	}
+
+	ofonocall_set_original_number(&v, vc);
 
 	vc->call_list = g_slist_insert_sorted(vc->call_list, v, call_compare);
 
@@ -1574,6 +1629,11 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 	v = dial_handle_result(vc, error, number, &need_to_emit);
 
 	if (v) {
+		struct tone_queue_entry *entry = g_queue_peek_head(vc->toneq);
+		if (entry && entry->call_id == -1) {
+			entry->call_id = v->call->id;
+		}
+
 		const char *path = voicecall_build_path(vc, v->call);
 
 		reply = dbus_message_new_method_return(vc->pending);
@@ -1592,6 +1652,8 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 					OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
 		}
 
+		tone_request_finish(vc, g_queue_peek_head(vc->toneq), ENOENT, FALSE);
+
 		reply = __ofono_error_failed(vc->pending);
 	}
 
@@ -1609,6 +1671,11 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 {
 	struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 	struct ofono_phone_number ph;
+	char number_dial[OFONO_MAX_PHONE_NUMBER_LENGTH];
+	char post_dial[MAX_DTMF_BUFFER];
+
+	memset(number_dial, 0, sizeof(number_dial));
+	memset(post_dial, 0, sizeof(post_dial));
 
 	if (g_slist_length(vc->call_list) >= MAX_VOICE_CALLS)
 		return -EPERM;
@@ -1618,6 +1685,11 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 			!valid_long_phone_number_format(number))
 			return -EINVAL;
 	}
+
+	parse_post_dial_string(number, number_dial, post_dial);
+
+	if (!valid_actual_number_format(number_dial, OFONO_MAX_PHONE_NUMBER_LENGTH))
+		return -EINVAL;
 
 	if (ofono_modem_get_online(modem) == FALSE)
 		return -ENETDOWN;
@@ -1641,7 +1713,14 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 				OFONO_VOICE, OFONO_NORMAL, "NA");
 	}
 
-	string_to_phone_number(number, &ph);
+	if (valid_actual_number_format(post_dial, MAX_DTMF_BUFFER)) {
+		int err = tone_queue(vc, post_dial, NULL, data, NULL, FALSE);
+		if (err < 0) {
+			ofono_error("Failed to play post dial string %s", post_dial);
+		}
+	}
+
+	string_to_phone_number(number_dial, &ph);
 
 	if (vc->settings) {
 		g_key_file_set_string(vc->settings, SETTINGS_GROUP,
@@ -2330,7 +2409,7 @@ static DBusMessage *manager_tone(DBusConnection *conn,
 
 	tones = g_ascii_strup(in_tones, len);
 
-	err = tone_queue(vc, tones, tone_callback, vc, NULL);
+	err = tone_queue(vc, tones, tone_callback, vc, NULL, TRUE);
 
 	g_free(tones);
 
@@ -2893,6 +2972,8 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 		ofono_error("Unable to register voice call");
 		goto error;
 	}
+
+	ofonocall_set_original_number(&v, vc);
 
 	vc->call_list = g_slist_insert_sorted(vc->call_list, v, call_compare);
 	if (v->call->mpty)
@@ -4605,7 +4686,7 @@ int __ofono_voicecall_tone_send(struct ofono_voicecall *vc,
 	if (!voicecalls_can_dtmf(vc))
 		return -ENOENT;
 
-	return tone_queue(vc, tone_str, cb, user_data, NULL);
+	return tone_queue(vc, tone_str, cb, user_data, NULL, TRUE);
 }
 
 void __ofono_voicecall_tone_cancel(struct ofono_voicecall *vc, int id)

@@ -24,6 +24,7 @@
 #endif
 
 #define _GNU_SOURCE
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>
@@ -35,6 +36,9 @@
 #include "common.h"
 #include "ofono.h"
 #include "util.h"
+
+#define PAUSE ","
+#define WAIT ";"
 
 static const int five_bar_rsrp_thresholds[] = {-140, -125, -115, -110, -102};
 static const int default_rsrp_thresholds[] = {-128, -118, -108, -98};
@@ -242,7 +246,63 @@ struct error_entry ceer_errors[] = {
 	{ 127,	"Interworking, unspecified" },
 };
 
+void parse_post_dial_string(const char *str, char *target, char *postdial)
+{
+	char str_src[OFONO_MAX_PHONE_NUMBER_LENGTH];
+
+	memset(str_src, 0, OFONO_MAX_PHONE_NUMBER_LENGTH);
+	strcpy(str_src, str);
+
+	gchar **number = g_strsplit(str_src, WAIT, -1);
+
+	if (number[0] != NULL && strlen(number[0]) > 0) {
+		gchar **post = g_strsplit(number[0], PAUSE, -1);
+
+		if (post[0] != NULL && strlen(post[0]) > 0) {
+			strcpy(target, post[0]);
+		}
+		if (post[1] != NULL && strlen(post[1]) > 0) {
+			strcpy(postdial, post[1]);
+		}
+		g_strfreev(post);
+	}
+
+	g_strfreev(number);
+}
+
 gboolean valid_number_format(const char *number, int length)
+{
+	int len = strlen(number);
+	int begin = 0;
+	int i;
+
+	if (!len)
+		return FALSE;
+
+	if (number[0] == '+')
+		begin = 1;
+
+	if (begin == len)
+		return FALSE;
+
+	if ((len - begin) > length)
+		return FALSE;
+
+	for (i = begin; i < len; i++) {
+		if (number[i] >= '0' && number[i] <= '9')
+			continue;
+
+		if (number[i] == '*' || number[i] == '#'
+			|| number[i] == ',' || number[i] == ';')
+			continue;
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+gboolean valid_actual_number_format(const char *number, int length)
 {
 	int len = strlen(number);
 	int begin = 0;
@@ -304,7 +364,8 @@ gboolean valid_cdma_phone_number_format(const char *number)
 		if (number[i] >= '0' && number[i] <= '9')
 			continue;
 
-		if (number[i] == '*' || number[i] == '#')
+		if (number[i] == '*' || number[i] == '#'
+			|| number[i] == ',' || number[i] == ';')
 			continue;
 
 		return FALSE;

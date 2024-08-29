@@ -104,6 +104,7 @@ struct ofono_call {
 	struct ofono_phone_number phone_number;
 	struct ofono_phone_number called_number;
 	char name[OFONO_MAX_CALLER_NAME_LENGTH + 1];
+	struct ofono_phone_number original_number;
 	int clip_validity;
 	int cnap_validity;
 	enum ofono_disconnect_reason disconnet_reason;
