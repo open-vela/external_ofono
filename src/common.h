@@ -202,6 +202,7 @@ gboolean valid_number_format(const char *number, int length);
 gboolean valid_phone_number_format(const char *number);
 gboolean valid_long_phone_number_format(const char *number);
 const char *phone_number_to_string(const struct ofono_phone_number *ph);
+void parse_post_dial_string(const char *str, char *target, char *postdial);
 void string_to_phone_number(const char *str, struct ofono_phone_number *ph);
 
 gboolean valid_cdma_phone_number_format(const char *number);
@@ -213,7 +214,7 @@ void string_to_cdma_phone_number(const char *str,
 int mmi_service_code_to_bearer_class(int code);
 
 gboolean valid_ussd_string(const char *str, gboolean call_in_progress);
-
+gboolean valid_actual_number_format(const char *number, int length);
 gboolean parse_ss_control_string(char *str, int *ss_type,
 					char **sc, char **sia,
 					char **sib, char **sic,
