@@ -1153,6 +1153,10 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 	gc = ctx->context_driver;
 
 	if (ctx->ref_count <= 0) {
+		if (gc->settings) {
+			g_free(gc->settings->ipv4);
+			g_free(gc->settings->ipv6);
+		}
 		release_context(ctx);
 		return;
 	}
@@ -3709,6 +3713,8 @@ void ofono_gprs_driver_unregister(const struct ofono_gprs_driver *d)
 static void free_contexts(struct ofono_gprs *gprs)
 {
 	GSList *l;
+
+	ofono_debug("free_contexts");
 
 	if (gprs->settings) {
 		storage_close(gprs->imsi, SETTINGS_STORE,
