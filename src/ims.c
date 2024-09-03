@@ -161,7 +161,8 @@ static void ims_load_settings_from_imsi(struct ofono_ims *ims)
 						"ImsNumber", ims->ph_number_from_setting);
 		}
 	} else {
-		strcpy(ims->ph_number_from_setting, value);
+		g_strlcpy(ims->ph_number_from_setting, value,
+					sizeof(ims->ph_number_from_setting));
 		g_free(value);
 		if (strlen(ims->ph_number) > 0 &&
 			g_strcmp0(ims->ph_number_from_setting, ims->ph_number) != 0) {
