@@ -463,6 +463,8 @@ static void ril_abnormal_event(struct ril_msg *message, gpointer user_data)
 	data_len = parcel_r_int32(&rilp);
 	data = parcel_r_string(&rilp);
 	ofono_handle_abnormal_event(type_id, data, data_len);
+
+	g_free(data);
 }
 
 static int create_gril(struct ofono_modem *modem)
