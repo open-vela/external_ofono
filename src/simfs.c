@@ -1045,8 +1045,15 @@ int sim_fs_read(struct ofono_sim_context *context, int id,
 		const unsigned char *path, unsigned int path_len,
 		ofono_sim_file_read_cb_t cb, void *data)
 {
-	struct sim_fs *fs = context->fs;
+	struct sim_fs *fs;
 	struct sim_fs_op *op;
+
+	if (context == NULL) {
+		ofono_debug("sim_fs_read context is NULL");
+		return -EINVAL;
+	}
+
+	fs = context->fs;
 
 	if (cb == NULL)
 		return -EINVAL;
