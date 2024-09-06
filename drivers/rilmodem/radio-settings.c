@@ -458,7 +458,7 @@ static int ril_radio_settings_probe(struct ofono_radio_settings *rs,
 
 	ofono_radio_settings_set_data(rs, rsd);
 
-	ril_set_fast_dormancy(rs, FALSE, ril_set_fast_dormancy_cb, rs);
+	ril_set_fast_dormancy(rs, TRUE, ril_set_fast_dormancy_cb, rs);
 
 	g_idle_add(ril_delayed_register, rs);
 
