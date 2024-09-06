@@ -195,21 +195,21 @@ static void set_new_ecc(struct ofono_modem *modem, GSList *cust_ecc_list)
 
 	g_hash_table_destroy(modem->en_list);
 	modem->en_list =
-		g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+		g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
 	for (el = cust_ecc_list; el; el = el->next) {
 		char buf[5];
 		ecc = el->data;
 		snprintf(buf, sizeof(buf), "%u,%u", ecc->category,
 			 ecc->condition);
-		g_hash_table_insert(modem->en_list, g_strdup(ecc->number), buf);
+		g_hash_table_replace(modem->en_list, g_strdup(ecc->number), g_strdup(buf));
 	}
 	while (default_en_list_no_sim[i])
-		g_hash_table_insert(
+		g_hash_table_replace(
 			modem->en_list, g_strdup(default_en_list_no_sim[i++]),
 			g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
 	i = 0;
 	while (default_en_list[i])
-		g_hash_table_insert(
+		g_hash_table_replace(
 			modem->en_list, g_strdup(default_en_list[i++]),
 			g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
 
@@ -230,7 +230,7 @@ static DBusMessage *modem_load_ecc_list(DBusConnection *conn, DBusMessage *msg,
 
 	char *mcc = ofono_voicecall_get_last_used_mnc_mcc("mcc");
 	char *mnc = ofono_voicecall_get_last_used_mnc_mcc("mnc");
-	if (!g_strcmp0(mcc, "") || !g_strcmp0(mnc, "")) {
+	if (mcc == NULL || mnc == NULL || !strcmp(mcc, "") || !strcmp(mnc, "")) {
 		g_free(mcc);
 		g_free(mnc);
 		mcc = "460";

@@ -196,7 +196,7 @@ static void add_to_en_list(struct ofono_voicecall *vc, char **list)
 	int i = 0;
 
 	while (list[i])
-		g_hash_table_insert(
+		g_hash_table_replace(
 			vc->en_list, g_strdup(list[i++]),
 			g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
 }
@@ -3200,7 +3200,7 @@ static void set_new_ecc(struct ofono_voicecall *vc)
 	g_hash_table_destroy(vc->en_list);
 
 	vc->en_list = g_hash_table_new_full(g_str_hash, g_str_equal,
-							g_free, NULL);
+							g_free, g_free);
 
 	/*Emergency numbers from customer country/operator */
 	if (vc->flags & VOICECALL_FLAG_CUST_ECC_READY) {
@@ -3212,7 +3212,7 @@ static void set_new_ecc(struct ofono_voicecall *vc)
 			ecc = el->data;
 			snprintf(buf, sizeof(buf), "%u,%u", ecc->category,
 				 ecc->condition);
-			g_hash_table_insert(vc->en_list, g_strdup(ecc->number), buf);
+			g_hash_table_replace(vc->en_list, g_strdup(ecc->number), g_strdup(buf));
 		}
 	}
 
@@ -3225,7 +3225,7 @@ static void set_new_ecc(struct ofono_voicecall *vc)
 		GSList *l;
 
 		for (l = vc->sim_en_list; l; l = l->next)
-			g_hash_table_insert(
+			g_hash_table_replace(
 				vc->en_list, g_strdup(l->data),
 				g_strdup(DEFAULT_CATEGORY_CONDITION_FOR_ECC));
 	} else
