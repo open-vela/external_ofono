@@ -331,12 +331,18 @@ static gboolean assign_context(struct pri_context *ctx)
 	ctx->context_driver->inuse = TRUE;
 
 	if (ctx->context.proto == OFONO_GPRS_PROTO_IPV4V6 ||
-			ctx->context.proto == OFONO_GPRS_PROTO_IP)
-		gc->settings->ipv4 = g_new0(struct ipv4_settings, 1);
+			ctx->context.proto == OFONO_GPRS_PROTO_IP) {
+		if (gc->settings->ipv4 == NULL) {
+			gc->settings->ipv4 = g_new0(struct ipv4_settings, 1);
+		}
+	}
 
 	if (ctx->context.proto == OFONO_GPRS_PROTO_IPV4V6 ||
-			ctx->context.proto == OFONO_GPRS_PROTO_IPV6)
-		gc->settings->ipv6 = g_new0(struct ipv6_settings, 1);
+			ctx->context.proto == OFONO_GPRS_PROTO_IPV6) {
+		if (gc->settings->ipv6 == NULL) {
+			gc->settings->ipv6 = g_new0(struct ipv6_settings, 1);
+		}
+	}
 
 	return TRUE;
 }
@@ -1153,10 +1159,6 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 	gc = ctx->context_driver;
 
 	if (ctx->ref_count <= 0) {
-		if (gc->settings) {
-			g_free(gc->settings->ipv4);
-			g_free(gc->settings->ipv6);
-		}
 		release_context(ctx);
 		return;
 	}
