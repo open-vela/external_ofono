@@ -60,7 +60,7 @@ struct ofono_ims {
 	char *imsi;
 	char ph_number_from_setting[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
 	char ph_number[OFONO_MAX_PHONE_NUMBER_LENGTH + 1];
-	time_t ims_register_start_time;
+	struct timespec ims_register_start_time;
 	int ims_register_duration;
 	int ims_reigster_report_time_id;
 };
@@ -330,19 +330,27 @@ static void notify_status_watches(struct ofono_ims *ims)
 
 void update_ims_register_duration(struct ofono_ims *ims, int reg_info)
 {
-	ofono_debug("update_ims_register_duration,reg_info=%d", reg_info);
+	ofono_debug("%s,reg_info=%d,flag=%d", __func__, reg_info,
+		    ims->ims_register_start_time.tv_sec != 0);
 	if (reg_info) {
-		if (ims->ims_register_start_time == 0) {
-			ims->ims_register_start_time = time(NULL);
+		if (ims->ims_register_start_time.tv_sec == 0 &&
+		    ims->ims_register_start_time.tv_nsec == 0) {
+			clock_gettime(CLOCK_MONOTONIC,
+				      &ims->ims_register_start_time);
 		} else {
 			ofono_error("unexpect status");
 		}
 	} else {
-		if (ims->ims_register_start_time != 0) {
-			ims->ims_register_duration = time(NULL) -
-				ims->ims_register_start_time +
-				ims->ims_register_duration;
-			ims->ims_register_start_time = 0;
+		if (ims->ims_register_start_time.tv_sec != 0 ||
+		    ims->ims_register_start_time.tv_nsec != 0) {
+			struct timespec update_time;
+			clock_gettime(CLOCK_MONOTONIC, &update_time);
+			int temp_value = update_time.tv_sec -
+					 ims->ims_register_start_time.tv_sec;
+			ims->ims_register_duration =
+				temp_value + ims->ims_register_duration;
+			memset(&ims->ims_register_start_time, 0,
+			       sizeof(ims->ims_register_start_time));
 		}
 	}
 }
@@ -350,11 +358,17 @@ void update_ims_register_duration(struct ofono_ims *ims, int reg_info)
 static gboolean report_ims_register_duration(gpointer user_data)
 {
 	struct ofono_ims *ims = user_data;
-	if (ims->ims_register_start_time != 0) {
-		ims->ims_register_duration = time(NULL) -
-			ims->ims_register_start_time +
-			ims->ims_register_duration;
-		ims->ims_register_start_time = time(NULL);
+	if (ims->ims_register_start_time.tv_sec != 0 ||
+	    ims->ims_register_start_time.tv_nsec != 0) {
+		struct timespec update_time;
+
+		clock_gettime(CLOCK_MONOTONIC, &update_time);
+		int temp_value = update_time.tv_sec -
+				 ims->ims_register_start_time.tv_sec;
+		ims->ims_register_duration =
+			temp_value + ims->ims_register_duration;
+
+		ims->ims_register_start_time = update_time;
 	} else {
 		ofono_debug("ims is not active currently");
 	}

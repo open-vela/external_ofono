@@ -21,7 +21,7 @@
 #define SIGNAL_LEVEL_COUNT 6
 
 struct ofono_voicecall_duration_info {
-	time_t start_time;
+	struct timespec start_time;
 	unsigned int record_level;
 	int level[SIGNAL_LEVEL_COUNT];
 	guint report_time_id;

@@ -89,15 +89,16 @@ struct ofono_netreg {
 	unsigned int hfp_watch;
 	unsigned int spn_watch;
 	unsigned int radio_online_watch;
-	time_t oos_start_time;
+	struct timespec oos_start_time;
 	int oos_duration;
 	int report_oos_time_id;
+	ofono_bool_t oos_by_radio_on_flag;
 	int signal_level_duration[6]; // 6 diff level base enum ofono_signal_strength_level
-	time_t signal_level_start_time;
+	struct timespec signal_level_start_time;
 	int current_signal_level;
 	int signal_level_time_id;
 	int rat_duration[4]; // just consider 1-2g,2-3g,3-4g,0-other rat
-	time_t rat_start_time;
+	struct timespec rat_start_time;
 	int current_rat;
 	int  rat_report_time_id;
 	int radio_status;
@@ -1292,20 +1293,29 @@ static void set_registration_denial_reason(struct ofono_netreg *netreg, int deni
 
 void update_rat_duration(struct ofono_netreg *netreg, int rat_value)
 {
-	ofono_debug("update_rat_duration:%d,%d,%d", netreg->rat_start_time != 0,
+	struct timespec update_time;
+
+	clock_gettime(CLOCK_MONOTONIC, &update_time);
+	ofono_debug("update_rat_duration:%d,%d,%d",
+		    netreg->rat_start_time.tv_sec != 0 ||
+			    netreg->rat_start_time.tv_nsec != 0,
 		    netreg->status, netreg->radio_status);
-	if (netreg->rat_start_time != 0) {
+
+	if (netreg->rat_start_time.tv_sec != 0 ||
+	    netreg->rat_start_time.tv_nsec != 0) {
+		int temp_value =
+			update_time.tv_sec - netreg->rat_start_time.tv_sec;
 		netreg->rat_duration[netreg->current_rat] =
-			time(NULL) - netreg->rat_start_time +
-			netreg->rat_duration[netreg->current_rat];
+			temp_value + netreg->rat_duration[netreg->current_rat];
 	}
 	if ((netreg->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
 	     netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
 	    netreg->radio_status == RADIO_STATUS_ON) {
-		netreg->rat_start_time = time(NULL);
+		netreg->rat_start_time = update_time;
 		netreg->current_rat = rat_value;
 	} else {
-		netreg->rat_start_time = 0;
+		memset(&netreg->rat_start_time, 0,
+		       sizeof(netreg->rat_start_time));
 	}
 }
 
@@ -1665,18 +1675,37 @@ static void notify_emulator_status(struct ofono_atom *atom, void *data)
 
 void start_record_oos_time(struct ofono_netreg *netreg)
 {
-	ofono_debug("start_record_oos_time");
-	if (netreg->oos_start_time == 0) {
-		netreg->oos_start_time = time(NULL);
+	ofono_debug("%s", __func__);
+	if (netreg->oos_start_time.tv_sec == 0 &&
+	    netreg->oos_start_time.tv_nsec == 0) {
+		clock_gettime(CLOCK_MONOTONIC, &netreg->oos_start_time);
+	} else {
+		ofono_error("unexpect status in %s", __func__);
 	}
 }
 
 void stop_record_oos_time(struct ofono_netreg *netreg)
 {
-	ofono_debug("stop_record_oos_time:%d", netreg->oos_start_time != 0);
-	if (netreg->oos_start_time != 0) {
-		netreg->oos_duration = netreg->oos_duration + time(NULL) - netreg->oos_start_time;
-		netreg->oos_start_time = 0;
+	ofono_debug("%s:%d", __func__,
+		    netreg->oos_start_time.tv_sec != 0 ||
+			    netreg->oos_start_time.tv_nsec != 0);
+	if (netreg->oos_start_time.tv_sec != 0 ||
+	    netreg->oos_start_time.tv_nsec != 0) {
+		struct timespec stop_time;
+
+		clock_gettime(CLOCK_MONOTONIC, &stop_time);
+		int temp_value =
+			stop_time.tv_sec - netreg->oos_start_time.tv_sec;
+		if (netreg->oos_by_radio_on_flag &&
+		    temp_value < NORMAL_REGISTER_DURATION) {
+			netreg->oos_by_radio_on_flag = FALSE;
+			ofono_debug("%s ignore oos duration", __func__);
+		} else {
+			netreg->oos_duration =
+				netreg->oos_duration + temp_value;
+		}
+		memset(&netreg->oos_start_time, 0,
+		       sizeof(netreg->oos_start_time));
 	}
 }
 
@@ -1684,9 +1713,12 @@ static gboolean report_oos_duration(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
 
-	ofono_debug("report_oos_duration:%d,%d", netreg->oos_start_time != 0,
+	ofono_debug("%s:%d,%d", __func__,
+		    netreg->oos_start_time.tv_sec != 0 ||
+			    netreg->oos_start_time.tv_nsec != 0,
 		    netreg->oos_duration != 0);
-	if (netreg->oos_start_time != 0) {
+	if (netreg->oos_start_time.tv_sec != 0 ||
+	    netreg->oos_start_time.tv_nsec != 0) {
 		stop_record_oos_time(netreg);
 		start_record_oos_time(netreg);
 	}
@@ -1700,6 +1732,7 @@ static gboolean report_oos_duration(gpointer user_data)
 void update_signal_level_duration(struct ofono_netreg *netreg)
 {
 	int current_signal_level;
+	struct timespec update_time;
 
 	ofono_debug("update_signal_level_duration:%d,%d", netreg->status,
 		    netreg->current_signal_level);
@@ -1711,13 +1744,14 @@ void update_signal_level_duration(struct ofono_netreg *netreg)
 	} else {
 		current_signal_level = SIGNAL_STRENGTH_UNKNOWN;
 	}
-	time_t update_time = time(NULL);
+	clock_gettime(CLOCK_MONOTONIC, &update_time);
 
 	if (netreg->current_signal_level != SIGNAL_STRENGTH_UNKNOWN) {
+		int temp_value = update_time.tv_sec -
+				 netreg->signal_level_start_time.tv_sec;
 		netreg->signal_level_duration[netreg->current_signal_level] =
-			update_time - netreg->signal_level_start_time +
-			netreg->signal_level_duration
-				[netreg->current_signal_level];
+			temp_value + netreg->signal_level_duration
+					     [netreg->current_signal_level];
 	}
 	netreg->signal_level_start_time = update_time;
 	netreg->current_signal_level = current_signal_level;
@@ -1748,7 +1782,8 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 			     netreg->status ==
 				     NETWORK_REGISTRATION_STATUS_ROAMING) &&
 			    (status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
-			     status != NETWORK_REGISTRATION_STATUS_ROAMING)) {
+			     status != NETWORK_REGISTRATION_STATUS_ROAMING) &&
+			    netreg->radio_status == RADIO_STATUS_ON) {
 				OFONO_DFX_OOS_INFO();
 				start_record_oos_time(netreg);
 			}
@@ -1948,12 +1983,17 @@ static gboolean report_rat_info(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
 
-	ofono_debug("report_rat_info");
-	if (netreg->rat_start_time != 0) {
+	ofono_debug("%s", __func__);
+	if (netreg->rat_start_time.tv_sec != 0 ||
+	    netreg->rat_start_time.tv_nsec != 0) {
+		struct timespec update_time;
+		int temp_value;
+
+		clock_gettime(CLOCK_MONOTONIC, &update_time);
+		temp_value = update_time.tv_sec - netreg->rat_start_time.tv_sec;
 		netreg->rat_duration[netreg->current_rat] =
-			time(NULL) - netreg->rat_start_time +
-			netreg->rat_duration[netreg->current_rat];
-		netreg->rat_start_time = time(NULL);
+			temp_value + netreg->rat_duration[netreg->current_rat];
+		netreg->rat_start_time = update_time;
 	}
 	if (netreg->rat_duration[0] != 0 || netreg->rat_duration[1] != 0 ||
 	    netreg->rat_duration[2] != 0 || netreg->rat_duration[3] != 0) {
@@ -1976,6 +2016,7 @@ static void netreg_radio_state_change(int state, void *data)
 	ofono_debug("netreg_radio_state_change:%d", state);
 
 	if (state == RADIO_STATUS_ON) {
+		netreg->oos_by_radio_on_flag = TRUE;
 		start_record_oos_time(netreg);
 	}
 	if ((state == RADIO_STATUS_OFF || state == RADIO_STATUS_UNAVAILABLE) &&
@@ -2892,13 +2933,14 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 	netreg->report_oos_time_id = g_timeout_add(REPORTING_PERIOD,
 				report_oos_duration, netreg);
 
-	netreg->signal_level_start_time = time(NULL);
+	memset(&netreg->signal_level_start_time, 0,
+	       sizeof(netreg->signal_level_start_time));
 	netreg->current_signal_level = SIGNAL_STRENGTH_UNKNOWN;
 	memset(netreg->signal_level_duration, 0, sizeof(netreg->signal_level_duration));
 	netreg->signal_level_time_id = g_timeout_add(REPORTING_PERIOD,
 			report_signal_level_info, netreg);
 
-	netreg->rat_start_time = 0;
+	memset(&netreg->rat_start_time, 0, sizeof(netreg->rat_start_time));
 	netreg->current_rat = 0;
 	memset(netreg->rat_duration, 0, sizeof(netreg->rat_duration));
 	netreg->rat_report_time_id = g_timeout_add(REPORTING_PERIOD,

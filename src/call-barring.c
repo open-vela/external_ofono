@@ -744,7 +744,7 @@ static void set_lock_callback(const struct ofono_error *error, void *data)
 		DBG("Enabling/disabling a lock failed");
 		__ofono_dbus_pending_reply(&cb->pending,
 					__ofono_error_failed(cb->pending));
-		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", "dbus method fail");
+		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", "modem fail");
 		return;
 	}
 

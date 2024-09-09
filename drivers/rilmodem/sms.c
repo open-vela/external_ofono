@@ -223,8 +223,6 @@ static void ril_submit_sms_cb(struct ril_msg *message, gpointer user_data)
 
 	if (message->error != RIL_E_SUCCESS) {
 
-		OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
-				OFONO_SMS_SEND, OFONO_SMS_FAIL);
 		CALLBACK_WITH_FAILURE(cb, 0, cbd->data);
 		return;
 	}
@@ -468,8 +466,6 @@ static void ril_cmgs(struct ofono_sms *sms, const unsigned char *pdu,
 			ril_submit_sms_cb, cbd, g_free) > 0)
 		return;
 
-	OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
-			OFONO_SMS_SEND, OFONO_SMS_FAIL);
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, -1, user_data);
 }
