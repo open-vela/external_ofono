@@ -95,7 +95,7 @@ struct ofono_gprs {
 	unsigned int sim_state_watch;
 	unsigned int spn_watch;
 	unsigned int radio_online_watch;
-	time_t internet_start_time;
+	struct timespec internet_start_time;
 	int internet_active_duration;
 	int report_data_active_time_id;
 };
@@ -962,18 +962,31 @@ static DBusMessage *pri_get_properties(DBusConnection *conn,
 
 void start_record_active_data_time(struct ofono_gprs *gprs)
 {
-	ofono_debug("start_record_active_data_time");
-	gprs->internet_start_time = time(NULL);
+	ofono_debug("%s", __func__);
+	if (gprs->internet_start_time.tv_sec == 0 &&
+	    gprs->internet_start_time.tv_nsec == 0) {
+		clock_gettime(CLOCK_MONOTONIC, &gprs->internet_start_time);
+	} else {
+		ofono_debug("unexpect status in %s", __func__);
+	}
 }
 
 void stop_record_active_data_time(struct ofono_gprs *gprs)
 {
-	ofono_debug("stop_record_active_data_time");
-	if (gprs->internet_start_time > 0) {
+	ofono_debug("%s flag %d", __func__,
+		    gprs->internet_start_time.tv_sec > 0 ||
+			    gprs->internet_start_time.tv_nsec > 0);
+	if (gprs->internet_start_time.tv_sec > 0 ||
+	    gprs->internet_start_time.tv_nsec > 0) {
+		struct timespec stop_time;
+
+		clock_gettime(CLOCK_MONOTONIC, &stop_time);
+		int temp_value =
+			stop_time.tv_sec - gprs->internet_start_time.tv_sec;
 		gprs->internet_active_duration =
-			gprs->internet_active_duration + time(NULL) -
-			gprs->internet_start_time;
-		gprs->internet_start_time = 0;
+			gprs->internet_active_duration + temp_value;
+		memset(&gprs->internet_start_time, 0,
+		       sizeof(gprs->internet_start_time));
 	}
 }
 
@@ -981,7 +994,8 @@ static gboolean report_data_active_duration(gpointer user_data)
 {
 	struct ofono_gprs *gprs = user_data;
 
-	if (gprs->internet_start_time != 0) {
+	if (gprs->internet_start_time.tv_sec != 0 ||
+	    gprs->internet_start_time.tv_nsec != 0) {
 		stop_record_active_data_time(gprs);
 		start_record_active_data_time(gprs);
 	}
@@ -4381,7 +4395,8 @@ void ofono_gprs_register(struct ofono_gprs *gprs)
 	gprs->radio_online_watch = __ofono_modem_add_online_watch(modem,
 					radio_online_watch_cb,
 					gprs, NULL);
-	gprs->internet_start_time = 0;
+	memset(&gprs->internet_start_time, 0,
+	       sizeof(gprs->internet_start_time));
 	gprs->internet_active_duration = 0;
 	gprs->report_data_active_time_id = g_timeout_add(REPORTING_PERIOD,
 			report_data_active_duration, gprs);

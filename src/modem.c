@@ -105,7 +105,7 @@ struct ofono_modem {
 	int			to_event_id;
 	int			modem_duration[2];
 	int			modem_status;
-	time_t			modem_start_time;
+	struct timespec		modem_start_time;
 	int			modem_duration_report_id;
 	GHashTable		*camp_band_info;
 	GHashTable		*en_list; /* emergency number list */
@@ -1645,17 +1645,34 @@ static DBusMessage *modem_enable_or_disable(struct ofono_modem *modem, ofono_boo
 	return NULL;
 }
 
+static void update_record_modem_time(struct ofono_modem *modem,
+				     int modem_status)
+{
+	struct timespec update_time;
+
+	ofono_debug("%s flag:%d status:%d, target status:%d ", __func__,
+		    modem->modem_start_time.tv_sec > 0 ||
+			    modem->modem_start_time.tv_nsec > 0,
+		    modem->modem_status, modem_status);
+	clock_gettime(CLOCK_MONOTONIC, &update_time);
+	if (modem->modem_start_time.tv_sec > 0 ||
+	    modem->modem_start_time.tv_nsec > 0) {
+		int temp_value =
+			update_time.tv_sec - modem->modem_start_time.tv_sec;
+		modem->modem_duration[modem->modem_status] =
+			temp_value + modem->modem_duration[modem->modem_status];
+	}
+
+	modem->modem_status = modem_status;
+	clock_gettime(CLOCK_MONOTONIC, &modem->modem_start_time);
+}
+
 static DBusMessage *modem_enable(DBusConnection *conn, DBusMessage *msg,
 				void *data)
 {
 	struct ofono_modem *modem = data;
 
-	ofono_debug("modem_enable");
-	modem->modem_duration[modem->modem_status] = time(NULL) -
-		modem->modem_start_time +
-		modem->modem_duration[modem->modem_status];
-	modem->modem_status = 1;
-	modem->modem_start_time = time(NULL);
+	update_record_modem_time(modem, 1);
 
 	return modem_enable_or_disable(modem, TRUE, conn, msg);
 }
@@ -1665,12 +1682,7 @@ static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_modem *modem = data;
 
-	ofono_debug("modem_disable");
-	modem->modem_duration[modem->modem_status] = time(NULL) -
-		modem->modem_start_time +
-		modem->modem_duration[modem->modem_status];
-	modem->modem_status = 0;
-	modem->modem_start_time = time(NULL);
+	update_record_modem_time(modem, 0);
 
 	return modem_enable_or_disable(modem, FALSE, conn, msg);
 }
@@ -2728,12 +2740,9 @@ static gboolean report_modem_duration(gpointer user_data)
 {
 	struct ofono_modem *modem = user_data;
 
-	modem->modem_duration[modem->modem_status] = time(NULL) -
-		modem->modem_start_time +
-		modem->modem_duration[modem->modem_status];
+	update_record_modem_time(modem,modem->modem_status);
 	OFONO_DFX_MODEM_DURATION_INFO(modem->modem_duration[0],
 				      modem->modem_duration[1]);
-	modem->modem_start_time = time(NULL);
 	memset(modem->modem_duration, 0, sizeof(modem->modem_duration));
 
 	return TRUE;
@@ -2778,9 +2787,8 @@ struct ofono_modem *ofono_modem_create(const char *name, const char *type)
 	if (name == NULL)
 		next_modem_id += 1;
 
-	modem->modem_start_time = time(NULL);
-	modem->modem_status = 0;
 	memset(modem->modem_duration, 0, sizeof(modem->modem_duration));
+	update_record_modem_time(modem,0);
 	modem->modem_duration_report_id = g_timeout_add(REPORTING_PERIOD,
 		report_modem_duration, modem);
 

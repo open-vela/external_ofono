@@ -695,7 +695,7 @@ static void ussd_cancel_callback(const struct ofono_error *error, void *data)
 		reply = __ofono_error_failed(ussd->cancel);
 		__ofono_dbus_pending_reply(&ussd->cancel, reply);
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
-		OFONO_DFX_SS_INFO("ss:ussd:cancel", "modem fail");
+		OFONO_DFX_SS_INFO("ss:ussd:cancel", reason_desc);
 
 		return;
 	}

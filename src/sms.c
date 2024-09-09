@@ -737,6 +737,7 @@ static void tx_finished(const struct ofono_error *error, int mr, void *data)
 	gboolean ok = error->type == OFONO_ERROR_TYPE_NO_ERROR;
 	enum message_state tx_state;
 	struct ofono_uuid entry_uuid;
+	int op_code = OFONO_OPERATOR_UNKNOW;
 
 	ofono_debug("tx_finished %p", entry);
 
@@ -808,6 +809,14 @@ next_q:
 		sms->tx_source = g_timeout_add(0, tx_next, sms);
 	}
 
+	if (ok == FALSE) {
+		if (sms->driver != NULL && sms->driver->get_op_code) {
+			op_code = sms->driver->get_op_code(sms->driver_data);
+		}
+
+		OFONO_DFX_SMS_INFO(op_code, OFONO_SMS_TYPE_UNKNOW,
+				   OFONO_SMS_SEND, OFONO_SMS_FAIL);
+	}
 	message_sent_cb(sms, &entry_uuid, error, sms->pending);
 }
 

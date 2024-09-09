@@ -156,45 +156,51 @@ static int call_compare(gconstpointer a, gconstpointer b)
 void start_record_time(struct ofono_voicecall *vc)
 {
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
-	ofono_debug("start record call time");
-	vd->call_duration_info.record_level = ofono_voicecall_get_signal_level(vc);
-	vd->call_duration_info.start_time = time(NULL);
+	struct ofono_voicecall_duration_info *cd_info = &vd->call_duration_info;
+
+	ofono_debug("%s", __func__);
+	cd_info->record_level = ofono_voicecall_get_signal_level(vc);
+	clock_gettime(CLOCK_MONOTONIC, &cd_info->start_time);
 }
 
 void stop_record_time(struct ofono_voicecall *vc)
 {
-	time_t stop_time = time(NULL);
+	struct timespec stop_time;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	int temp_value = 0;
+	struct ofono_voicecall_duration_info *cd_info = &vd->call_duration_info;
 
-	ofono_debug("stop record time");
-	if (vd->call_duration_info.start_time == 0) {
+	ofono_debug("%s", __func__);
+	clock_gettime(CLOCK_MONOTONIC, &stop_time);
+	if (cd_info->start_time.tv_sec == 0 &&
+	    cd_info->start_time.tv_nsec == 0) {
 		ofono_error("unexpected status");
 		return;
 	}
 
-	if (vd->call_duration_info.record_level >= SIGNAL_LEVEL_COUNT) {
+	if (cd_info->record_level >= SIGNAL_LEVEL_COUNT) {
 		ofono_error("unexpected record_level");
-		vd->call_duration_info.start_time = 0;
+		memset(&cd_info->start_time, 0, sizeof(cd_info->start_time));
 		return;
 	}
-
-	vd->call_duration_info.level[vd->call_duration_info.record_level] =
-		vd->call_duration_info.level[vd->call_duration_info.record_level] +
-		stop_time - vd->call_duration_info.start_time;
-
-	vd->call_duration_info.start_time = 0;
+	temp_value = stop_time.tv_sec - cd_info->start_time.tv_sec;
+	cd_info->level[cd_info->record_level] =
+		cd_info->level[cd_info->record_level] + temp_value;
+	memset(&cd_info->start_time, 0, sizeof(cd_info->start_time));
 }
 
 void ril_update_call_duration(struct ofono_voicecall *vc, int signal_level)
 {
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct ofono_voicecall_duration_info *cd_info = &vd->call_duration_info;
 
 	ofono_debug("ril_update_call_duration,signal_level:%d", signal_level);
-	if(signal_level != vd->call_duration_info.record_level) {
-		if (vd->call_duration_info.start_time != 0) {
+	if (signal_level != cd_info->record_level) {
+		if (cd_info->start_time.tv_sec != 0 ||
+		    cd_info->start_time.tv_nsec != 0) {
 			stop_record_time(vc);
-			vd->call_duration_info.record_level = signal_level;
-			vd->call_duration_info.start_time = time(NULL);
+			cd_info->record_level = signal_level;
+			clock_gettime(CLOCK_MONOTONIC, &cd_info->start_time);
 		}
 	}
 }
@@ -828,13 +834,13 @@ void ril_hangup_all(struct ofono_voicecall *vc, ofono_voicecall_cb_t cb,
 			ret = ril_template(RIL_REQUEST_HANGUP, vc, hangup_generic_cb,
 					AFFECTED_STATES_ALL, &rilp, NULL, NULL);
 		}
+		OFONO_DFX_CALL_INFO_IF(!ret, OFONO_CALL_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
+				OFONO_VOICE, OFONO_HANGUP_FAIL, "send RIL Request fail");
 	}
 
 	/* TODO: Deal in case of an error at hungup */
 	decode_ril_error(&error, "OK");
 	cb(&error, data);
-	OFONO_DFX_CALL_INFO_IF(!ret, OFONO_CALL_TYPE_UNKNOW, OFONO_DIRECTION_UNKNOW,
-			OFONO_VOICE, OFONO_HANGUP_FAIL, "send RIL Request fail");
 }
 
 void ril_hangup_specific(struct ofono_voicecall *vc,
@@ -1270,31 +1276,26 @@ static gboolean report_call_time(gpointer user_data)
 {
 	struct ofono_voicecall *vc = user_data;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct ofono_voicecall_duration_info *cd_info = &vd->call_duration_info;
 
-	if (vd->call_duration_info.start_time != 0) {
+	if (cd_info->start_time.tv_sec != 0 ||
+	    cd_info->start_time.tv_nsec != 0) {
 		stop_record_time(vc);
 		start_record_time(vc);
 	}
 
 	if (SIGNAL_LEVEL_COUNT == 6) {
-		if (vd->call_duration_info.level[0] != 0 ||
-		    vd->call_duration_info.level[1] != 0 ||
-		    vd->call_duration_info.level[2] != 0 ||
-		    vd->call_duration_info.level[3] != 0 ||
-		    vd->call_duration_info.level[4] != 0 ||
-		    vd->call_duration_info.level[5] != 0) {
+		if (cd_info->level[0] != 0 || cd_info->level[1] != 0 ||
+		    cd_info->level[2] != 0 || cd_info->level[3] != 0 ||
+		    cd_info->level[4] != 0 || cd_info->level[5] != 0) {
 			OFONO_DFX_CALL_TIME_INFO(
-				vd->call_duration_info.level[0],
-				vd->call_duration_info.level[1],
-				vd->call_duration_info.level[2],
-				vd->call_duration_info.level[3],
-				vd->call_duration_info.level[4],
-				vd->call_duration_info.level[5]);
+				cd_info->level[0], cd_info->level[1],
+				cd_info->level[2], cd_info->level[3],
+				cd_info->level[4], cd_info->level[5]);
 		}
 	}
 
-		memset(vd->call_duration_info.level, 0,
-				sizeof(vd->call_duration_info.level));
+	memset(cd_info->level, 0, sizeof(cd_info->level));
 
 	return TRUE;
 }
@@ -1310,7 +1311,8 @@ int ril_voicecall_probe(struct ofono_voicecall *vc, unsigned int vendor,
 	vd->cb = NULL;
 	vd->data = NULL;
 	vd->suppress_clcc_poll = FALSE;
-	vd->call_duration_info.start_time = 0;
+	memset(&vd->call_duration_info.start_time, 0,
+	       sizeof(vd->call_duration_info.start_time));
 	vd->call_duration_info.record_level = 0;
 	memset(vd->call_duration_info.level, 0,
 			sizeof(vd->call_duration_info.level));
