@@ -532,6 +532,7 @@ static void ril_sms_delete_on_sim(struct ofono_sms *sms,
 
 	parcel_init(&rilp);
 
+	parcel_w_int32(&rilp, 1);
 	parcel_w_int32(&rilp, index); /* delete sms index */
 
 	if (g_ril_send(sd->ril, RIL_REQUEST_DELETE_SMS_ON_SIM, &rilp,
