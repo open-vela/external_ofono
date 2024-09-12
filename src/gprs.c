@@ -2568,6 +2568,7 @@ static void gprs_deactivate_for_remove(const struct ofono_error *error,
 	}
 
 	if (gprs->settings) {
+		ofono_debug("deactivate for remove context name:%s", ctx->key);
 		g_key_file_remove_group(gprs->settings, ctx->key, NULL);
 		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 	}
@@ -2634,6 +2635,7 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 	}
 
 	if (gprs->settings) {
+		ofono_debug("remove context context name:%s", ctx->key);
 		g_key_file_remove_group(gprs->settings, ctx->key, NULL);
 		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 	}
@@ -3010,6 +3012,7 @@ static void remove_context(struct ofono_gprs *gprs,
 	const char *atompath;
 
 	if (gprs->settings) {
+		ofono_debug("remove context context name:%s", ctx->key);
 		g_key_file_remove_group(gprs->settings, ctx->key, NULL);
 		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 	}
@@ -3930,62 +3933,88 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	unsigned int id;
 
 	if (sscanf(group, "context%d", &id) != 1) {
-		if (sscanf(group, "primarycontext%d", &id) != 1)
+		if (sscanf(group, "primarycontext%d", &id) != 1) {
+			ofono_error("load_context primarycontext");
 			goto error;
+		}
 
 		legacy = TRUE;
 	}
 
-	if (id < 1 || id > MAX_CONTEXTS)
+	if (id < 1 || id > MAX_CONTEXTS) {
+		ofono_error("load_context id invalid");
 		goto error;
+	}
 
 	name = g_key_file_get_string(gprs->settings, group, "Name", NULL);
-	if (name == NULL)
+	if (name == NULL) {
+		ofono_error("load_context name invalid");
 		goto error;
+	}
 
 	typestr = g_key_file_get_string(gprs->settings, group, "Type", NULL);
-	if (typestr == NULL)
+	if (typestr == NULL) {
+		ofono_error("load_context type invalid");
 		goto error;
+	}
 
-	if (gprs_context_string_to_type(typestr, &type) == FALSE)
+	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
+		ofono_error("load_context type invalid1");
 		goto error;
+	}
 
 	protostr = g_key_file_get_string(gprs->settings, group,
 							"Protocol", NULL);
 	if (protostr == NULL)
 		protostr = g_strdup("IPV4V6");
 
-	if (gprs_proto_from_string(protostr, &proto) == FALSE)
+	if (gprs_proto_from_string(protostr, &proto) == FALSE) {
+		ofono_error("load_context protocol invalid");
 		goto error;
+	}
 
 	username = g_key_file_get_string(gprs->settings, group,
 						"Username", NULL);
-	if (username == NULL)
+	if (username == NULL) {
+		ofono_error("load_context username invalid");
 		goto error;
+	}
 
-	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
+		ofono_error("load_context username invalid1");
 		goto error;
+	}
 
 	password = g_key_file_get_string(gprs->settings, group,
 						"Password", NULL);
-	if (password == NULL)
+	if (password == NULL) {
+		ofono_error("load_context password invalid");
 		goto error;
+	}
 
 	authstr = g_key_file_get_string(gprs->settings, group,
 						"AuthenticationMethod", NULL);
-	if (authstr == NULL)
+	if (authstr == NULL) {
+		ofono_error("load_context auth invalid");
 		authstr = g_strdup("chap");
+	}
 
-	if (gprs_auth_method_from_string(authstr, &auth) == FALSE)
+	if (gprs_auth_method_from_string(authstr, &auth) == FALSE) {
+		ofono_error("load_context auth invalid1");
 		goto error;
+	}
 
-	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
+		ofono_error("load_context password invalid");
 		goto error;
+	}
 
 	apn = g_key_file_get_string(gprs->settings, group,
 					"AccessPointName", NULL);
-	if (apn == NULL)
+	if (apn == NULL) {
+		ofono_error("load_context apn invalid");
 		goto error;
+	}
 
 	if (type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
 		msgproxy = g_key_file_get_string(gprs->settings, group,
@@ -3999,12 +4028,16 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	 * Accept empty (just created) APNs, but don't allow other
 	 * invalid ones
 	 */
-	if (apn[0] != '\0' && is_valid_apn(apn) == FALSE)
+	if (apn[0] != '\0' && is_valid_apn(apn) == FALSE) {
+		ofono_error("load_context apn invalid1");
 		goto error;
+	}
 
 	context = pri_context_create(gprs, name, type, apn, username, password, proto, auth);
-	if (context == NULL)
+	if (context == NULL) {
+		ofono_error("load_context context invalid");
 		goto error;
+	}
 
 	l_uintset_put(gprs->used_pids, id);
 	context->id = id;
@@ -4029,6 +4062,7 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	ret = TRUE;
 
 	if (legacy) {
+		ofono_debug("load_context context name:%s", context->key);
 		write_context_settings(gprs, context);
 		g_key_file_remove_group(gprs->settings, group, NULL);
 	}
@@ -4154,10 +4188,15 @@ static void gprs_load_settings(struct ofono_gprs *gprs, const char *imsi)
 			legacy = TRUE;
 		}
 
-		if (load_context(gprs, groups[i]) == TRUE)
+		if (load_context(gprs, groups[i]) == TRUE) {
 			continue;
+		} else {
+			ofono_error("load settings load context fail:%s", groups[i]);
+			continue;//didn't remove context even load fail
+		}
 
 remove:
+		ofono_debug("gprs_load_settings group name:%s", groups[i]);
 		g_key_file_remove_group(gprs->settings, groups[i], NULL);
 	}
 
