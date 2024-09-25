@@ -3277,11 +3277,11 @@ static void ecc_g2_read_cb(int ok, int total_length, int record,
 	DBG("%d", ok);
 
 	if (!ok)
-		return;
+		goto done;
 
 	if (total_length < 3) {
 		ofono_error("Unable to read emergency numbers from SIM");
-		return;
+		goto done;
 	}
 
 	free_sim_ecc_numbers(vc, TRUE);
@@ -3296,6 +3296,7 @@ static void ecc_g2_read_cb(int ok, int total_length, int record,
 								g_strdup(en));
 	}
 
+done:
 	vc->flags |= VOICECALL_FLAG_SIM_ECC_READY;
 
 	set_new_ecc(vc);
