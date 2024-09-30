@@ -50,7 +50,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 		break;
 	case OFONO_ABNORMAL_EF_FILE: {
 		struct ofono_abnormal_ef_file *ef_file_data =
-			( struct ofono_abnormal_ef_file * ) covert_data;
+			(struct ofono_abnormal_ef_file *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,ef_id=%u,"
 			    "sw1=%u,sw2=%u",
@@ -60,7 +60,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_PROFILE: {
 		struct ofono_abnormal_profile *profile_data =
-			( struct ofono_abnormal_profile * ) covert_data;
+			(struct ofono_abnormal_profile *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    profile_data->sub);
@@ -68,7 +68,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_RLF: {
 		struct ofono_abnormal_reest *reest_data =
-			( struct ofono_abnormal_reest * ) covert_data;
+			(struct ofono_abnormal_reest *) covert_data;
 
 		ofono_debug(
 			"ofono_handle_abnormal_event,sub=%u,earfcn=%u,pci=%u,"
@@ -83,7 +83,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_RACH_ACCESS: {
 		struct ofono_abnormal_rach_access *rach_access_data =
-			( struct ofono_abnormal_rach_access * ) covert_data;
+			(struct ofono_abnormal_rach_access *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,earfcn=%u,"
 			    "pci=%u,fail_reason=%u",
@@ -94,7 +94,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_OOS: {
 		struct ofono_abnormal_oos *oos_data =
-			( struct ofono_abnormal_oos * ) covert_data;
+			(struct ofono_abnormal_oos *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,earfcn=%u,"
 			    "pci=%u,oos_type=%u",
@@ -104,7 +104,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_NAS_TIMEOUT: {
 		struct ofono_abnormal_timer_exp *timer_exp_data =
-			( struct ofono_abnormal_timer_exp * ) covert_data;
+			(struct ofono_abnormal_timer_exp *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,timer_id=%u",
 			    timer_exp_data->sub, timer_exp_data->timer_id);
@@ -120,7 +120,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_SIP_TIMEOUT: {
 		struct ofono_abnormal_sip_timeout *sip_timeout_data =
-			( struct ofono_abnormal_sip_timeout * ) covert_data;
+			(struct ofono_abnormal_sip_timeout *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,srv_type=%u,"
 			    "sip_method=%u",
@@ -130,7 +130,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_TIMEOUT_IN_RRC: {
 		struct ofono_abnormal_timeout_in_rrc *sip_timeout_in_rrc_data =
-			( struct ofono_abnormal_timeout_in_rrc * ) covert_data;
+			(struct ofono_abnormal_timeout_in_rrc *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,earfcn=%u,"
 			    "pci=%u,timer=%u",
@@ -142,7 +142,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_ECC_CALL_FAIL: {
 		struct ofono_abnormal_ecc_call_fail *ecc_call_fail_data =
-			( struct ofono_abnormal_ecc_call_fail * ) covert_data;
+			(struct ofono_abnormal_ecc_call_fail *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,cause=%u",
 			    ecc_call_fail_data->sub, ecc_call_fail_data->cause);
@@ -150,7 +150,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_RTP_RTCP: {
 		struct ofono_abnormal_rtp_rtcp *rtp_rtcp_data =
-			( struct ofono_abnormal_rtp_rtcp * ) covert_data;
+			(struct ofono_abnormal_rtp_rtcp *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,error_type=%u",
 			    rtp_rtcp_data->sub, rtp_rtcp_data->error_type);
@@ -158,7 +158,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_PAGING_DECODE: {
 		struct ofono_abnormal_paging_decode *paging_decode_data =
-			( struct ofono_abnormal_paging_decode * ) covert_data;
+			(struct ofono_abnormal_paging_decode *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,earfcn=%u,"
 			    "pci=%u,rsrp=%d,rsrq=%d,sinr=%d,rssi=%d",
@@ -172,7 +172,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_CALL_QUALITY: {
 		struct ofono_abnormal_call_quality *call_quality_data =
-			( struct ofono_abnormal_call_quality * ) covert_data;
+			(struct ofono_abnormal_call_quality *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,pkt_lost=%u,"
 			    "fraction_lost=%u,jitter_buffer_size=%u",
@@ -183,7 +183,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_PDCP: {
 		struct ofono_abnormal_pdcp *pdcp_data =
-			( struct ofono_abnormal_pdcp * ) covert_data;
+			(struct ofono_abnormal_pdcp *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,"
 			    "dl_loss_rate=%u,ul_loss_rate=%u,rsrp=%d,rsrq=%d,"
@@ -198,7 +198,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_NAS_REJECT: {
 		struct ofono_abnormal_nas_reject *nas_reject_data =
-			( struct ofono_abnormal_nas_reject * ) covert_data;
+			(struct ofono_abnormal_nas_reject *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,"
 			    "procedure_type=%u,reject_cause=%u",
@@ -217,7 +217,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_SIP_REJECT: {
 		struct ofono_abnormal_sip_reject *sip_reject_data =
-			( struct ofono_abnormal_sip_reject * ) covert_data;
+			(struct ofono_abnormal_sip_reject *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,srv_type=%u,"
 			    "sip_method=%u,resp_code=%u",
@@ -228,7 +228,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_RRC_REJECT: {
 		struct ofono_abnormal_rrc_reject *rrc_reject_data =
-			( struct ofono_abnormal_rrc_reject * ) covert_data;
+			(struct ofono_abnormal_rrc_reject *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,earfcn=%u,"
 			    "pci=%u,error_scenario_id=%u",
@@ -239,7 +239,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_PING_PONG: {
 		struct ofono_abnormal_ping_pong *ping_pong_data =
-			( struct ofono_abnormal_ping_pong * ) covert_data;
+			(struct ofono_abnormal_ping_pong *) covert_data;
 
 		ofono_debug(
 			"ofono_handle_abnormal_event,pcell_pci=%u,"
@@ -253,7 +253,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_CC: {
 		struct ofono_cc_abnormal_fail *cc_fail_data =
-			( struct ofono_cc_abnormal_fail * ) covert_data;
+			(struct ofono_cc_abnormal_fail *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,cause=%u,"
 			    "error_scenario_id=%u",
@@ -263,7 +263,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_XCAP: {
 		struct ofono_abnormal_xcap *xcap_data =
-			( struct ofono_abnormal_xcap * ) covert_data;
+			(struct ofono_abnormal_xcap *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,mode=%u,"
 			    "reason=%u,error_type=%u",
@@ -273,7 +273,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_ABNORMAL_DATA: {
 		struct ofono_abnormal_data *data_data =
-			( struct ofono_abnormal_data * ) covert_data;
+			(struct ofono_abnormal_data *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,event=%u,"
 			    "rsrp=%d,rsrq=%d,sinr=%d,rssi=%d",
@@ -289,8 +289,8 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	case OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP: {
 		struct ofono_abnormal_call_end_reason_from_sip
 			*sip_end_reason_data =
-				( struct ofono_abnormal_call_end_reason_from_sip
-					  * ) covert_data;
+				(struct ofono_abnormal_call_end_reason_from_sip
+					 *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,reason_type=%u",
 			    sip_end_reason_data->sub,
@@ -300,7 +300,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	case OFONO_LIMITED_SERVICE_CAMP_EVENT: // 200
 	{
 		struct ofono_abnormal_limited_service *limited_service_data =
-			( struct ofono_abnormal_limited_service * ) covert_data;
+			(struct ofono_abnormal_limited_service *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,type=%u,"
 			    "cause=%u",
@@ -311,7 +311,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_REDIRECT_EVENT: {
 		struct ofono_redirect_event *redirect_data =
-			( struct ofono_redirect_event * ) covert_data;
+			(struct ofono_redirect_event *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    redirect_data->sub);
@@ -319,7 +319,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_HANDOVER_EVENT: {
 		struct ofono_abnormal_handover_event *handover_data =
-			( struct ofono_abnormal_handover_event * ) covert_data;
+			(struct ofono_abnormal_handover_event *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    handover_data->sub);
@@ -327,7 +327,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_RESELECT_EVENT: {
 		struct ofono_abnormal_reselect_event *reselect_data =
-			( struct ofono_abnormal_reselect_event * ) covert_data;
+			(struct ofono_abnormal_reselect_event *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    reselect_data->sub);
@@ -335,7 +335,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_CSFB_EVENT: {
 		struct ofono_csfb_event *csfb_data =
-			( struct ofono_csfb_event * ) covert_data;
+			(struct ofono_csfb_event *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    csfb_data->sub);
@@ -343,7 +343,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_SRVCC_EVENT: {
 		struct ofono_srvcc_event *srvcc_data =
-			( struct ofono_srvcc_event * ) covert_data;
+			(struct ofono_srvcc_event *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    srvcc_data->sub);
@@ -351,7 +351,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_UE_CAP_INFO: {
 		struct ofono_ue_cap_info *ue_cap_data =
-			( struct ofono_ue_cap_info * ) covert_data;
+			(struct ofono_ue_cap_info *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u",
 			    ue_cap_data->sub);
@@ -365,7 +365,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_UE_CAMP_CELL_INFO: {
 		struct ofono_ue_camp_cell_info *ue_camp_cell_data =
-			( struct ofono_ue_camp_cell_info * ) covert_data;
+			(struct ofono_ue_camp_cell_info *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,plmn=%u,tac=%u,"
 			    "cell_id=%u,band=%u,earfcn=%u,pci=%u",
@@ -381,7 +381,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
 	}
 	case OFONO_UE_SIM_INFO: {
 		struct ofono_ue_sim_info *ue_sim_data =
-			( struct ofono_ue_sim_info * ) covert_data;
+			(struct ofono_ue_sim_info *) covert_data;
 
 		ofono_debug("ofono_handle_abnormal_event,sub=%u,hplmn=%u",
 			    ue_sim_data->sub, ue_sim_data->hplmn);
