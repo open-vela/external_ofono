@@ -183,6 +183,9 @@ struct ofono_modem *ofono_modem_find(ofono_modem_compare_cb_t func,
 void ofono_modem_set_powered_timeout_hint(struct ofono_modem *modem,
 							unsigned int seconds);
 
+ofono_bool_t ofono_modem_check_and_save_band(struct ofono_modem *modem,
+					     unsigned int band);
+
 #ifdef __cplusplus
 }
 #endif

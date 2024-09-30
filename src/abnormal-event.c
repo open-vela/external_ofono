@@ -32,7 +32,8 @@
 
 #define INT_STR_MAX 15
 
-void ofono_handle_abnormal_event(int type_id, char *data, int data_len)
+void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
+				 char *data, int data_len)
 {
 	size_t len;
 	unsigned char *covert_data = NULL;
@@ -372,7 +373,10 @@ void ofono_handle_abnormal_event(int type_id, char *data, int data_len)
 			    ue_camp_cell_data->tac, ue_camp_cell_data->cell_id,
 			    ue_camp_cell_data->band, ue_camp_cell_data->earfcn,
 			    ue_camp_cell_data->pci);
-		OFONO_DFX_BAND_INFO(ue_camp_cell_data->band);
+		if (!ofono_modem_check_and_save_band(modem,
+						     ue_camp_cell_data->band)) {
+			OFONO_DFX_BAND_INFO(ue_camp_cell_data->band);
+		}
 		break;
 	}
 	case OFONO_UE_SIM_INFO: {

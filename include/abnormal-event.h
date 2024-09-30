@@ -471,7 +471,8 @@ struct ofono_ue_sim_info {
 
 #pragma pack()
 
-void ofono_handle_abnormal_event(int type_id, char *data, int data_len);
+void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id,
+				 char *data, int data_len);
 
 #ifdef __cplusplus
 }

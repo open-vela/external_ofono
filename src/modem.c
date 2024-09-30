@@ -107,6 +107,7 @@ struct ofono_modem {
 	int			modem_status;
 	time_t			modem_start_time;
 	int			modem_duration_report_id;
+	GHashTable		*camp_band_info;
 };
 
 struct ofono_devinfo {
@@ -2658,6 +2659,7 @@ struct ofono_modem *ofono_modem_create(const char *name, const char *type)
 	modem->driver_type = g_strdup(type);
 	modem->properties = g_hash_table_new_full(g_str_hash, g_str_equal,
 						g_free, unregister_property);
+	modem->camp_band_info = g_hash_table_new(NULL, NULL);
 	modem->timeout_hint = DEFAULT_POWERED_TIMEOUT;
 	modem->configs = NULL;
 
@@ -2917,6 +2919,9 @@ static void modem_unregister(struct ofono_modem *modem)
 	g_hash_table_destroy(modem->properties);
 	modem->properties = NULL;
 
+	g_hash_table_destroy(modem->camp_band_info);
+	modem->camp_band_info = NULL;
+
 	modem->driver = NULL;
 
 	emit_modem_removed(modem);
@@ -3123,4 +3128,16 @@ void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 	}
 
 	radio_status_change(modem, old_radio_state, modem->radio_status);
+}
+
+ofono_bool_t ofono_modem_check_and_save_band(struct ofono_modem *modem,
+					     unsigned int band)
+{
+	if (!g_hash_table_contains(modem->camp_band_info,
+				   GINT_TO_POINTER(band))) {
+		g_hash_table_insert(modem->camp_band_info,
+				    GINT_TO_POINTER(band), NULL);
+		return FALSE;
+	}
+	return TRUE;
 }

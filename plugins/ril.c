@@ -457,12 +457,13 @@ static void ril_abnormal_event(struct ril_msg *message, gpointer user_data)
 	int type_id;
 	char *data;
 	int data_len;
+	struct ofono_modem *modem = (struct ofono_modem *) user_data;
 
 	g_ril_init_parcel(message, &rilp);
 	type_id = parcel_r_int32(&rilp);
 	data_len = parcel_r_int32(&rilp);
 	data = parcel_r_string(&rilp);
-	ofono_handle_abnormal_event(type_id, data, data_len);
+	ofono_handle_abnormal_event(modem, type_id, data, data_len);
 
 	g_free(data);
 }
