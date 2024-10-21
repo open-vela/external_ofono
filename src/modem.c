@@ -203,6 +203,7 @@ static void set_new_ecc(struct ofono_modem *modem, GSList *cust_ecc_list)
 			 ecc->condition);
 		g_hash_table_replace(modem->en_list, g_strdup(ecc->number), g_strdup(buf));
 	}
+	g_slist_free(cust_ecc_list);
 	while (default_en_list_no_sim[i])
 		g_hash_table_replace(
 			modem->en_list, g_strdup(default_en_list_no_sim[i++]),
