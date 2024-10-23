@@ -464,12 +464,20 @@ DBusMessage *__ofono_error_from_error(const struct ofono_error *error,
 
 void __ofono_dbus_pending_reply(DBusMessage **msg, DBusMessage *reply)
 {
+	gboolean pop_flag = FALSE;
+	const GDBusMethodTable *pop_method = NULL;
+	void *data;
 	DBusConnection *conn = ofono_dbus_get_connection();
 
 	g_dbus_send_message(conn, reply);
 
+	pop_flag = g_dbus_check_pop_cap(conn, *msg, &pop_method, &data);
+
 	dbus_message_unref(*msg);
 	*msg = NULL;
+	if (pop_flag) {
+		pop_method->function(conn, *msg, data);
+	}
 }
 
 DBusConnection *ofono_dbus_get_connection(void)

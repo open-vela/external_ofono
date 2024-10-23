@@ -109,6 +109,7 @@ struct ofono_modem {
 	int			modem_duration_report_id;
 	GHashTable		*camp_band_info;
 	GHashTable		*en_list; /* emergency number list */
+	GQueue			*modem_queue;
 };
 
 struct ofono_devinfo {
@@ -144,6 +145,14 @@ struct modem_property {
 	enum property_type type;
 	void *value;
 };
+
+static const char *modem_support_pending_list[] = { "SetProperty",
+						    "EnableModem",
+						    "DisableModem", NULL };
+static DBusMessage *modem_pop_message_from_queue(DBusConnection *connection,
+						 DBusMessage *msg, void *data);
+static DBusMessage *modem_push_message_to_queue(DBusConnection *connection,
+						DBusMessage *msg, void *data);
 
 static const char *modem_type_to_string(enum ofono_modem_type type)
 {
@@ -1954,6 +1963,10 @@ static const GDBusMethodTable modem_methods[] = {
 			NULL, modem_handle_command) },
 	{ GDBUS_ASYNC_METHOD("LoadModemEccList", NULL, NULL,
 			     modem_load_ecc_list) },
+	{ GDBUS_METHOD("PopMessage", NULL, NULL,
+			     modem_pop_message_from_queue) },
+	{ GDBUS_METHOD("PushMessage", NULL, NULL,
+			     modem_push_message_to_queue) },
 	{ }
 };
 
@@ -1966,6 +1979,116 @@ static const GDBusSignalTable modem_signals[] = {
 	{ GDBUS_SIGNAL("DeviceInfoChanged", NULL) },
 	{ }
 };
+
+void modem_free_pending_data(void *data)
+{
+	DBusMessage *msg = data;
+	DBusConnection *conn = ofono_dbus_get_connection();
+
+	g_dbus_send_message(conn, __ofono_error_not_available(msg));
+	dbus_message_unref(msg);
+}
+
+static DBusMessage *modem_pop_message_from_queue(DBusConnection *connection,
+						 DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply = NULL;
+	gboolean unexpect_msg_flag = TRUE;
+	DBusMessage *pending_msg = NULL;
+	const char *member_name;
+	const GDBusMethodTable *method;
+
+	if (modem->pending) {
+		ofono_error("%s fail as pending", __func__);
+		return NULL;
+	}
+
+	if (g_queue_get_length(modem->modem_queue) == 0) {
+		ofono_debug("%s modem_queue len = 0", __func__);
+		return NULL;
+	}
+
+	pending_msg = g_queue_pop_head(modem->modem_queue);
+	member_name = dbus_message_get_member(pending_msg);
+	ofono_debug("%s,member_name:%s", __func__, member_name);
+
+	for (method = modem_methods; method && method->name && method->function;
+	     method++) {
+		if (!strcmp(method->name, member_name)) {
+			reply = method->function(connection, pending_msg,
+						 modem);
+			unexpect_msg_flag = FALSE;
+			break;
+		}
+	}
+	if (unexpect_msg_flag) {
+		ofono_error("%s,unexpected pending message", __func__);
+		reply = __ofono_error_not_supported(pending_msg);
+	}
+	dbus_message_unref(pending_msg);
+	if (reply != NULL) {
+		g_dbus_send_message(connection, reply);
+		modem_pop_message_from_queue(connection, pending_msg, modem);
+	}
+	return NULL;
+}
+
+static DBusMessage *modem_push_message_to_queue(DBusConnection *connection,
+						DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	int i = 0;
+
+	if (!modem->pending) {
+		return NULL;
+	}
+
+	while (modem_support_pending_list[i]) {
+		if (dbus_message_is_method_call(
+			    msg, OFONO_MODEM_INTERFACE,
+			    modem_support_pending_list[i])) {
+			ofono_debug("%s,%s", __func__,
+				    modem_support_pending_list[i]);
+			if (!strcmp(modem_support_pending_list[i],
+				    "SetProperty")) {
+				DBusMessageIter iter, var;
+				const char *name;
+				if (dbus_message_iter_init(msg, &iter) ==
+				    FALSE) {
+					ofono_error("%s, parameter invalid",
+						    __func__);
+					return NULL;
+				}
+				if (dbus_message_iter_get_arg_type(&iter) !=
+				    DBUS_TYPE_STRING) {
+					ofono_error("%s, parameter invalid",
+						    __func__);
+					return NULL;
+				}
+				dbus_message_iter_get_basic(&iter, &name);
+				dbus_message_iter_next(&iter);
+				if (dbus_message_iter_get_arg_type(&iter) !=
+				    DBUS_TYPE_VARIANT) {
+					ofono_error("%s, parameter invalid",
+						    __func__);
+					return NULL;
+				}
+				dbus_message_iter_recurse(&iter, &var);
+				if (!g_str_equal(name, "Online")) {
+					ofono_error("%s,%s", __func__, name);
+					return NULL;
+				}
+			}
+			g_queue_push_tail(modem->modem_queue,
+					  dbus_message_ref(msg));
+			ofono_debug("%s,push queue done", __func__);
+			return msg;
+		}
+		i++;
+	}
+	return NULL;
+}
 
 void ofono_modem_set_powered(struct ofono_modem *modem, ofono_bool_t powered)
 {
@@ -2961,6 +3084,8 @@ int ofono_modem_register(struct ofono_modem *modem)
 
 	modem_load_settings(modem);
 
+	modem->modem_queue = g_queue_new();
+
 	return 0;
 }
 
@@ -3047,6 +3172,9 @@ static void modem_unregister(struct ofono_modem *modem)
 
 	g_hash_table_destroy(modem->en_list);
 	modem->en_list = NULL;
+
+	g_queue_free_full(modem->modem_queue, modem_free_pending_data);
+	modem->modem_queue = NULL;
 }
 
 void ofono_modem_remove(struct ofono_modem *modem)
