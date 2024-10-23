@@ -264,7 +264,9 @@ gboolean g_dbus_send_reply(DBusConnection *connection,
 				DBusMessage *message, int type, ...);
 gboolean g_dbus_send_reply_valist(DBusConnection *connection,
 				DBusMessage *message, int type, va_list args);
-
+gboolean g_dbus_check_pop_cap(DBusConnection *connection, DBusMessage *msg,
+			      const GDBusMethodTable **pop_method,
+			      void **user_data);
 gboolean g_dbus_emit_signal(DBusConnection *connection,
 				const char *path, const char *interface,
 				const char *name, int type, ...);

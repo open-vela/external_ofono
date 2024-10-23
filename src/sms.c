@@ -90,6 +90,7 @@ struct ofono_sms {
 	GHashTable *messages;
 	struct ofono_watchlist *text_handlers;
 	struct ofono_watchlist *datagram_handlers;
+	GQueue *sms_queue;
 };
 
 struct pending_pdu {
@@ -111,6 +112,14 @@ struct tx_queue_entry {
 	ofono_destroy_func destroy;
 	unsigned long id;
 };
+
+static const char *sms_support_pending_list[] = { "SendMessage",
+						  "SendDataMessage", NULL };
+
+static DBusMessage *sms_pop_message_from_queue(DBusConnection *connection,
+					       DBusMessage *msg, void *data);
+static DBusMessage *sms_push_message_to_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data);
 
 static gboolean uuid_equal(gconstpointer v1, gconstpointer v2)
 {
@@ -1587,7 +1596,11 @@ static const GDBusMethodTable sms_manager_methods[] = {
 			NULL,
 			GDBUS_ARGS({ "messages", "a(oa{sv})" }),
 			get_all_messages_from_sim) },
-	{ }
+	{ GDBUS_METHOD("PopMessage", NULL, NULL,
+			sms_pop_message_from_queue) },
+	{ GDBUS_METHOD("PushMessage", NULL, NULL,
+			sms_push_message_to_queue) },
+	{}
 };
 
 static const GDBusSignalTable sms_manager_signals[] = {
@@ -1606,6 +1619,83 @@ static const GDBusSignalTable sms_manager_signals[] = {
 			GDBUS_ARGS({ "path", "o" })) },
 	{ }
 };
+
+void sms_free_pending_data(void *data)
+{
+	DBusMessage *msg = data;
+	DBusConnection *conn = ofono_dbus_get_connection();
+
+	g_dbus_send_message(conn, __ofono_error_not_available(msg));
+	dbus_message_unref(msg);
+}
+
+static DBusMessage *sms_pop_message_from_queue(DBusConnection *connection,
+					       DBusMessage *msg, void *data)
+{
+	struct ofono_sms *sms = data;
+	DBusMessage *reply = NULL;
+	gboolean unexpect_msg_flag = TRUE;
+	DBusMessage *pending_msg = NULL;
+	const char *member_name;
+	const GDBusMethodTable *method;
+
+	if (sms->pending) {
+		ofono_error("%s fail as pending", __func__);
+		return NULL;
+	}
+
+	if (g_queue_get_length(sms->sms_queue) == 0) {
+		ofono_debug("%s sms_queue len = 0", __func__);
+		return NULL;
+	}
+
+	pending_msg = g_queue_pop_head(sms->sms_queue);
+	member_name = dbus_message_get_member(pending_msg);
+	ofono_debug("%s,member_name:%s", __func__, member_name);
+
+	for (method = sms_manager_methods;
+	     method && method->name && method->function; method++) {
+		if (!strcmp(method->name, member_name)) {
+			reply = method->function(connection, pending_msg, sms);
+			unexpect_msg_flag = FALSE;
+			break;
+		}
+	}
+	if (unexpect_msg_flag) {
+		ofono_error("%s,unexpected pending message", __func__);
+		reply = __ofono_error_not_supported(pending_msg);
+	}
+	dbus_message_unref(pending_msg);
+	if (reply != NULL) {
+		g_dbus_send_message(connection, reply);
+		sms_pop_message_from_queue(connection, pending_msg, sms);
+	}
+	return NULL;
+}
+
+static DBusMessage *sms_push_message_to_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data)
+{
+	struct ofono_sms *sms = data;
+	int i = 0;
+
+	if (!sms->pending) {
+		return NULL;
+	}
+
+	while (sms_support_pending_list[i]) {
+		if (dbus_message_is_method_call(msg,
+						OFONO_MESSAGE_MANAGER_INTERFACE,
+						sms_support_pending_list[i])) {
+			g_queue_push_tail(sms->sms_queue,
+					  dbus_message_ref(msg));
+			ofono_debug("%s,push queue done", __func__);
+			return msg;
+		}
+		i++;
+	}
+	return NULL;
+}
 
 static gboolean compute_incoming_msgid(GSList *sms_list,
 						struct ofono_uuid *uuid)
@@ -2201,6 +2291,9 @@ static void sms_unregister(struct ofono_atom *atom)
 
 	__ofono_watchlist_free(sms->datagram_handlers);
 	sms->datagram_handlers = NULL;
+
+	g_queue_free_full(sms->sms_queue, sms_free_pending_data);
+	sms->sms_queue = NULL;
 }
 
 static void sms_remove(struct ofono_atom *atom)
@@ -2511,6 +2604,8 @@ void ofono_sms_register(struct ofono_sms *sms)
 	sms->datagram_handlers = __ofono_watchlist_new(g_free);
 
 	__ofono_atom_register(sms->atom, sms_unregister);
+
+	sms->sms_queue = g_queue_new();
 }
 
 void ofono_sms_remove(struct ofono_sms *sms)
