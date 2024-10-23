@@ -1042,6 +1042,8 @@ static DBusHandlerResult generic_message(DBusConnection *connection,
 	struct generic_data *data = user_data;
 	struct interface_data *iface;
 	const GDBusMethodTable *method;
+	const GDBusMethodTable *process_method = NULL;
+	const GDBusMethodTable *push_method = NULL;
 	const char *interface;
 
 	interface = dbus_message_get_interface(message);
@@ -1052,6 +1054,11 @@ static DBusHandlerResult generic_message(DBusConnection *connection,
 
 	for (method = iface->methods; method &&
 			method->name && method->function; method++) {
+
+		if (!strcmp(method->name, "PushMessage")) {
+			push_method = method;
+			continue;
+		}
 
 		if (dbus_message_is_method_call(message, iface->name,
 							method->name) == FALSE)
@@ -1069,11 +1076,22 @@ static DBusHandlerResult generic_message(DBusConnection *connection,
 						iface->user_data) == TRUE)
 			return DBUS_HANDLER_RESULT_HANDLED;
 
-		return process_message(connection, message, method,
-							iface->user_data);
+		process_method = method;
 	}
 
-	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	if (process_method == NULL) {
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	} else {
+		if (push_method != NULL) {
+			DBusMessage *reply = push_method->function(
+				connection, message, iface->user_data);
+			if (reply) {
+				return DBUS_HANDLER_RESULT_HANDLED;
+			}
+		}
+		return process_message(connection, message, process_method,
+				       iface->user_data);
+	}
 }
 
 static DBusObjectPathVTable generic_table = {
@@ -1822,4 +1840,38 @@ void g_dbus_set_flags(int flags)
 int g_dbus_get_flags(void)
 {
 	return global_flags;
+}
+
+gboolean g_dbus_check_pop_cap(DBusConnection *conn, DBusMessage *msg,
+			      const GDBusMethodTable **pop_method,
+			      void **user_data)
+{
+	struct generic_data *data = NULL;
+	struct interface_data *iface = NULL;
+	const GDBusMethodTable *method = NULL;
+	const char *interface = dbus_message_get_interface(msg);
+	const char *path = dbus_message_get_path(msg);
+
+	dbus_connection_get_object_path_data(conn, path, (void *) &data);
+	if (data == NULL) {
+		error("%s,data == NULL", __func__);
+		return FALSE;
+	}
+	iface = find_interface(data->interfaces, interface);
+	if (iface != NULL) {
+		for (method = iface->methods;
+		     method && method->name && method->function; method++) {
+			if (!strcmp(method->name, "PopMessage")) {
+				*pop_method = method;
+				break;
+			}
+		}
+		if (*pop_method) {
+			*user_data = iface->user_data;
+			return TRUE;
+		}
+	} else {
+		error("%s,iface == NULL", __func__);
+	}
+	return FALSE;
 }
