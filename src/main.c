@@ -38,6 +38,9 @@
 
 #define SHUTDOWN_GRACE_SECONDS 10
 
+#define DBUS_INIT_RETRY_COUNT 100
+#define DBUS_INIT_RETRY_MS (100 * 1000)
+
 static GMainLoop *event_loop;
 
 void __ofono_exit(void)
@@ -204,6 +207,7 @@ int main(int argc, char **argv)
 	DBusError error;
 	guint signal;
 	struct ell_event_source *source;
+	int retry_round = 0;
 
 	context = g_option_context_new(NULL);
 	g_option_context_add_main_entries(context, options, NULL);
@@ -256,8 +260,12 @@ int main(int argc, char **argv)
 
 	dbus_error_init(&error);
 
-	conn = g_dbus_setup_bus(DBUS_BUS_SYSTEM, OFONO_SERVICE, &error);
-	if (conn == NULL) {
+	while (true) {
+		conn = g_dbus_setup_bus(DBUS_BUS_SYSTEM, OFONO_SERVICE, &error);
+		if (conn != NULL) {
+			break;
+		}
+
 		if (dbus_error_is_set(&error) == TRUE) {
 			ofono_error("Unable to hop onto D-Bus: %s",
 					error.message);
@@ -266,6 +274,12 @@ int main(int argc, char **argv)
 			ofono_error("Unable to hop onto D-Bus");
 		}
 
+		if (retry_round++ < DBUS_INIT_RETRY_COUNT) {
+			usleep(DBUS_INIT_RETRY_MS);
+			continue;
+		}
+
+		ofono_error("max retry times, giving up! \n");
 		goto cleanup;
 	}
 
