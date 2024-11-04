@@ -53,6 +53,17 @@
 
 static GSList *g_drivers = NULL;
 
+enum vc_method_type {
+	MANAGER_METHOD = 1,
+	VOICECALL_METHOD,
+};
+
+struct vc_data {
+	int type;
+	DBusMessage *msg;
+	unsigned int call_id;
+};
+
 struct ofono_voicecall {
 	GSList *call_list;
 	GSList *release_list;
@@ -85,6 +96,7 @@ struct ofono_voicecall {
 	struct ofono_netreg *netreg;
 	unsigned int netreg_watch;
 	unsigned int netreg_status_watch;
+	GQueue *voicecall_queue;
 };
 
 struct voicecall {
@@ -142,6 +154,23 @@ static const char *default_en_list_no_sim[] = { "119", "118", "999", "110",
 						"08", "000", NULL };
 static const char *valid_ecc_number_whitelist[] = {"08", NULL};
 
+static const char *vc_support_pending_list[] = { "Hangup", "Answer", NULL };
+
+static const char *mc_support_pending_list[] = {
+	"Dial",		 "SwapCalls", "ReleaseAndAnswer", "ReleaseAndSwap",
+	"HoldAndAnswer", "HangupAll", "Hangup",		  "Answer",
+	"PlayDtmf",	 NULL
+};
+
+static DBusMessage *vc_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data);
+static DBusMessage *vc_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data);
+static DBusMessage *mc_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data);
+static DBusMessage *mc_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data);
+static void vc_pop_message(DBusConnection *connection, void *data);
 static void send_ciev_after_swap_callback(const struct ofono_error *error,
 								void *data);
 static void generic_callback(const struct ofono_error *error, void *data);
@@ -771,6 +800,8 @@ static const GDBusMethodTable voicecall_methods[] = {
 							voicecall_deflect) },
 	{ GDBUS_ASYNC_METHOD("Hangup", NULL, NULL, voicecall_hangup) },
 	{ GDBUS_ASYNC_METHOD("Answer", NULL, NULL, voicecall_answer) },
+	{ GDBUS_METHOD("PopMessage", NULL, NULL, vc_pop_message_from_queue) },
+	{ GDBUS_METHOD("PushMessage", NULL, NULL, vc_push_message_to_queue) },
 	{ }
 };
 
@@ -2848,6 +2879,8 @@ static const GDBusMethodTable manager_methods[] = {
 	{ GDBUS_ASYNC_METHOD("Answer", GDBUS_ARGS({ "path", "o" }), NULL, manager_answer) },
 	{ GDBUS_ASYNC_METHOD("PlayDtmf", GDBUS_ARGS({ "digit", "y" }, { "flag", "i" }), NULL,
 							manager_dtmf) },
+	{ GDBUS_METHOD("PopMessage", NULL, NULL, mc_pop_message_from_queue) },
+	{ GDBUS_METHOD("PushMessage", NULL, NULL, mc_push_message_to_queue) },
 	{ }
 };
 
@@ -2865,6 +2898,278 @@ static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("RingBackTone", GDBUS_ARGS({ "status", "i" })) },
 	{ }
 };
+
+static struct voicecall *voicecall_by_call_id(struct ofono_voicecall *vc,
+					      int id)
+{
+	GSList *l;
+	struct voicecall *v;
+	for (l = vc->call_list; l; l = l->next) {
+		v = l->data;
+		if (id == v->call->id) {
+			return v;
+		}
+	}
+	return NULL;
+}
+
+static void voicecall_free_pending_data(void *data)
+{
+	struct vc_data *pending_data = data;
+	DBusConnection *conn = ofono_dbus_get_connection();
+
+	g_dbus_send_message(conn,
+			    __ofono_error_not_available(pending_data->msg));
+	dbus_message_unref(pending_data->msg);
+	g_free(pending_data);
+}
+
+static DBusMessage *vc_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data)
+{
+	struct voicecall *v = data;
+	struct ofono_voicecall *vc = v->vc;
+	gboolean push_flag = FALSE;
+	int i = 0;
+
+	while (vc_support_pending_list[i]) {
+		if (dbus_message_is_method_call(msg, OFONO_VOICECALL_INTERFACE,
+						vc_support_pending_list[i])) {
+			ofono_debug("%s,%s", __func__,
+				    vc_support_pending_list[i]);
+			if (!strcmp(vc_support_pending_list[i], "Hangup")) {
+				if (vc->pending || vc->pending_em ||
+				    (vc->dial_req && vc->dial_req->call != v)) {
+					push_flag = TRUE;
+				}
+			} else {
+				if (vc->pending || vc->dial_req ||
+				    vc->pending_em) {
+					push_flag = TRUE;
+				}
+			}
+			break;
+		}
+		i++;
+	}
+	if (push_flag) {
+		struct vc_data *pending_data = g_new(struct vc_data, 1);
+
+		pending_data->type = VOICECALL_METHOD;
+		pending_data->msg = dbus_message_ref(msg);
+		pending_data->call_id = v->call->id;
+		g_queue_push_tail(vc->voicecall_queue, pending_data);
+		ofono_debug("%s,add queue done", __func__);
+		return msg;
+	}
+	return NULL;
+}
+
+static DBusMessage *mc_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	gboolean push_flag = FALSE;
+	int i = 0;
+
+	while (mc_support_pending_list[i]) {
+		if (dbus_message_is_method_call(
+			    msg, OFONO_VOICECALL_MANAGER_INTERFACE,
+			    mc_support_pending_list[i])) {
+			ofono_debug("%s,%s", __func__,
+				    mc_support_pending_list[i]);
+			if (!strcmp(mc_support_pending_list[i], "HangupAll")) {
+				if (vc->pending || vc->pending_em ||
+				    (vc->dial_req &&
+				     vc->dial_req->call == NULL)) {
+					push_flag = TRUE;
+				}
+			} else if (!strcmp(mc_support_pending_list[i],
+					   "Hangup")) {
+				if (vc->pending || vc->pending_em) {
+					push_flag = TRUE;
+				}
+			} else if (!strcmp(mc_support_pending_list[i],
+					   "PlayDtmf")) {
+				if (vc->pending) {
+					push_flag = TRUE;
+				}
+			} else {
+				if (vc->pending || vc->dial_req ||
+				    vc->pending_em) {
+					push_flag = TRUE;
+				}
+			}
+			break;
+		}
+		i++;
+	}
+	if (push_flag) {
+		struct vc_data *pending_data = g_new(struct vc_data, 1);
+
+		pending_data->type = MANAGER_METHOD;
+		pending_data->msg = dbus_message_ref(msg);
+		g_queue_push_tail(vc->voicecall_queue, pending_data);
+		ofono_debug("%s,add queue done", __func__);
+		return msg;
+	}
+	return NULL;
+}
+
+static DBusMessage *mc_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data)
+{
+	struct ofono_voicecall *vc = data;
+	DBusMessage *reply = NULL;
+	struct vc_data *pending_data;
+	gboolean unexpect_msg_flag = TRUE;
+	const char *member_name;
+	const GDBusMethodTable *method;
+
+	if (g_queue_get_length(vc->voicecall_queue) == 0) {
+		return NULL;
+	}
+
+	pending_data = g_queue_peek_head(vc->voicecall_queue);
+
+	ofono_debug("%s,pop queue", __func__);
+
+	if (pending_data->type == MANAGER_METHOD) {
+		pending_data = g_queue_pop_head(vc->voicecall_queue);
+		member_name = dbus_message_get_member(pending_data->msg);
+		if (!strcmp(member_name, "HangupAll")) {
+			if (vc->pending || vc->pending_em ||
+			    (vc->dial_req && vc->dial_req->call == NULL)) {
+				ofono_error("%s fail as pending", __func__);
+				return NULL;
+			}
+		} else if (!strcmp(member_name, "Hangup")) {
+			if (vc->pending || vc->pending_em) {
+				ofono_error("%s fail as pending", __func__);
+				return NULL;
+			}
+		} else if (!strcmp(member_name, "PlayDtmf")) {
+			if (vc->pending) {
+				ofono_error("%s fail as pending", __func__);
+				return NULL;
+			}
+		} else {
+			if (vc->pending || vc->dial_req || vc->pending_em) {
+				ofono_error("%s fail as pending", __func__);
+				return NULL;
+			}
+		}
+		for (method = manager_methods;
+		     method && method->name && method->function; method++) {
+			if (!strcmp(method->name, member_name)) {
+				reply = method->function(
+					connection, pending_data->msg, data);
+				unexpect_msg_flag = FALSE;
+				break;
+			}
+		}
+		if (unexpect_msg_flag) {
+			ofono_error("%s,unexpected pending message", __func__);
+			reply = __ofono_error_not_supported(pending_data->msg);
+		}
+		dbus_message_unref(pending_data->msg);
+		g_free(pending_data);
+		if (reply != NULL) {
+			g_dbus_send_message(connection, reply);
+			ofono_debug("%s,pop next directly", __func__);
+			mc_pop_message_from_queue(connection, NULL, vc);
+		}
+	} else {
+		struct voicecall *v =
+			voicecall_by_call_id(vc, pending_data->call_id);
+		if (v) {
+			vc_pop_message(connection, v);
+		} else { // not found call_id
+			ofono_debug("%s,call_id is not found", __func__);
+			pending_data = g_queue_pop_head(vc->voicecall_queue);
+			reply = __ofono_error_not_available(pending_data->msg);
+			dbus_message_unref(pending_data->msg);
+			g_free(pending_data);
+			g_dbus_send_message(connection, reply);
+			mc_pop_message_from_queue(connection, NULL, vc);
+		}
+	}
+	return NULL;
+}
+
+static void vc_pop_message(DBusConnection *connection, void *data)
+{
+	struct voicecall *v = data;
+	struct ofono_voicecall *vc = v->vc;
+	const char *member_name;
+	const GDBusMethodTable *method;
+	gboolean unexpect_msg_flag = TRUE;
+	DBusMessage *reply = NULL;
+	struct vc_data *pending_data;
+
+	if (g_queue_get_length(vc->voicecall_queue) == 0) {
+		return;
+	}
+
+	ofono_debug("%s,pop queue", __func__);
+
+	pending_data = g_queue_pop_head(vc->voicecall_queue);
+
+	member_name = dbus_message_get_member(pending_data->msg);
+	if (!strcmp("Hangup", member_name)) {
+		if (vc->pending || vc->pending_em ||
+		    (vc->dial_req && vc->dial_req->call != v)) {
+			ofono_error("%s fail as pending", __func__);
+			return;
+		}
+	} else {
+		if (vc->pending || vc->dial_req || vc->pending_em) {
+			ofono_error("%s fail as pending", __func__);
+			return;
+		}
+	}
+
+	for (method = voicecall_methods;
+	     method && method->name && method->function; method++) {
+		if (!strcmp(method->name, member_name)) {
+			reply = method->function(connection, pending_data->msg,
+						 data);
+			unexpect_msg_flag = FALSE;
+			break;
+		}
+	}
+	if (unexpect_msg_flag) {
+		ofono_error("%s,unexpected pending message", __func__);
+		reply = __ofono_error_not_supported(pending_data->msg);
+	}
+	dbus_message_unref(pending_data->msg);
+	g_free(pending_data);
+	if (reply != NULL) {
+		g_dbus_send_message(connection, reply);
+		ofono_debug("%s,pop next directly", __func__);
+		mc_pop_message_from_queue(connection, NULL, vc);
+	}
+}
+
+static DBusMessage *vc_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data)
+{
+	struct voicecall *v = data;
+	struct ofono_voicecall *vc = v->vc;
+	struct vc_data *pending_data;
+
+	if (g_queue_get_length(vc->voicecall_queue) == 0) {
+		return NULL;
+	}
+
+	pending_data = g_queue_peek_head(vc->voicecall_queue);
+	if (pending_data->type == MANAGER_METHOD) {
+		mc_pop_message_from_queue(connection, NULL, vc);
+	} else {
+		vc_pop_message(connection, v);
+	}
+	return NULL;
+}
 
 void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 				enum ofono_disconnect_reason reason,
@@ -3658,6 +3963,8 @@ static void voicecall_unregister(struct ofono_atom *atom)
 	ofono_modem_remove_interface(modem, OFONO_VOICECALL_MANAGER_INTERFACE);
 	g_dbus_unregister_interface(conn, path,
 					OFONO_VOICECALL_MANAGER_INTERFACE);
+	g_queue_free_full(vc->voicecall_queue, voicecall_free_pending_data);
+	vc->voicecall_queue = NULL;
 }
 
 static void voicecall_remove(struct ofono_atom *atom)
@@ -4561,6 +4868,7 @@ void ofono_voicecall_register(struct ofono_voicecall *vc)
 	vc->hfp_watch = __ofono_modem_add_atom_watch(modem,
 					OFONO_ATOM_TYPE_EMULATOR_HFP,
 					emulator_hfp_watch, vc, NULL);
+	vc->voicecall_queue = g_queue_new();
 }
 
 void ofono_voicecall_remove(struct ofono_voicecall *vc)
