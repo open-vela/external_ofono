@@ -112,7 +112,16 @@ struct ofono_call_settings {
 	const struct ofono_call_settings_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
+	GQueue *cs_queue;
 };
+
+static const char *cs_support_pending_list[] = { "SetCallWaiting",
+						 "GetCallWaiting", NULL };
+
+static DBusMessage *cs_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data);
+static DBusMessage *cs_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data);
 
 static int clir_status_from_string(const char *status)
 {
@@ -1562,8 +1571,99 @@ static const GDBusMethodTable cs_methods[] = {
 	{ GDBUS_ASYNC_METHOD("GetClir", NULL,
 			GDBUS_ARGS({ "status", "i" }),
 			cs_get_clir) },
+	{ GDBUS_ASYNC_METHOD("PopMessage", NULL,
+			NULL, cs_pop_message_from_queue) },
+	{ GDBUS_ASYNC_METHOD("PushMessage", NULL,
+			NULL, cs_push_message_to_queue) },
 	{ }
 };
+
+void cs_free_pending_data(void *data)
+{
+	DBusMessage *msg = data;
+	DBusConnection *conn = ofono_dbus_get_connection();
+
+	g_dbus_send_message(conn, __ofono_error_not_available(msg));
+	dbus_message_unref(msg);
+}
+
+static DBusMessage *cs_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	DBusMessage *reply = NULL;
+	gboolean unexpect_msg_flag = TRUE;
+	const char *member_name;
+	const GDBusMethodTable *method;
+	DBusMessage *pending_msg = NULL;
+
+	if (g_queue_get_length(cs->cs_queue) == 0) {
+		return NULL;
+	}
+
+	pending_msg = g_queue_pop_head(cs->cs_queue);
+	member_name = dbus_message_get_member(pending_msg);
+	ofono_debug("%s,member_name:%s", __func__, member_name);
+
+	if (!strcmp(member_name, "SetCallWaiting") ||
+	    !strcmp(member_name, "GetCallWaiting")) {
+		if (cs->pending) {
+			ofono_error("%s fail as pending", __func__);
+			return NULL;
+		}
+	}
+	for (method = cs_methods; method && method->name && method->function;
+	     method++) {
+		if (!strcmp(method->name, member_name)) {
+			reply = method->function(connection, pending_msg, cs);
+			unexpect_msg_flag = FALSE;
+			break;
+		}
+	}
+	if (unexpect_msg_flag) {
+		ofono_error("%s,unexpected pending message", __func__);
+		reply = __ofono_error_not_supported(pending_msg);
+	}
+	dbus_message_unref(pending_msg);
+	if (reply != NULL) {
+		g_dbus_send_message(connection, reply);
+		cs_pop_message_from_queue(connection, pending_msg, cs);
+	}
+	return NULL;
+}
+
+static DBusMessage *cs_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data)
+{
+	struct ofono_call_settings *cs = data;
+	gboolean push_flag = FALSE;
+	int i = 0;
+
+	while (cs_support_pending_list[i]) {
+		if (dbus_message_is_method_call(msg,
+						OFONO_CALL_SETTINGS_INTERFACE,
+						cs_support_pending_list[i])) {
+			ofono_debug("%s,%s", __func__,
+				    cs_support_pending_list[i]);
+			if (!strcmp(cs_support_pending_list[i],
+				    "GetCallWaiting") ||
+			    !strcmp(cs_support_pending_list[i],
+				    "SetCallWaiting")) {
+				if (cs->pending) {
+					push_flag = TRUE;
+				}
+			} // used to extension
+			break;
+		}
+		i++;
+	}
+	if (push_flag) {
+		g_queue_push_tail(cs->cs_queue, dbus_message_ref(msg));
+		ofono_debug("%s,add queue done", __func__);
+		return msg;
+	}
+	return NULL;
+}
 
 static const GDBusSignalTable cs_signals[] = {
 	{ GDBUS_SIGNAL("PropertyChanged",
@@ -1605,6 +1705,9 @@ static void call_settings_unregister(struct ofono_atom *atom)
 
 	if (cs->ussd_watch)
 		__ofono_modem_remove_atom_watch(modem, cs->ussd_watch);
+
+	g_queue_free_full(cs->cs_queue, cs_free_pending_data);
+	cs->cs_queue = NULL;
 }
 
 static void call_settings_remove(struct ofono_atom *atom)
@@ -1705,6 +1808,8 @@ void ofono_call_settings_register(struct ofono_call_settings *cs)
 					ussd_watch, cs, NULL);
 
 	__ofono_atom_register(cs->atom, call_settings_unregister);
+
+	cs->cs_queue = g_queue_new();
 }
 
 void ofono_call_settings_remove(struct ofono_call_settings *cs)

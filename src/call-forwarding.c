@@ -71,6 +71,7 @@ struct ofono_call_forwarding {
 	const struct ofono_call_forwarding_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
+	GQueue *cf_queue;
 };
 
 struct cf_ss_request {
@@ -82,9 +83,16 @@ struct cf_ss_request {
 
 static GSList *g_drivers = NULL;
 
+static const char *cf_support_pending_list[] = { "GetCallForwarding",
+						 "SetCallForwarding", NULL };
+
 static void get_query_next_cf_cond(struct ofono_call_forwarding *cf);
 static void set_query_next_cf_cond(struct ofono_call_forwarding *cf);
 static void ss_set_query_next_cf_cond(struct ofono_call_forwarding *cf);
+static DBusMessage *cf_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data);
+static DBusMessage *cf_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data);
 
 static gint cf_cond_compare(gconstpointer a, gconstpointer b)
 {
@@ -1034,6 +1042,10 @@ static const GDBusMethodTable cf_methods[] = {
 			GDBUS_ARGS({ "type", "i" },
 			{ "cls", "i" }, { "number", "s" }),
 			NULL, cf_set_call_forwarding) },
+	{GDBUS_ASYNC_METHOD("PopMessage",
+			NULL, NULL, cf_pop_message_from_queue) },
+	{GDBUS_ASYNC_METHOD("PushMessage",
+			NULL, NULL, cf_push_message_to_queue) },
 	{ }
 };
 
@@ -1042,6 +1054,93 @@ static const GDBusSignalTable cf_signals[] = {
 			GDBUS_ARGS({ "name", "s" }, { "value", "v" })) },
 	{ }
 };
+
+void cf_free_pending_data(void *data)
+{
+	DBusMessage *msg = data;
+	DBusConnection *conn = ofono_dbus_get_connection();
+
+	g_dbus_send_message(conn, __ofono_error_not_available(msg));
+	dbus_message_unref(msg);
+}
+
+static DBusMessage *cf_pop_message_from_queue(DBusConnection *connection,
+					      DBusMessage *msg, void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+	DBusMessage *reply = NULL;
+	gboolean unexpect_msg_flag = TRUE;
+	const char *member_name;
+	const GDBusMethodTable *method;
+	DBusMessage *pending_msg = NULL;
+
+	if (g_queue_get_length(cf->cf_queue) == 0) {
+		return NULL;
+	}
+
+	pending_msg = g_queue_pop_head(cf->cf_queue);
+	member_name = dbus_message_get_member(pending_msg);
+	ofono_debug("%s,member_name:%s", __func__, member_name);
+
+	if (!strcmp(member_name, "GetCallForwarding") ||
+	    !strcmp(member_name, "SetCallForwarding")) {
+		if (cf->pending) {
+			ofono_error("%s fail as pending", __func__);
+			return NULL;
+		}
+	}
+	for (method = cf_methods; method && method->name && method->function;
+	     method++) {
+		if (!strcmp(method->name, member_name)) {
+			reply = method->function(connection, pending_msg, cf);
+			unexpect_msg_flag = FALSE;
+			break;
+		}
+	}
+	if (unexpect_msg_flag) {
+		ofono_error("%s,unexpected pending message", __func__);
+		reply = __ofono_error_not_supported(pending_msg);
+	}
+	dbus_message_unref(pending_msg);
+	if (reply != NULL) {
+		g_dbus_send_message(connection, reply);
+		cf_pop_message_from_queue(connection, pending_msg, cf);
+	}
+	return NULL;
+}
+
+static DBusMessage *cf_push_message_to_queue(DBusConnection *connection,
+					     DBusMessage *msg, void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+	gboolean push_flag = FALSE;
+	int i = 0;
+
+	while (cf_support_pending_list[i]) {
+		if (dbus_message_is_method_call(msg,
+						OFONO_CALL_FORWARDING_INTERFACE,
+						cf_support_pending_list[i])) {
+			ofono_debug("%s,%s", __func__,
+				    cf_support_pending_list[i]);
+			if (!strcmp(cf_support_pending_list[i],
+				    "GetCallForwarding") ||
+			    !strcmp(cf_support_pending_list[i],
+				    "SetCallForwarding")) {
+				if (cf->pending) {
+					push_flag = TRUE;
+				}
+			} // used to extension
+			break;
+		}
+		i++;
+	}
+	if (push_flag) {
+		g_queue_push_tail(cf->cf_queue, dbus_message_ref(msg));
+		ofono_debug("%s,add queue done", __func__);
+		return msg;
+	}
+	return NULL;
+}
 
 static DBusMessage *cf_ss_control_reply(struct ofono_call_forwarding *cf,
 					struct cf_ss_request *req)
@@ -1537,6 +1636,9 @@ static void call_forwarding_unregister(struct ofono_atom *atom)
 		__ofono_modem_remove_atom_watch(modem, cf->ussd_watch);
 
 	cf->flags = 0;
+
+	g_queue_free_full(cf->cf_queue, cf_free_pending_data);
+	cf->cf_queue = NULL;
 }
 
 static void sim_cfis_changed(int id, void *userdata)
@@ -1701,6 +1803,8 @@ void ofono_call_forwarding_register(struct ofono_call_forwarding *cf)
 					ussd_watch, cf, NULL);
 
 	__ofono_atom_register(cf->atom, call_forwarding_unregister);
+
+	cf->cf_queue = g_queue_new();
 }
 
 void ofono_call_forwarding_remove(struct ofono_call_forwarding *cf)
