@@ -495,8 +495,11 @@ static DBusMessage *cf_get_properties_reply(DBusMessage *msg,
 	GSList *cf_list;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message for call forwarding",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -545,7 +548,7 @@ static void get_query_cf_callback(const struct ofono_error *error, int total,
 
 		set_new_cond_list(cf, cf->query_next, l);
 
-		DBG("%s conditions:", cf_type_lut[cf->query_next]);
+		ofono_debug("%s, conditions: %s", __func__, cf_type_lut[cf->query_next]);
 
 		cf_cond_list_print(l);
 
@@ -579,12 +582,21 @@ static DBusMessage *cf_get_properties(DBusConnection *conn, DBusMessage *msg,
 			ofono_modem_get_online(modem) == FALSE)
 		return cf_get_properties_reply(msg, cf);
 
-	if (cf->driver->query == NULL)
+	if (cf->driver->query == NULL) {
+		ofono_error("%s: Call forwarding driver's 'query' function is not implemented",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (__ofono_call_forwarding_is_busy(cf) ||
-			__ofono_ussd_is_busy(cf->ussd))
+	if (__ofono_call_forwarding_is_busy(cf)) {
+		ofono_error("%s: Call forwarding is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (__ofono_ussd_is_busy(cf->ussd)) {
+		ofono_error("%s: USSD service is currently busy.", __func__);
+		return __ofono_error_busy(msg);
+	}
 
 	cf->pending = dbus_message_ref(msg);
 	cf->query_next = 0;
@@ -669,7 +681,7 @@ static void set_query_cf_callback(const struct ofono_error *error, int total,
 
 	set_new_cond_list(cf, cf->query_next, cf_cond_list_create(total, list));
 
-	DBG("%s conditions:", cf_type_lut[cf->query_next]);
+	ofono_debug("%s, conditions: %s", __func__, cf_type_lut[cf->query_next]);
 	cf_cond_list_print(cf->cf_conditions[cf->query_next]);
 
 	if (cf->query_next == cf->query_end)
@@ -690,7 +702,7 @@ static void set_property_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_forwarding *cf = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during set/erasure");
+		ofono_error("Error occurred during set/erasure");
 		__ofono_dbus_pending_reply(&cf->pending,
 					__ofono_error_failed(cf->pending));
 		return;
@@ -706,17 +718,23 @@ static DBusMessage *set_property_request(struct ofono_call_forwarding *cf,
 						struct ofono_phone_number *ph,
 						int timeout)
 {
-	if (ph->number[0] != '\0' && cf->driver->registration == NULL)
+	if (ph->number[0] != '\0' && cf->driver->registration == NULL) {
+		ofono_error("%s: Call forwarding driver's 'registration' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (ph->number[0] == '\0' && cf->driver->erasure == NULL)
+	if (ph->number[0] == '\0' && cf->driver->erasure == NULL) {
+		ofono_error("%s: Call forwarding driver's 'erasure' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	cf->pending = dbus_message_ref(msg);
 	cf->query_next = type;
 	cf->query_end = type;
 
-	DBG("Farming off request, will be erasure: %d", ph->number[0] == '\0');
+	ofono_debug("Farming off request, will be erasure: %d", ph->number[0] == '\0');
 
 	if (ph->number[0] != '\0')
 		cf->driver->registration(cf, type, cls, ph, timeout,
@@ -738,24 +756,40 @@ static DBusMessage *cf_set_property(DBusConnection *conn, DBusMessage *msg,
 	int cls;
 	int type;
 
-	if (ofono_modem_get_online(modem) == FALSE)
+	if (ofono_modem_get_online(modem) == FALSE) {
+		ofono_error("%s: Failed to set property - modem is offline", __func__);
 		return __ofono_error_not_available(msg);
+	}
 
-	if (__ofono_call_forwarding_is_busy(cf) ||
-			__ofono_ussd_is_busy(cf->ussd))
+	if (__ofono_call_forwarding_is_busy(cf)) {
+		ofono_error("%s: Call forwarding is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_iter_init(msg, &iter))
-		return __ofono_error_invalid_args(msg);
+	if (__ofono_ussd_is_busy(cf->ussd)) {
+		ofono_error("%s: USSD service is currently busy.", __func__);
+		return __ofono_error_busy(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
+		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
@@ -765,18 +799,26 @@ static DBusMessage *cf_set_property(DBusConnection *conn, DBusMessage *msg,
 
 		type = CALL_FORWARDING_TYPE_NO_REPLY;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_UINT16)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_UINT16) {
+			ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_UINT16 ('q'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &timeout);
 
-		if (timeout < 1 || timeout > 30)
+		if (timeout < 1 || timeout > 30) {
+			ofono_error("%s: Invalid timeout value %d. Expected between 1 and 30",
+				__func__, (int)timeout);
 			return __ofono_error_invalid_format(msg);
-
+		}
 
 		c = cf_cond_find(cf->cf_conditions[type], cls);
-		if (c == NULL)
+		if (c == NULL) {
+			ofono_error("%s: No call forwarding condition found for type %d and class %d",
+				__func__, type, cls);
 			return __ofono_error_failed(msg);
+		}
 
 		return set_property_request(cf, msg, type, cls,
 						&c->phone_number, timeout);
@@ -788,20 +830,30 @@ static DBusMessage *cf_set_property(DBusConnection *conn, DBusMessage *msg,
 		ph.number[0] = '\0';
 		ph.type = 129;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [cf_condition_enabled_property] Invalid argument type. "
+				"Expected DBUS_TYPE_STRING ('s'), but received type '%c'.",
+				__func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &number);
 
-		if (strlen(number) > 0 && !valid_phone_number_format(number))
+		if (strlen(number) > 0 && !valid_phone_number_format(number)) {
+			ofono_error("%s: Invalid phone number format. Length: %zu",
+				__func__, strlen(number));
 			return __ofono_error_invalid_format(msg);
+		}
 
 		/*
 		 * Don't set conditional cfs when cfu is active
 		 */
 		if (type != CALL_FORWARDING_TYPE_UNCONDITIONAL &&
-				number[0] != '\0' && is_cfu_enabled(cf))
+				number[0] != '\0' && is_cfu_enabled(cf)) {
+			ofono_error("%s: Cannot set conditional call forwarding when CFU is active.",
+				__func__);		
 			return __ofono_error_not_available(msg);
+		}
 
 		if (number[0] != '\0')
 			string_to_phone_number(number, &ph, FALSE);
@@ -821,7 +873,7 @@ static void disable_conditional_callback(const struct ofono_error *error,
 	struct ofono_call_forwarding *cf = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during conditional erasure");
+		ofono_error("Error occurred during conditional erasure");
 
 		__ofono_dbus_pending_reply(&cf->pending,
 					__ofono_error_failed(cf->pending));
@@ -839,7 +891,7 @@ static void disable_all_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_forwarding *cf = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during erasure of all");
+		ofono_error("Error occurred during erasure of all");
 
 		__ofono_dbus_pending_reply(&cf->pending,
 					__ofono_error_failed(cf->pending));
@@ -859,23 +911,38 @@ static DBusMessage *cf_disable_all(DBusConnection *conn, DBusMessage *msg,
 	const char *strtype;
 	int type;
 
-	if (cf->driver->erasure == NULL)
+	if (cf->driver->erasure == NULL) {
+		ofono_error("%s: Call forwarding driver's 'erasure' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (__ofono_call_forwarding_is_busy(cf) ||
-			__ofono_ussd_is_busy(cf->ussd))
+	if (__ofono_call_forwarding_is_busy(cf)) {
+		ofono_error("%s: Call forwarding is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (__ofono_ussd_is_busy(cf->ussd)) {
+		ofono_error("%s: USSD service is currently busy.", __func__);
+		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &strtype,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to retrieve string argument from D-Bus message.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	if (!strcmp(strtype, "all") || !strcmp(strtype, ""))
 		type = CALL_FORWARDING_TYPE_ALL;
 	else if (!strcmp(strtype, "conditional"))
 		type = CALL_FORWARDING_TYPE_ALL_CONDITIONAL;
-	else
+	else {
+		ofono_error("%s: Invalid call forwarding type '%s'. Expected 'all', 'conditional', "
+			"or empty string \"\"", __func__, strtype);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	cf->pending = dbus_message_ref(msg);
 
@@ -959,10 +1026,14 @@ static DBusMessage *cf_get_call_forwarding(DBusConnection *conn,
 	int type;
 	int cls;
 
-	if (cf->driver->query == NULL)
+	if (cf->driver->query == NULL) {
+		ofono_error("%s: Call forwarding driver's 'query' function is not implemented",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (cf->pending) {
+		ofono_error("%s: Call forwarding is currently busy.", __func__);
 		OFONO_DFX_SS_INFO("ss:query call forwarding", "busy");
 		return __ofono_error_busy(msg);
 	}
@@ -970,8 +1041,10 @@ static DBusMessage *cf_get_call_forwarding(DBusConnection *conn,
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_INT32, &type,
 				DBUS_TYPE_INT32, &cls,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	cf->pending = dbus_message_ref(msg);
 	cf->driver->query(cf, type, cls, get_call_forwarding_cb, cf);
@@ -988,13 +1061,20 @@ static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
 	const char *number;
 	struct ofono_phone_number ph;
 
-	if (cf->driver->erasure == NULL)
+	if (cf->driver->erasure == NULL) {
+		ofono_error("%s: Call forwarding driver's 'erasure' function is not implemented",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (cf->driver->registration == NULL)
+	if (cf->driver->registration == NULL) {
+		ofono_error("%s: Call forwarding driver's 'registration' function is not implemented",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (cf->pending) {
+		ofono_error("%s: Call forwarding is currently busy.", __func__);
 		OFONO_DFX_SS_INFO("ss:set call forwarding", "busy");
 		return __ofono_error_busy(msg);
 	}
@@ -1003,8 +1083,10 @@ static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
 				DBUS_TYPE_INT32, &type,
 				DBUS_TYPE_INT32, &cls,
 				DBUS_TYPE_STRING, &number,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	cf->pending = dbus_message_ref(msg);
 
@@ -1022,6 +1104,7 @@ static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
 	} else {
 		cf->driver->erasure(cf, type, cls, set_call_forwarding_cb, cf);
 	}
+
 	return NULL;
 }
 
@@ -1080,12 +1163,12 @@ static DBusMessage *cf_pop_message_from_queue(DBusConnection *connection,
 
 	pending_msg = g_queue_pop_head(cf->cf_queue);
 	member_name = dbus_message_get_member(pending_msg);
-	ofono_debug("%s,member_name:%s", __func__, member_name);
+	ofono_debug("%s, member_name: %s", __func__, member_name);
 
 	if (!strcmp(member_name, "GetCallForwarding") ||
 	    !strcmp(member_name, "SetCallForwarding")) {
 		if (cf->pending) {
-			ofono_error("%s fail as pending", __func__);
+			ofono_error("%s: Call forwarding is currently busy.", __func__);
 			return NULL;
 		}
 	}
@@ -1098,7 +1181,7 @@ static DBusMessage *cf_pop_message_from_queue(DBusConnection *connection,
 		}
 	}
 	if (unexpect_msg_flag) {
-		ofono_error("%s,unexpected pending message", __func__);
+		ofono_error("%s, unexpected pending message", __func__);
 		reply = __ofono_error_not_supported(pending_msg);
 	}
 	dbus_message_unref(pending_msg);
@@ -1232,7 +1315,7 @@ static void ss_set_query_cf_callback(const struct ofono_error *error, int total,
 	}
 
 	l = cf_cond_list_create(total, list);
-	DBG("%s conditions:", cf_type_lut[cf->query_next]);
+	ofono_debug("%s, conditions: %s", __func__, cf_type_lut[cf->query_next]);
 	cf_cond_list_print(l);
 
 	cf->ss_req->cf_list[cf->query_next] = l;
@@ -1271,8 +1354,7 @@ static void cf_ss_control_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_forwarding *cf = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-
-		DBG("CF ss control set/erasure failed with error: %s",
+		ofono_error("CF ss control set/erasure failed with error: %s",
 						telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cf->pending,
 				__ofono_error_from_error(error, cf->pending));
@@ -1299,19 +1381,23 @@ static gboolean cf_ss_control(int type, const char *sc,
 	void *operation = NULL;
 
 	/* Before we do anything, make sure we're actually initialized */
-	if (cf == NULL)
+	if (cf == NULL) {
+		ofono_error("%s: Call forwarding instance is NULL. Initialization failed.",
+			__func__);
 		return FALSE;
+	}
 
 	if (__ofono_call_forwarding_is_busy(cf)) {
+		ofono_error("%s: Call forwarding is currently busy.", __func__);
 		reply = __ofono_error_busy(msg);
 		g_dbus_send_message(conn, reply);
 
 		return TRUE;
 	}
 
-	DBG("Received call forwarding ss control request");
+	ofono_debug("Received call forwarding ss control request");
 
-	DBG("type: %d, sc: %s, sia: %s, sib: %s, sic: %s, dn: %s",
+	ofono_debug("type: %d, sc: %s, sia: %s, sib: %s, sic: %s, dn: %s",
 		type, sc, sia, sib, sic, dn);
 
 	if (!strcmp(sc, "21"))
@@ -1402,6 +1488,8 @@ static gboolean cf_ss_control(int type, const char *sc,
 	}
 
 	if (operation == NULL) {
+		ofono_error("%s: Operation for call forwarding type '%d' is not implemented.",
+			__func__, type);
 		reply = __ofono_error_not_implemented(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -1411,6 +1499,7 @@ static gboolean cf_ss_control(int type, const char *sc,
 	cf->ss_req = g_try_new0(struct cf_ss_request, 1);
 
 	if (cf->ss_req == NULL) {
+		ofono_error("%s: Failed to allocate memory for ss_req.", __func__);
 		reply = __ofono_error_failed(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -1515,6 +1604,7 @@ static void sim_cfis_read_cb(int ok, int total_length, int record,
 	const char *path = __ofono_atom_get_path(cf->atom);
 
 	if (!ok || record_length < 16 || total_length < record_length) {
+		ofono_debug("%s, record_length: %d, total_length: %d", __func__, record_length, total_length);
 		cf->cfis_record_id = 0;
 		return;
 	}
