@@ -2625,8 +2625,8 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 		id = l_uintset_find_unused_min(gprs->used_pids);
 
 	if (id > l_uintset_get_max(gprs->used_pids)) {
-		ofono_error("%s: Unable to find a free context ID. Current last ID: %u, Max allowed ID: %ld.",
-                __func__, gprs->last_context_id, (long)l_uintset_get_max(gprs->used_pids));
+		ofono_error("%s: Unable to find a free context ID. Current last ID: %u, Max allowed ID: %lu.",
+                __func__, gprs->last_context_id, l_uintset_get_max(gprs->used_pids));
 		return NULL;
 	}
 
@@ -3335,8 +3335,8 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 		id = l_uintset_find_unused_min(gprs->used_pids);
 
 	if (id > l_uintset_get_max(gprs->used_pids)) {
-		ofono_error("%s: Generated context ID (%u) exceeds maximum allowed (%ld).",
-                __func__, id, (long)l_uintset_get_max(gprs->used_pids));
+		ofono_error("%s: Generated context ID (%u) exceeds maximum allowed (%lu).",
+                __func__, id, l_uintset_get_max(gprs->used_pids));
 		return;
 	}
 
