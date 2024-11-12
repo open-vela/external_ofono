@@ -246,6 +246,287 @@ struct error_entry ceer_errors[] = {
 	{ 127,	"Interworking, unspecified" },
 };
 
+const char *abnormal_event[] = { "inside_modem",
+				 "ef_file",
+				 "profile",
+				 "rlf",
+				 "rach_access",
+				 "oos",
+				 "nas_timeout",
+				 "sip_timeout",
+				 "rrc_timeout",
+				 "ecc_call_fail",
+				 "rtp_rtcp",
+				 "paging_decode",
+				 "call_quality",
+				 "pdcp",
+				 "nas_reject",
+				 "sip_reject",
+				 "rrc_reject",
+				 "ping_pong",
+				 "call_control",
+				 "xcap_fail",
+				 "data_flow_interruption",
+				 "sip_call_end_cause" };
+
+const char *normal_event[] = { "limited_service_camp",
+			       "redirect",
+			       "handover",
+			       "reselect",
+			       "csfb",
+			       "srvcc",
+			       "ue_cap_info",
+			       "camp_cell_info",
+			       "sim_info" };
+
+const char *reest_cause_str[] = { "RECFG_FAILURE",    "HO_FAILURE",
+				  "T310 TIMEOUT",     "RACH_PROBLEM",
+				  "MAX_RETRX RLC",    "IP_CHECK_FAILURE",
+				  "SIB_READ_FAILURE", "SMC_FAILURE",
+				  "CFG_L2_FAILURE",   "OTHER_FAILURE" };
+
+const char *rach_fail_reason_str[] = { "RA_FAIL_CAUSE_NOMSG2",
+				       "RA_FAIL_CAUSE_NOMSG4",
+				       "RA_FAIL_CAUSE_NORARESOURCE" };
+
+const char *oos_type_str[] = {
+	"OOS_TYPE_S_CRIT_FAIL",	  "OOS_TYPE_RESYNC_FAIL",
+	"OOS_TYPE_RESEL_FAIL",	  "OOS_TYPE_L1_ABN_IND",
+	"OOS_TYPE_MORMAL_TO_OOS", "OOS_TYPE_OOS_DIRECTLY"
+};
+
+const char *nas_timer_id_1_str[] = { "EMM_T3402", "EMM_T3410", "EMM_T3411",
+				     "EMM_T3412", "EMM_T3417", "EMM_T3421",
+				     "EMM_T3430", "EMM_T3440" };
+const char *nas_timer_id_2_str[] = { "ESM_T3480", "ESM_T3481", "ESM_T3482",
+				     "ESM_T3492" };
+
+const char *sip_srv_type_str[] = { "SRV_REGISTATION", "SRV_CALL",
+				   "SRV_EMG_CALL",    "SRV_SMS",
+				   "SRV_MPTY",	      "SRV_USSI" };
+
+const char *sip_method_str[] = { "SIP_REGISTER",  "SIP_SUBSCRIBE", "SIP_INVITE",
+				 "SIP_RE_INVITE", "SIP_PRACK",	   "SIP_UPDATE",
+				 "SIP_MESSAGE",	  "SIP_REFER",	   "SIP_INFO" };
+
+const char *rrc_timer_id_str[] = { "T300_EST_FAIL", "T301_REEST_FAIL",
+				   "T304_HO_FAIL", "T310_RADIO_LINK_FAIL",
+				   "T311_REEST_CELL_SELECT_FAIL" };
+
+const char *ecall_fail_reason_str[] = { "other", "Lost covery",
+					"Emergency Bearer not support by NW",
+					"Emergency Bearer Establish failure" };
+
+const char *rtp_rtcp_error_type_str[] = { "DL_RTP_TIMEOUT", "DL_RTCP_TIMEOUT",
+					  "MV_UDP_SOCKET_ERROR" };
+
+const char *nas_procedure_type1_str[] = { "ATTACH_REJ", "TAU_REJ", "SR_REJ",
+					  "IDENTITY",	"SMC_REJ", "AUTH_REJ",
+					  "MT_DETACH" };
+const char *nas_procedure_type2_str[] = { "ESM_PDN_CONN_REJECT",
+					  "ESM_BEARER_MT_DEACT" };
+
+const char *xcap_mode_str[] = { "MODE_DISABLE", "MODE_ENABLE", "MODE_QUERY",
+				"MODE_REGISTRATION", "MODE_ERASURE" };
+
+const char *xcap_reason_str[] = {
+	"CDIV_ALL",    "CDIV_CONDS",	  "CDIV_CFU",
+	"CDIV_CFB",    "CDIV_CFNR",	  "CDIV_CFNR_TMR",
+	"CDIV_CFNRC",  "CDIV_CFNI",	  "CB_ICB_ALL",
+	"CB_ICB_BAIC", "CB_ICB_BICROAM",  "CB_ICB_ACR",
+	"CB_OCB_AL",   "CB_OCB_BAOC",	  "CB_OCB_BOCROAM",
+	"CB_OCB_BOIC", "CB_OCB_BOICEXHC", "CW",
+	"OIP_CLIP",    "OIR_CLIR",	  "TIP_COLP",
+	"TIR_COLR"
+};
+
+const char *xcap_error_str[] = { "NET_ERROR",	"HTTP_ERROR",	 "HTTP_TIMEOUT",
+				 "GBA_ERROR",	"NO_DNS_RESULT", "DNS_TIMEOUT",
+				 "NO_FUNCTION", "OTHER" };
+
+const char *sip_call_end_reason_str[] = {
+	"RTP_RTCP_TIMEOUT", "MEDIA_BEARER_LOSS",  "SIP_TIMEOUT_NO_ACK",
+	"SIP_RESP_TIMEOUT", "CALL_SETUP_TIMEOUT", "REDIRECTION_FAILURE"
+};
+
+const char *limited_srv_cause_str[] = { "Reseved", "No suitable cell",
+					"No SIM Insert", "No Cell" };
+
+const char *abnormal_event_type_to_string(int type)
+{
+	if (type >= 1 &&
+	    type <= sizeof(abnormal_event) / sizeof(abnormal_event[0])) {
+		return abnormal_event[type - 1];
+	}
+
+	if (type >= 200 &&
+	    type < 200 + sizeof(normal_event) / sizeof(normal_event[0])) {
+		return normal_event[type - 200];
+	}
+
+	return "unexepected";
+}
+
+const char *reest_cause_to_string(unsigned int reest_cause)
+{
+	if (reest_cause >=
+	    sizeof(reest_cause_str) / sizeof(reest_cause_str[0])) {
+		ofono_debug("abnormal event:%d", reest_cause);
+		return "unknow";
+	}
+	return reest_cause_str[reest_cause];
+}
+
+const char *rach_fail_reason_to_string(unsigned int rach_fail_reason)
+{
+	if (rach_fail_reason >=
+	    sizeof(rach_fail_reason_str) / sizeof(rach_fail_reason_str[0])) {
+		ofono_debug("abnormal event:%d", rach_fail_reason);
+		return "unknow";
+	}
+	return rach_fail_reason_str[rach_fail_reason];
+}
+
+const char *oos_type_to_string(unsigned int oos_type)
+{
+	if (oos_type >= sizeof(oos_type_str) / sizeof(oos_type_str[0])) {
+		ofono_debug("abnormal event:%d", oos_type);
+		return "unknow";
+	}
+	return oos_type_str[oos_type];
+}
+
+const char *nas_timer_id_to_string(unsigned int timer_id)
+{
+	if (timer_id <
+	    sizeof(nas_timer_id_1_str) / sizeof(nas_timer_id_1_str[0])) {
+		return nas_timer_id_1_str[timer_id];
+	}
+
+	if (timer_id >= 100 &&
+	    timer_id < 100 + sizeof(nas_timer_id_2_str) /
+				       sizeof(nas_timer_id_2_str[0])) {
+		return nas_timer_id_2_str[timer_id - 100];
+	}
+
+	ofono_debug("abnormal event:%d", timer_id);
+	return "unknow";
+}
+
+const char *sip_srv_type_to_string(unsigned int srv_type)
+{
+	if (srv_type >=
+	    sizeof(sip_srv_type_str) / sizeof(sip_srv_type_str[0])) {
+		ofono_debug("abnormal event:%d", srv_type);
+		return "unknow";
+	}
+	return sip_srv_type_str[srv_type];
+}
+
+const char *sip_method_to_string(unsigned int sip_method)
+{
+	if (sip_method >= sizeof(sip_method_str) / sizeof(sip_method_str[0])) {
+		ofono_debug("abnormal event:%d", sip_method);
+		return "unknow";
+	}
+	return sip_method_str[sip_method];
+}
+
+const char *rrc_timer_id_to_string(unsigned int timer_id)
+{
+	if (timer_id >=
+	    sizeof(rrc_timer_id_str) / sizeof(rrc_timer_id_str[0])) {
+		ofono_debug("abnormal event:%d", timer_id);
+		return "unknow";
+	}
+	return rrc_timer_id_str[timer_id];
+}
+
+const char *ecall_fail_cause_to_string(unsigned int cause)
+{
+	if (cause >=
+	    sizeof(ecall_fail_reason_str) / sizeof(ecall_fail_reason_str[0])) {
+		ofono_debug("abnormal event:%d", cause);
+		return "unknow";
+	}
+	return ecall_fail_reason_str[cause];
+}
+
+const char *rtp_rtcp_error_to_string(unsigned int error_type)
+{
+	if (error_type >= sizeof(rtp_rtcp_error_type_str) /
+				  sizeof(rtp_rtcp_error_type_str[0])) {
+		ofono_debug("abnormal event:%d", error_type);
+		return "unknow";
+	}
+	return rtp_rtcp_error_type_str[error_type];
+}
+
+const char *nas_procedure_type_to_string(unsigned int procedure_type)
+{
+	if (procedure_type < sizeof(nas_procedure_type1_str) /
+				     sizeof(nas_procedure_type1_str[0])) {
+		return nas_procedure_type1_str[procedure_type];
+	}
+
+	if (procedure_type >= 100 &&
+	    procedure_type <
+		    100 + sizeof(nas_procedure_type2_str) /
+				    sizeof(nas_procedure_type2_str[0])) {
+		return nas_procedure_type2_str[procedure_type - 100];
+	}
+
+	ofono_debug("abnormal event:%d", procedure_type);
+	return "unknow";
+}
+
+const char *xcap_mode_to_string(unsigned int mode)
+{
+	if (mode >= sizeof(xcap_mode_str) / sizeof(xcap_mode_str[0])) {
+		ofono_debug("abnormal event:%d", mode);
+		return "unknow";
+	}
+	return xcap_mode_str[mode];
+}
+
+const char *xcap_reason_to_string(unsigned int reason)
+{
+	if (reason >= sizeof(xcap_reason_str) / sizeof(xcap_reason_str[0])) {
+		ofono_debug("abnormal event:%d", reason);
+		return "unknow";
+	}
+	return xcap_reason_str[reason];
+}
+
+const char *xcap_error_to_string(unsigned int error_type)
+{
+	if (error_type >= sizeof(xcap_error_str) / sizeof(xcap_error_str[0])) {
+		ofono_debug("abnormal event:%d", error_type);
+		return "unknow";
+	}
+	return xcap_error_str[error_type];
+}
+
+const char *call_end_reason_to_string(unsigned int reason)
+{
+	if (reason >= sizeof(sip_call_end_reason_str) /
+			      sizeof(sip_call_end_reason_str[0])) {
+		ofono_debug("abnormal event:%d", reason);
+		return "unknow";
+	}
+	return sip_call_end_reason_str[reason];
+}
+
+const char *limited_cause_to_string(unsigned int cause)
+{
+	if (cause >= sizeof(limited_srv_cause_str) /
+			      sizeof(limited_srv_cause_str[0])) {
+		ofono_debug("abnormal event:%d", cause);
+		return "unknow";
+	}
+	return limited_srv_cause_str[cause];
+}
+
 void parse_post_dial_string(const char *str, char *target, char *postdial)
 {
 	char str_src[OFONO_MAX_PHONE_NUMBER_LENGTH];

@@ -196,6 +196,23 @@ enum radio_status {
 	RADIO_STATUS_OFF = 2,
 };
 
+const char *abnormal_event_type_to_string(int type);
+const char *reest_cause_to_string(unsigned int reest_cause);
+const char *rach_fail_reason_to_string(unsigned int rach_fail_reason);
+const char *oos_type_to_string(unsigned int oos_type);
+const char *nas_timer_id_to_string(unsigned int timer_id);
+const char *sip_srv_type_to_string(unsigned int srv_type);
+const char *sip_method_to_string(unsigned int sip_method);
+const char *rrc_timer_id_to_string(unsigned int timer_id);
+const char *ecall_fail_cause_to_string(unsigned int cause);
+const char *rtp_rtcp_error_to_string(unsigned int error_type);
+const char *nas_procedure_type_to_string(unsigned int procedure_type);
+const char *xcap_mode_to_string(unsigned int mode);
+const char *xcap_reason_to_string(unsigned int reason);
+const char *xcap_error_to_string(unsigned int error_type);
+const char *call_end_reason_to_string(unsigned int reason);
+const char *limited_cause_to_string(unsigned int cause);
+
 const char *telephony_error_to_str(const struct ofono_error *error);
 
 gboolean valid_number_format(const char *number, int length);
