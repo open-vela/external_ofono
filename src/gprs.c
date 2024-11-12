@@ -324,8 +324,10 @@ static gboolean assign_context(struct pri_context *ctx)
 	struct ofono_gprs_context *gc;
 
 	gc = find_avail_gprs_context(ctx);
-	if (gc == NULL)
+	if (gc == NULL) {
+		ofono_error("%s: No available GPRS context found.", __func__);
 		return FALSE;
+	}
 
 	ctx->context_driver = gc;
 	ctx->context_driver->inuse = TRUE;
@@ -349,8 +351,23 @@ static gboolean assign_context(struct pri_context *ctx)
 
 static void release_context(struct pri_context *ctx)
 {
-	if (ctx == NULL || ctx->gprs == NULL || ctx->context_driver == NULL)
+	if (ctx == NULL) {
+		ofono_error("%s: Contex (ctx) is NULL. Nothing to release.",
+			__func__);
 		return;
+	}
+
+	if (ctx->gprs == NULL) {
+		ofono_error("%s: GPRS context (ctx->gprs) is NULL. Nothing to release.",
+			__func__);
+		return;
+	}
+
+	if (ctx->context_driver == NULL) {
+		ofono_error("%s: Context driver (ctx->context_driver) is NULL. Nothing to release.",
+			__func__);
+		return;
+	}
 
 	l_uintset_take(ctx->gprs->used_cids, ctx->context.cid);
 	ctx->context.cid = 0;
@@ -601,8 +618,11 @@ static void signal_settings(struct pri_context *ctx, const char *prop,
 					OFONO_CONNECTION_CONTEXT_INTERFACE,
 					"PropertyChanged");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create DBus 'PropertyChanged' signal for path '%s'.",
+			__func__, path);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &prop);
@@ -624,16 +644,22 @@ static void update_preferred_context(struct ofono_gprs *gprs, const char *path)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *atompath;
 
-	if (path == NULL)
+	if (path == NULL) {
+		ofono_error("%s: 'path' parameter is NULL. Cannot update preferred APN.",
+			__func__);
 		return;
+	}
 
 	if (g_strcmp0(path, gprs->preferred_apn)) {
 		if (gprs->preferred_apn)
 			g_free(gprs->preferred_apn);
 
 		gprs->preferred_apn = g_strdup(path);
-		if (gprs->preferred_apn == NULL)
+		if (gprs->preferred_apn == NULL) {
+			ofono_error("%s: Failed to duplicate 'path', preferred APN is NULL.",
+				__func__);
 			return;
+		}
 
 		if (gprs->settings)
 			g_key_file_set_string(gprs->settings, SETTINGS_GROUP,
@@ -669,8 +695,11 @@ static void pri_parse_proxy(struct pri_context *ctx, const char *proxy)
 	char *scheme, *host, *port, *path;
 
 	scheme = g_strdup(proxy);
-	if (scheme == NULL)
+	if (scheme == NULL) {
+		ofono_error("%s: Failed to duplicate proxy string. 'scheme' is NULL.",
+			__func__);
 		return;
+	}
 
 	host = strstr(scheme, "://");
 	if (host != NULL) {
@@ -752,18 +781,27 @@ static void pri_set_ipv4_addr(const char *interface, const char *address)
 	struct sockaddr_in addr;
 	int sk;
 
-	if (interface == NULL)
+	if (interface == NULL) {
+		ofono_error("%s: 'interface' parameter is NULL. Cannot set IPv4 address.",
+			__func__);
 		return;
+	}
 
 	sk = socket(PF_INET, SOCK_DGRAM, 0);
-	if (sk < 0)
+	if (sk < 0) {
+		ofono_error("%s: Failed to create socket for interface '%s'.",
+			__func__, interface);
 		return;
+	}
 
 	memset(&ifr, 0, sizeof(ifr));
 	l_strlcpy(ifr.ifr_name, interface, IFNAMSIZ);
 
-	if (ioctl(sk, SIOCGIFFLAGS, &ifr) < 0)
+	if (ioctl(sk, SIOCGIFFLAGS, &ifr) < 0) {
+		ofono_error("%s: Failed to get flags for interface '%s'.",
+			__func__, interface);
 		goto done;
+	}
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
@@ -771,12 +809,16 @@ static void pri_set_ipv4_addr(const char *interface, const char *address)
 	memcpy(&ifr.ifr_addr, &addr, sizeof(ifr.ifr_addr));
 
 	if (ioctl(sk, SIOCSIFADDR, &ifr) < 0) {
-		ofono_error("Failed to set interface address");
+		ofono_error("%s: Failed to set IP address for interface '%s'.",
+			__func__, interface);
 		goto done;
 	}
 
-	if (address == NULL)
+	if (address == NULL) {
+		ofono_debug("%s: 'address' parameter is NULL. Set IP address to "
+			"INADDR_ANY for interface '%s'.", __func__, interface);
 		goto done;
+	}
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
@@ -784,7 +826,7 @@ static void pri_set_ipv4_addr(const char *interface, const char *address)
 	memcpy(&ifr.ifr_netmask, &addr, sizeof(ifr.ifr_netmask));
 
 	if (ioctl(sk, SIOCSIFNETMASK, &ifr) < 0)
-		ofono_error("Failed to set interface netmask");
+		ofono_error("%s: Failed to set netmask for interface '%s'.", __func__, interface);
 
 done:
 	close(sk);
@@ -796,12 +838,18 @@ static void pri_setproxy(const char *interface, const char *proxy)
 	struct sockaddr_in addr;
 	int sk;
 
-	if (interface == NULL)
+	if (interface == NULL) {
+		ofono_error("%s: 'interface' parameter is NULL. Cannot set proxy route.",
+			__func__);
 		return;
+	}
 
 	sk = socket(PF_INET, SOCK_DGRAM, 0);
-	if (sk < 0)
+	if (sk < 0) {
+		ofono_error("%s: Failed to create socket for interface '%s'.",
+			__func__, interface);
 		return;
+	}
 
 	memset(&rt, 0, sizeof(rt));
 	rt.rt_flags = RTF_UP | RTF_HOST;
@@ -823,7 +871,8 @@ static void pri_setproxy(const char *interface, const char *proxy)
 	memcpy(&rt.rt_genmask, &addr, sizeof(addr));
 
 	if (ioctl(sk, SIOCADDRT, &rt) < 0)
-		ofono_error("Failed to add proxy host route");
+		ofono_error("%s: Failed to add proxy host route for interface '%s'.",
+			__func__, interface);
 
 	close(sk);
 }
@@ -835,8 +884,10 @@ static void pri_reset_context_settings(struct pri_context *ctx)
 	gboolean signal_ipv4;
 	gboolean signal_ipv6;
 
-	if (ctx->context_driver == NULL)
+	if (ctx->context_driver == NULL) {
+		ofono_error("context_driver in %s is null", __func__);
 		return;
+	}
 
 	interface = ctx->context_driver->interface;
 	settings = ctx->context_driver->settings;
@@ -867,7 +918,7 @@ static void pri_update_mms_context_settings(struct pri_context *ctx)
 	settings->ipv4->proxy = g_strdup(ctx->message_proxy);
 	pri_parse_proxy(ctx, ctx->message_proxy);
 
-	DBG("proxy %s port %u", ctx->proxy_host, ctx->proxy_port);
+	ofono_debug("%s, proxy: %s, port: %u", __func__, ctx->proxy_host, ctx->proxy_port);
 
 	pri_set_ipv4_addr(gc->interface, settings->ipv4->ip);
 
@@ -946,8 +997,11 @@ static DBusMessage *pri_get_properties(DBusConnection *conn,
 	DBusMessageIter dict;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -1116,26 +1170,35 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 	const char *apn_typestr = gprs_context_type_to_string(apn_type);
 	int apn_count;
 
-	if (apn_typestr == NULL || !gprs_context_type_allowed(apn_type)) {
-		ofono_error("requested apn type (%d) validation failed.", apn_type);
+	if (apn_typestr == NULL) {
+		ofono_error("%s: APN type string is NULL. Cannot set up data call.",
+			__func__);
+		return;
+	}
+
+	if (!gprs_context_type_allowed(apn_type)) {
+		ofono_error("%s: APN type %d is not allowed. Cannot set up data call.",
+			__func__, apn_type);
 		return;
 	}
 
 	apn_count = g_slist_length(gprs->contexts);
 	if (apn_count == 0) {
-		ofono_error("apn list is empty.");
+		ofono_error("%s: APN list is empty. Cannot set up data call.",
+			__func__);
 		return;
 	}
 
 	if (gprs->restricted) {
-		ofono_warn("data call is not allowned due to ps restricted.");
+		ofono_warn("%s: Data call is not allowed due to PS restrictions.",
+			__func__);
 		return;
 	}
 
 	if (apn_type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 		if (!gprs->data_on || (!gprs->roaming_allowed
 			&& gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING)) {
-			ofono_warn("data switch is off.");
+			ofono_warn("%s: Data switch is off.", __func__);
 			return;
 		}
 
@@ -1143,7 +1206,8 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 		if (gprs->preferred_apn != NULL) {
 			ctx = gprs_context_by_path(gprs, gprs->preferred_apn);
 			if (ctx != NULL) {
-				ofono_info("found preferred apn with path -> %s ", ctx->path);
+				ofono_info("%s: Found preferred APN with path -> %s",
+					__func__, ctx->path);
 			}
 		}
 	}
@@ -1151,7 +1215,8 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 	if (ctx == NULL) {
 		ctx = gprs_context_by_type(gprs, apn_type);
 		if (ctx == NULL) {
-			ofono_error("no available apn context.");
+			ofono_error("%s: No available APN context for type '%s'.",
+				__func__, apn_typestr);
 			return;
 		}
 	}
@@ -1161,13 +1226,14 @@ static void gprs_try_setup_data_call(struct ofono_gprs *gprs, int apn_type)
 		|| ctx->status == CONTEXT_STATUS_ACTIVATING
 		|| ctx->status == CONTEXT_STATUS_RETRYING
 		|| !gprs->attached) {
-		ofono_warn("unexpected gprs status -> active = %d; attached = %d; status = %d;",
-				ctx->active, gprs->attached, ctx->status);
+		ofono_warn("%s: Unexpected GPRS status -> active = %d; attached = %d; status = %d.",
+                __func__, ctx->active, gprs->attached, ctx->status);
 		return;
 	}
 
 	if (assign_context(ctx) == FALSE) {
-		ofono_error("failed to assign gc for apn type (%s) - %s.", apn_typestr, __func__);
+		ofono_error("%s: Failed to assign GPRS context for APN type '%s'.",
+			__func__, apn_typestr);
 		return;
 	}
 	gc = ctx->context_driver;
@@ -1189,7 +1255,8 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 	ofono_bool_t cleanup = FALSE;
 
 	if (apn_typestr == NULL) {
-		ofono_error("released apn type (%d) validation failed.", apn_type);
+		ofono_error("%s: Released APN type (%d) validation failed.",
+			__func__, apn_type);
 		return;
 	}
 
@@ -1197,8 +1264,13 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 	if (ctx && ctx->status == CONTEXT_STATUS_RETRYING) {
 		gc = ctx->context_driver;
 		if (gc) {
+			ofono_info("%s: Deactivating retrying APN context '%s' for APN type '%s'.",
+				__func__, ctx->path, apn_typestr);
 			gc->driver->deactivate_primary(
 				gc, ctx->context.cid, pri_deactivate_callback, ctx);
+		} else {
+			ofono_error("%s: Context driver is NULL for APN context '%s'.",
+				__func__, ctx->path);
 		}
 
 		return;
@@ -1206,21 +1278,23 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 
 	ctx = gprs_active_context_by_type(gprs, apn_type);
 	if (ctx == NULL) {
-		ofono_warn("no active apn context (%s)", apn_typestr);
+		ofono_warn("%s: No active APN context for type '%s'.",
+			__func__, apn_typestr);
 		return;
 	}
 
 	gc = ctx->context_driver;
 	if (gc == NULL) {
-		ofono_error("failed to assign gc for apn type (%s) - %s.", apn_typestr, __func__);
+		ofono_error("%s: Failed to assign GPRS context driver for APN type '%s'.",
+			__func__, apn_typestr);
 		return;
 	}
 
 	if (ctx->active == FALSE
 		|| ctx->status == CONTEXT_STATUS_DEACTIVATING
 		|| ctx->status == CONTEXT_STATUS_DEACTIVATED) {
-		ofono_warn("unexpected apn status -> active = %d; status = %d;",
-			ctx->active, ctx->status);
+		ofono_warn("%s: Unexpected APN status -> active = %d; status = %d for APN context '%s'.",
+                __func__, ctx->active, ctx->status, ctx->path);
 
 		if (ctx->status == CONTEXT_STATUS_RETRYING)
 			ctx->status = CONTEXT_STATUS_DEACTIVATED;
@@ -1229,17 +1303,29 @@ static void gprs_try_deactive_data_call(struct ofono_gprs *gprs, int apn_type)
 	}
 
 	if (apn_type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
-		if (!gprs->data_on)
+		if (!gprs->data_on) {
 			cleanup = TRUE;
-		else if (!gprs->roaming_allowed
-				&& gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING)
+			ofono_info("%s: Data is turned off. Marking APN context '%s' for cleanup.",
+				__func__, ctx->path);
+		} else if (!gprs->roaming_allowed
+				&& gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING) {
 			cleanup = TRUE;
-		else if (ctx->ref_count == 0)
+			ofono_info("%s: Roaming not allowed and currently roaming. Marking APN context '%s' for cleanup.",
+				__func__, ctx->path);
+		} else if (ctx->ref_count == 0) {
 			cleanup = TRUE;
-	} else if (ctx->ref_count == 0)
+			ofono_info("%s: APN context '%s' reference count is zero for APN type '%s'. Marking for cleanup.",
+				__func__, ctx->path, apn_typestr);
+		}
+	} else if (ctx->ref_count == 0) {
 		cleanup = TRUE;
+		ofono_info("%s: APN context '%s' reference count is zero for non-internet APN type '%s'. Marking for cleanup.",
+			__func__, ctx->path, apn_typestr);
+	}
 
 	if (cleanup) {
+		ofono_info("%s: Deactivating APN context '%s' for APN type '%s'.",
+			__func__, ctx->path, apn_typestr);
 		gc->driver->deactivate_primary(
 			gc, ctx->context.cid, pri_deactivate_callback, ctx);
 		ctx->status = CONTEXT_STATUS_DEACTIVATING;
@@ -1253,8 +1339,9 @@ static void gprs_set_attached_property(struct ofono_gprs *gprs,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t value = attached;
 
-	if (gprs->attached == attached)
+	if (gprs->attached == attached) {
 		return;
+	}
 
 	gprs->attached = attached;
 
@@ -1277,8 +1364,11 @@ static void gprs_context_changed(struct pri_context *context)
 	signal = dbus_message_new_signal(path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
 					"ContextChanged");
-	if (!signal)
+	if (!signal) {
+		ofono_error("%s: Failed to create DBus signal 'ContextChanged' for path '%s'.",
+			__func__, path);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 
@@ -1335,11 +1425,17 @@ static DBusMessage *pri_set_apn(struct pri_context *ctx, DBusConnection *conn,
 {
 	GKeyFile *settings = ctx->gprs->settings;
 
-	if (g_str_equal(apn, ctx->context.apn))
+	if (g_str_equal(apn, ctx->context.apn)) {
+		ofono_debug("%s: APN is already set to '%s'. No changes required.",
+			__func__, apn);
 		return dbus_message_new_method_return(msg);
+	}
 
-	if (is_valid_apn(apn) == FALSE)
+	if (is_valid_apn(apn) == FALSE) {
+		ofono_error("%s: Invalid APN '%s' provided.",
+			__func__, apn);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	strcpy(ctx->context.apn, apn);
 
@@ -1366,11 +1462,17 @@ static DBusMessage *pri_set_username(struct pri_context *ctx,
 {
 	GKeyFile *settings = ctx->gprs->settings;
 
-	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
+		ofono_error("%s: Invalid Username length (%zu). Maximum allowed is %d characters.", 
+                __func__, strlen(username), OFONO_GPRS_MAX_USERNAME_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (g_str_equal(username, ctx->context.username))
+	if (g_str_equal(username, ctx->context.username)) {
+		ofono_debug("%s: Username is already set to '%s'. No changes needed.",
+			__func__, username);
 		return dbus_message_new_method_return(msg);
+	}
 
 	strcpy(ctx->context.username, username);
 
@@ -1396,11 +1498,17 @@ static DBusMessage *pri_set_password(struct pri_context *ctx,
 {
 	GKeyFile *settings = ctx->gprs->settings;
 
-	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
+		ofono_error("%s: Invalid Password length (%zu). Maximum allowed is %d characters.", 
+                __func__, strlen(password), OFONO_GPRS_MAX_PASSWORD_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (g_str_equal(password, ctx->context.password))
+	if (g_str_equal(password, ctx->context.password)) {
+		ofono_debug("%s: Password is already set to '%s'. No changes needed.",
+			__func__, password);
 		return dbus_message_new_method_return(msg);
+	}
 
 	strcpy(ctx->context.password, password);
 
@@ -1426,11 +1534,17 @@ static DBusMessage *pri_set_type(struct pri_context *ctx, DBusConnection *conn,
 	GKeyFile *settings = ctx->gprs->settings;
 	enum ofono_gprs_context_type context_type;
 
-	if (gprs_context_string_to_type(type, &context_type) == FALSE)
+	if (gprs_context_string_to_type(type, &context_type) == FALSE) {
+		ofono_error("%s: Invalid context type '%s' provided.",
+			__func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (ctx->type == context_type)
+	if (ctx->type == context_type) {
+		ofono_debug("%s: Context type is already set to '%s' (%d). No changes needed.",
+			__func__, type, (int)ctx->type);
 		return dbus_message_new_method_return(msg);
+	}
 
 	ctx->type = context_type;
 
@@ -1455,11 +1569,17 @@ static DBusMessage *pri_set_proto(struct pri_context *ctx,
 	GKeyFile *settings = ctx->gprs->settings;
 	enum ofono_gprs_proto proto;
 
-	if (gprs_proto_from_string(str, &proto) == FALSE)
+	if (gprs_proto_from_string(str, &proto) == FALSE) {
+		ofono_error("%s: Invalid Protocol string '%s' provided.",
+			__func__, str);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (ctx->context.proto == proto)
+	if (ctx->context.proto == proto) {
+		ofono_debug("%s: Protocol is already set to '%s' (%d). No changes needed.",
+			__func__, str, proto);
 		return dbus_message_new_method_return(msg);
+	}
 
 	ctx->context.proto = proto;
 
@@ -1482,11 +1602,17 @@ static DBusMessage *pri_set_name(struct pri_context *ctx, DBusConnection *conn,
 {
 	GKeyFile *settings = ctx->gprs->settings;
 
-	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH)
+	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH) {
+		ofono_error("%s: Invalid Name length (%zu). Maximum allowed is %d characters.",
+                __func__, strlen(name), MAX_CONTEXT_NAME_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (g_str_equal(ctx->name, name))
+	if (g_str_equal(ctx->name, name)) {
+		ofono_debug("%s: Name is already set to '%s'. No changes needed.",
+			__func__, ctx->name);
 		return dbus_message_new_method_return(msg);
+	}
 
 	strcpy(ctx->name, name);
 
@@ -1510,11 +1636,17 @@ static DBusMessage *pri_set_message_proxy(struct pri_context *ctx,
 {
 	GKeyFile *settings = ctx->gprs->settings;
 
-	if (strlen(proxy) > MAX_MESSAGE_PROXY_LENGTH)
+	if (strlen(proxy) > MAX_MESSAGE_PROXY_LENGTH) {
+		ofono_error("%s: Invalid MessageProxy length (%zu). Maximum allowed is %d characters.",
+            	__func__, strlen(proxy), MAX_MESSAGE_PROXY_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (g_str_equal(ctx->message_proxy, proxy))
+	if (g_str_equal(ctx->message_proxy, proxy)) {
+		ofono_debug("%s: MessageProxy is already set to '%s'. No changes needed.",
+			__func__, proxy);
 		return dbus_message_new_method_return(msg);
+	}
 
 	strcpy(ctx->message_proxy, proxy);
 
@@ -1539,11 +1671,17 @@ static DBusMessage *pri_set_message_center(struct pri_context *ctx,
 {
 	GKeyFile *settings = ctx->gprs->settings;
 
-	if (strlen(center) > MAX_MESSAGE_CENTER_LENGTH)
+	if (strlen(center) > MAX_MESSAGE_CENTER_LENGTH) {
+		ofono_error("%s: Invalid MessageCenter length (%zu). Maximum allowed is %d characters.",
+                __func__, strlen(center), MAX_MESSAGE_CENTER_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (g_str_equal(ctx->message_center, center))
+	if (g_str_equal(ctx->message_center, center)) {
+		ofono_debug("%s: MessageCenter is already set to '%s'. No changes needed.",
+			__func__, center);
 		return dbus_message_new_method_return(msg);
+	}
 
 	strcpy(ctx->message_center, center);
 
@@ -1569,11 +1707,17 @@ static DBusMessage *pri_set_auth_method(struct pri_context *ctx,
 	GKeyFile *settings = ctx->gprs->settings;
 	enum ofono_gprs_auth_method auth;
 
-	if (gprs_auth_method_from_string(str, &auth) == FALSE)
+	if (gprs_auth_method_from_string(str, &auth) == FALSE) {
+		ofono_error("%s: Invalid AuthenticationMethod string '%s' provided.",
+			__func__, str);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (ctx->context.auth_method == auth)
+	if (ctx->context.auth_method == auth) {
+		ofono_debug("%s: AuthenticationMethod is already set to '%s' (%d). No changes needed.",
+			__func__, str, auth);
 		return dbus_message_new_method_return(msg);
+	}
 
 	ctx->context.auth_method = auth;
 
@@ -1603,42 +1747,67 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 	dbus_bool_t value;
 	const char *str;
 
-	if (!dbus_message_iter_init(msg, &iter))
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
 	if (g_str_equal(property, "Active")) {
 		struct ofono_gprs_context *gc;
 
-		if (ctx->gprs->pending)
+		if (ctx->gprs->pending) {
+			ofono_error("%s: Cannot set 'Active' property - GPRS is currently handling "
+				"a pending operation.", __func__);
 			return __ofono_error_busy(msg);
+		}
 
-		if (ctx->pending)
+		if (ctx->pending) {
+			ofono_error("%s: Cannot set 'Active' property - the context is already "
+				"processing another request.", __func__);
 			return __ofono_error_busy(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [Active] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (ctx->active == (ofono_bool_t) value)
+		if (ctx->active == (ofono_bool_t) value) {
+			ofono_debug("%s: 'Active' property is already set to '%s'. No changes needed.",
+				__func__, value ? "TRUE" : "FALSE");
 			return dbus_message_new_method_return(msg);
+		}
 
-		if (value && !ctx->gprs->attached)
+		if (value && !ctx->gprs->attached) {
+			ofono_error("%s: Cannot activate context - GPRS is not attached.",
+				__func__);
 			return __ofono_error_not_attached(msg);
+		}
 
-		if (value && assign_context(ctx) == FALSE)
+		if (value && assign_context(ctx) == FALSE) {
+			ofono_error("%s: Failed to assign context for activation.", __func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
 		gc = ctx->context_driver;
 
@@ -1646,10 +1815,12 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 
 		if (value) {
 			ctx->ref_count = 1;
+			ofono_info("%s: Initiating activation of context.", __func__);
 			gc->driver->activate_primary(gc, &ctx->context,
 						pri_activate_callback, ctx);
 		} else {
 			ctx->ref_count = 0;
+			ofono_info("%s: Initiating deactivation of context.", __func__);
 			gc->driver->deactivate_primary(gc, ctx->context.cid,
 						pri_deactivate_callback, ctx);
 		}
@@ -1658,73 +1829,106 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 	}
 
 	/* All other properties are read-only when context is active */
-	if (ctx->active == TRUE)
+	if (ctx->active == TRUE) {
+		ofono_error("%s: Cannot set property '%s' - the context is currently active.",
+			__func__, property);
 		return __ofono_error_in_use(msg);
+	}
 
 	if (!strcmp(property, "AccessPointName")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [AccessPointName] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_apn(ctx, conn, msg, str);
 	} else if (!strcmp(property, "Type")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Type] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_type(ctx, conn, msg, str);
 	} else if (!strcmp(property, "Protocol")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Protocol] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_proto(ctx, conn, msg, str);
 	} else if (!strcmp(property, "Username")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Username] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_username(ctx, conn, msg, str);
 	} else if (!strcmp(property, "Password")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Password] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_password(ctx, conn, msg, str);
 	} else if (!strcmp(property, "Name")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Name] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_name(ctx, conn, msg, str);
 	} else if (!strcmp(property, "AuthenticationMethod")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [AuthenticationMethod] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_auth_method(ctx, conn, msg, str);
 	}
 
-	if (ctx->type != OFONO_GPRS_CONTEXT_TYPE_MMS)
+	if (ctx->type != OFONO_GPRS_CONTEXT_TYPE_MMS) {
+		 ofono_error("%s: Cannot set property '%s' - context type is not MMS.",
+		 	__func__, property);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	if (!strcmp(property, "MessageProxy")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [MessageProxy] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
 		return pri_set_message_proxy(ctx, conn, msg, str);
 	} else if (!strcmp(property, "MessageCenter")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [MessageCenter] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &str);
 
@@ -1761,12 +1965,16 @@ static struct pri_context *pri_context_create(struct ofono_gprs *gprs,
 {
 	struct pri_context *context = g_try_new0(struct pri_context, 1);
 
-	if (context == NULL)
+	if (context == NULL) {
+		ofono_error("%s: Failed to allocate memory for PRI context.", __func__);
 		return NULL;
+	}
 
 	if (name == NULL) {
 		name = gprs_context_default_name(type);
 		if (name == NULL) {
+			ofono_error("%s: Default context name is NULL for context type %d.",
+				__func__, type);
 			g_free(context);
 			return NULL;
 		}
@@ -1878,10 +2086,11 @@ static void update_suspended_property(struct ofono_gprs *gprs,
 		gprs->suspend_timeout = 0;
 	}
 
-	if (gprs->suspended == suspended)
+	if (gprs->suspended == suspended) {
 		return;
+	}
 
-	DBG("%s GPRS service %s", __ofono_atom_get_path(gprs->atom),
+	ofono_debug("%s GPRS service %s", __ofono_atom_get_path(gprs->atom),
 		suspended ? "suspended" : "resumed");
 
 	gprs->suspended = suspended;
@@ -1991,8 +2200,9 @@ static void gprs_attached_update(struct ofono_gprs *gprs)
 	attached = (status == NETWORK_REGISTRATION_STATUS_REGISTERED
 				|| status == NETWORK_REGISTRATION_STATUS_ROAMING);
 
-	if (attached == gprs->attached)
+	if (attached == gprs->attached) {
 		return;
+	}
 
 	gprs_set_attached_property(gprs, attached);
 
@@ -2007,7 +2217,7 @@ static void registration_status_cb(const struct ofono_error *error,
 {
 	struct ofono_gprs *gprs = data;
 
-	DBG("%s error %d status %d", __ofono_atom_get_path(gprs->atom),
+	ofono_debug("%s, error: %d, status: %d", __func__,
 		error->type, status);
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
@@ -2041,7 +2251,7 @@ static void netreg_status_changed(int status, int lac, int ci, int tech,
 static void gprs_set_data_allow_callback(const struct ofono_error *error,
 						int status, void *data)
 {
-	DBG("error = %d", error->type);
+	ofono_debug("%s: error = %d", __func__, error->type);
 }
 
 static DBusMessage *gprs_get_properties(DBusConnection *conn,
@@ -2054,8 +2264,11 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 	dbus_bool_t value;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create a new D-Bus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -2123,31 +2336,47 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 	const char *value_str;
 	const char *path;
 
-	if (gprs->pending)
+	if (gprs->pending) {
+		ofono_error("%s: GPRS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_iter_init(msg, &iter))
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
 	if (!strcmp(property, "RoamingAllowed")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [RoamingAllowed] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (gprs->roaming_allowed == (ofono_bool_t) value)
+		if (gprs->roaming_allowed == (ofono_bool_t) value) {
+			ofono_debug("%s: 'RoamingAllowed' is already set to '%s'. No changes needed.",
+				__func__, value ? "TRUE" : "FALSE");
 			return dbus_message_new_method_return(msg);
+		}
 
 		gprs->roaming_allowed = value;
 
@@ -2159,16 +2388,25 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 					gprs->settings);
 		}
 	} else if (!strcmp(property, "Powered")) {
-		if (gprs->driver->set_attached == NULL)
+		if (gprs->driver->set_attached == NULL) {
+			ofono_error("%s: GPRS driver's 'set_attached' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [Powered] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (gprs->powered == (ofono_bool_t) value)
+		if (gprs->powered == (ofono_bool_t) value) {
+			ofono_debug("%s: 'Powered' is already set to '%s'. No changes needed.",
+				__func__, value ? "TRUE" : "FALSE");
 			return dbus_message_new_method_return(msg);
+		}
 
 		gprs->powered = value;
 
@@ -2179,13 +2417,19 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 					gprs->settings);
 		}
 	} else if (!strcmp(property, "DataOn")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [DataOn] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (gprs->data_on == (ofono_bool_t) value)
+		if (gprs->data_on == (ofono_bool_t) value) {
+			ofono_debug("%s: 'DataOn' is already set to '%s'. No changes needed.",
+				__func__, value ? "TRUE" : "FALSE");
 			return dbus_message_new_method_return(msg);
+		}
 
 		gprs->data_on = value;
 		if (gprs->settings) {
@@ -2194,16 +2438,22 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 			storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 		}
 
-		if (gprs->data_on)
+		if (gprs->data_on) {
+			ofono_info("%s: Initiating setup of data call for Internet context.", __func__);
 			gprs_try_setup_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
-		else
+		} else {
+			ofono_info("%s: Initiating deactivation of data call for Internet context.", __func__);
 			gprs_try_deactive_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
+		}
 	} else if (!strcmp(property, "PreferredApn")) {
 		struct pri_context *new_internet_ctx = NULL;
 		struct pri_context *active_internet_ctx = NULL;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [PreferredApn] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value_str);
 
@@ -2227,27 +2477,43 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 				gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
 			if (active_internet_ctx != NULL) {
 				active_internet_ctx->ref_count = 0;
+				ofono_info("%s: Reference count for active Internet context ('%s') set to 0.",
+					__func__, active_internet_ctx->name);
+				ofono_info("%s: Initiating deactivation of active Internet context.", __func__);
 				gprs_try_deactive_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
 			} else {
+				ofono_info("%s: No active Internet context found. Initiating setup of new Internet context.",
+					__func__);
 				gprs_try_setup_data_call(gprs, OFONO_GPRS_CONTEXT_TYPE_INTERNET);
 			}
 		}
 	} else if (!strcmp(property, "DataAllowed")) {
-		if (gprs->driver->set_data_allow == NULL)
+		if (gprs->driver->set_data_allow == NULL) {
+			ofono_error("%s: GPRS driver's 'set_data_allow' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [DataAllowed] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (gprs->data_allowed == (ofono_bool_t) value)
+		if (gprs->data_allowed == (ofono_bool_t) value) {
+			ofono_debug("%s: 'DataAllowed' is already set to '%s'. No changes needed.",
+				__func__, value ? "TRUE" : "FALSE");
 			return dbus_message_new_method_return(msg);
+		}
 
 		gprs->data_allowed = value;
 
 		gprs->driver->set_data_allow(gprs, value, gprs_set_data_allow_callback, gprs);
 	} else {
+		ofono_error("%s: Attempted to set unsupported property '%s'.",
+			__func__, property);
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -2344,7 +2610,8 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 		struct pri_context *ctx = l->data;
 
 		if (type == ctx->type && g_strcmp0(apn, ctx->context.apn) == 0) {
-			ofono_error("duplicated apn is already existing!");
+			ofono_error("%s: Duplicate context detected. APN '%s' with type '%d' "
+				"already exists (Context ID: %u).", __func__, apn, type, ctx->id);
 			return NULL;
 		}
 	}
@@ -2355,23 +2622,28 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 	else
 		id = l_uintset_find_unused_min(gprs->used_pids);
 
-	if (id > l_uintset_get_max(gprs->used_pids))
+	if (id > l_uintset_get_max(gprs->used_pids)) {
+		ofono_error("%s: Unable to find a free context ID. Current last ID: %u, Max allowed ID: %ld.",
+                __func__, gprs->last_context_id, (long)l_uintset_get_max(gprs->used_pids));
 		return NULL;
+	}
 
 	context = pri_context_create(gprs, name, type,
 		apn, username, password, protocal, authtype);
 	if (context == NULL) {
-		ofono_error("Unable to allocate context struct");
+		ofono_error("%s: Failed to create a new PRI context with APN '%s' and type '%d'.",
+                __func__, apn, type);
 		return NULL;
 	}
 
 	l_uintset_put(gprs->used_pids, id);
 	context->id = id;
 
-	DBG("Registering new context");
+	ofono_info("%s: Registering new context '%s' with ID %u.", __func__, context->name, id);
 
 	if (!context_dbus_register(context)) {
-		ofono_error("Unable to register primary context");
+		ofono_error("%s: Failed to register PRI context '%s' with ID %u to D-Bus.",
+                __func__, context->name, id);
 		return NULL;
 	}
 
@@ -2393,21 +2665,25 @@ void ofono_gprs_cid_activated(struct ofono_gprs *gprs, unsigned int cid,
 	struct pri_context *pri_ctx;
 	struct ofono_gprs_context *gc;
 
-	DBG("cid %u", cid);
+	ofono_info("%s: Received activation request for CID %u with APN '%s'.",
+		__func__, cid, apn ? apn : "(NULL)");
 
 	if (!__ofono_atom_get_registered(gprs->atom)) {
-		ofono_debug("cid %u activated before atom registered", cid);
+		ofono_debug("%s: CID %u activated before Atom was registered. Ignoring activation.",
+			__func__, cid);
 		return;
 	}
 
 	if (l_uintset_contains(gprs->used_cids, cid)) {
-		ofono_debug("cid %u already activated", cid);
+		ofono_debug("%s: CID %u is already activated. No action taken.",
+			__func__, cid);
 		return;
 	}
 
 	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH
 				|| is_valid_apn(apn) == FALSE) {
-		ofono_error("Context activated with an invalid APN");
+		ofono_error("%s: Activation failed for CID %u due to invalid APN '%s'.",
+			__func__, cid, apn ? apn : "(NULL)");
 		return;
 	}
 
@@ -2418,22 +2694,23 @@ void ofono_gprs_cid_activated(struct ofono_gprs *gprs, unsigned int cid,
 					OFONO_GPRS_CONTEXT_TYPE_INTERNET, apn, NULL, NULL,
 					OFONO_GPRS_PROTO_IPV4V6, OFONO_GPRS_AUTH_METHOD_NONE);
 		if (!pri_ctx) {
-			ofono_error("Can't find/create automatic context %d "
-					"with APN %s.", cid, apn);
+			ofono_error("%s: Failed to find or create automatic context for CID %u with APN '%s'.",
+				__func__, cid, apn);
 			return;
 		}
 	}
 
 	if (assign_context(pri_ctx) == FALSE) {
-		ofono_warn("Can't assign context to driver for APN.");
+		ofono_warn("%s: Unable to assign context '%s' (ID %u) to driver for APN '%s'.",
+			__func__, pri_ctx->name, pri_ctx->id, apn);
 		return;
 	}
 
 	gc = pri_ctx->context_driver;
 
 	if (gc->driver->read_settings == NULL) {
-		ofono_warn("Context activated for driver that doesn't support "
-				"automatic context activation.");
+		ofono_warn("%s: Driver for context '%s' (ID %u) does not support automatic "
+			"context activation. Releasing context.", __func__, pri_ctx->name, pri_ctx->id);
 		release_context(pri_ctx);
 		return;
 	}
@@ -2469,8 +2746,11 @@ static void send_context_added_signal(struct ofono_gprs *gprs,
 	signal = dbus_message_new_signal(path,
 					OFONO_CONNECTION_MANAGER_INTERFACE,
 					"ContextAdded");
-	if (!signal)
+	if (!signal) {
+		ofono_error("%s: Failed to create 'ContextAdded' signal message.",
+			__func__);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 
@@ -2509,20 +2789,33 @@ static DBusMessage *gprs_add_context(DBusConnection *conn,
 				DBUS_TYPE_STRING, &password,
 				DBUS_TYPE_INT32, &protocal,
 				DBUS_TYPE_INT32, &authtype,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (gprs_context_string_to_type(typestr, &type) == FALSE)
+	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
+		ofono_error("%s: Invalid context type string '%s'.", __func__, typestr);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
+		ofono_error("%s: Username length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(username), OFONO_GPRS_MAX_USERNAME_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
+		ofono_error("%s: Password length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(password), OFONO_GPRS_MAX_PASSWORD_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH)
+	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH) {
+		ofono_error("%s: APN length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(apn), OFONO_GPRS_MAX_APN_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	if (name == NULL)
 		name = gprs_context_default_name(type);
@@ -2530,12 +2823,18 @@ static DBusMessage *gprs_add_context(DBusConnection *conn,
 	if (name == NULL)
 		name = typestr;
 
-	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH)
+	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH) {
+		ofono_error("%s: Name length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(name), MAX_CONTEXT_NAME_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	context = add_context(gprs, name, type, apn, username, password, protocal, authtype);
-	if (context == NULL)
+	if (context == NULL) {
+		ofono_error("%s: Failed to add context with APN '%s'.",
+			__func__, apn);
 		return __ofono_error_failed(msg);
+	}
 
 	path = context->path;
 
@@ -2621,23 +2920,36 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 	const char *path;
 	const char *atompath;
 
-	if (gprs->pending)
+	if (gprs->pending) {
+		ofono_error("%s: Cannot remove context - GPRS is currently handling a "
+			"pending operation.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH, &path,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments. Invalid or missing 'path'.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (path[0] == '\0')
+	if (path[0] == '\0') {
+		ofono_error("%s: Received empty 'path' argument.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	ctx = gprs_context_by_path(gprs, path);
-	if (ctx == NULL)
+	if (ctx == NULL) {
+		ofono_error("%s: No context found for path '%s'.", __func__, path);
 		return __ofono_error_not_found(msg);
+	}
 
 	/* This context is already being messed with */
-	if (ctx->pending)
+	if (ctx->pending) {
+		ofono_error("%s: Cannot remove context '%s' (ID: %u) - it is currently pending.",
+			__func__, ctx->name, ctx->id);
 		return __ofono_error_busy(msg);
+	}
 
 	if (ctx->active) {
 		struct ofono_gprs_context *gc = ctx->context_driver;
@@ -2649,12 +2961,13 @@ static DBusMessage *gprs_remove_context(DBusConnection *conn,
 	}
 
 	if (gprs->settings) {
-		ofono_debug("remove context context name:%s", ctx->key);
+		ofono_debug("%s: Removing settings for context '%s'.", __func__, ctx->key);
 		g_key_file_remove_group(gprs->settings, ctx->key, NULL);
 		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 	}
 
-	DBG("Unregistering context: %s", ctx->path);
+	ofono_info("%s: Unregistering context '%s' (Path: '%s').",
+		__func__, ctx->name, ctx->path);
 	context_dbus_unregister(ctx);
 	gprs->contexts = g_slist_remove(gprs->contexts, ctx);
 
@@ -2681,7 +2994,7 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 	const char *apn;
 	const char *username;
 	const char *password;
-	int protocal;
+	int protocol;
 	int authtype;
 	const char *path;
 	enum ofono_gprs_context_type type;
@@ -2693,48 +3006,81 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 				DBUS_TYPE_STRING, &apn,
 				DBUS_TYPE_STRING, &username,
 				DBUS_TYPE_STRING, &password,
-				DBUS_TYPE_INT32, &protocal,
+				DBUS_TYPE_INT32, &protocol,
 				DBUS_TYPE_INT32, &authtype,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (path[0] == '\0')
+	if (path[0] == '\0') {
+		ofono_error("%s: Received empty 'path' argument.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (gprs_context_string_to_type(typestr, &type) == FALSE)
+	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
+		ofono_error("%s: Invalid context type string '%s'.", __func__, typestr);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
+		ofono_error("%s: Username length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(username), OFONO_GPRS_MAX_USERNAME_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
+		ofono_error("%s: Password length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(password), OFONO_GPRS_MAX_PASSWORD_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH)
+	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH) {
+		ofono_error("%s: APN length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(apn), OFONO_GPRS_MAX_APN_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (protocal < OFONO_GPRS_PROTO_IP || protocal > OFONO_GPRS_PROTO_IPV4V6)
+	if (protocol < OFONO_GPRS_PROTO_IP || protocol > OFONO_GPRS_PROTO_IPV4V6) {
+		ofono_error("%s: Protocol value (%d) is out of valid range [%d, %d].",
+                __func__, protocol, OFONO_GPRS_PROTO_IP, OFONO_GPRS_PROTO_IPV4V6);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (authtype < OFONO_GPRS_AUTH_METHOD_CHAP || authtype > OFONO_GPRS_AUTH_METHOD_NONE)
+	if (authtype < OFONO_GPRS_AUTH_METHOD_CHAP || authtype > OFONO_GPRS_AUTH_METHOD_NONE) {
+		ofono_error("%s: AuthType value (%d) is out of valid range [%d, %d].",
+                __func__, authtype, OFONO_GPRS_AUTH_METHOD_CHAP, OFONO_GPRS_AUTH_METHOD_NONE);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (name == NULL)
+	if (name == NULL) {
+		ofono_debug("%s: Name was NULL. Defaulted to '%s'.", __func__, name ? name : "(NULL)");
 		name = gprs_context_default_name(type);
+	}
 
-	if (name == NULL)
+	if (name == NULL) {
+		ofono_debug("%s: Name was still NULL. Defaulted to typestr '%s'.", __func__, typestr);
 		name = typestr;
+	}
 
-	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH)
+	if (strlen(name) > MAX_CONTEXT_NAME_LENGTH) {
+		ofono_error("%s: Name length (%zu) exceeds maximum allowed (%d).",
+                __func__, strlen(name), MAX_CONTEXT_NAME_LENGTH);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	ctx = gprs_context_by_path(gprs, path);
-	if (ctx == NULL)
+	if (ctx == NULL) {
+		ofono_error("%s: No context found for path '%s'.", __func__, path);
 		return __ofono_error_not_found(msg);
+	}
 
 	/* This context is already being messed with */
-	if (ctx->pending)
+	if (ctx->pending) {
+		ofono_error("%s: Cannot edit context '%s' (ID: %u) - it is currently pending.",
+			__func__, ctx->name, ctx->id);
 		return __ofono_error_busy(msg);
+	}
 
 	if (ctx->type != type) {
 		ctx->type = type;
@@ -2756,8 +3102,8 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 		strcpy(ctx->context.password, password);
 	}
 
-	if (ctx->context.proto != protocal) {
-		ctx->context.proto = protocal;
+	if (ctx->context.proto != protocol) {
+		ctx->context.proto = protocol;
 	}
 
 	if (ctx->context.auth_method != authtype) {
@@ -2796,6 +3142,7 @@ static void gprs_deactivate_for_all(const struct ofono_error *error,
 	struct ofono_gprs *gprs = ctx->gprs;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("failed to deactivate context in %s", __func__);
 		__ofono_dbus_pending_reply(&gprs->pending,
 					__ofono_error_failed(gprs->pending));
 		return;
@@ -2842,17 +3189,27 @@ static DBusMessage *gprs_deactivate_all(DBusConnection *conn,
 	GSList *l;
 	struct pri_context *ctx;
 
-	if (gprs->pending)
+	if (gprs->pending) {
+		ofono_error("%s: Cannot deactivate all contexts - GPRS is "
+			"currently handling a pending operation.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_INVALID))
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments. "
+			"Expected no arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	for (l = gprs->contexts; l; l = l->next) {
 		ctx = l->data;
 
-		if (ctx->pending)
+		if (ctx->pending) {
+			ofono_error("%s: Cannot deactivate all contexts - "
+				"context '%s' (ID: %u) is currently pending.",
+					__func__, ctx->name, ctx->id);
 			return __ofono_error_busy(msg);
+		}
 	}
 
 	gprs->pending = dbus_message_ref(msg);
@@ -2875,8 +3232,11 @@ static DBusMessage *gprs_get_contexts(DBusConnection *conn,
 	struct pri_context *ctx;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -2921,43 +3281,70 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 	struct pri_context *context = NULL;
 
 	/* Sanity check */
-	if (ap == NULL)
+	if (ap == NULL) {
+		ofono_error("%s: Provision data (ap) is NULL.", __func__);
 		return;
+	}
 
-	if (ap->name && strlen(ap->name) > MAX_CONTEXT_NAME_LENGTH)
+	if (ap->name && strlen(ap->name) > MAX_CONTEXT_NAME_LENGTH) {
+		ofono_error("%s: Context name '%s' exceeds maximum length (%d).",
+                __func__, ap->name, MAX_CONTEXT_NAME_LENGTH);
 		return;
+	}
 
-	if (is_valid_apn(ap->apn) == FALSE)
+	if (is_valid_apn(ap->apn) == FALSE) {
+		ofono_error("%s: APN '%s' is invalid.",
+			__func__, ap->apn ? ap->apn : "(NULL)");
 		return;
+	}
 
 	if (ap->username &&
-			strlen(ap->username) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+			strlen(ap->username) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
+		ofono_error("%s: Username '%s' exceeds maximum length (%d).",
+                __func__, ap->username, OFONO_GPRS_MAX_USERNAME_LENGTH);
 		return;
+	}
 
 	if (ap->password &&
-			strlen(ap->password) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+			strlen(ap->password) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
+		ofono_error("%s: Password exceeds maximum length (%d).",
+                __func__, OFONO_GPRS_MAX_PASSWORD_LENGTH);
 		return;
+	}
 
 	if (ap->message_proxy &&
-			strlen(ap->message_proxy) > MAX_MESSAGE_PROXY_LENGTH)
+			strlen(ap->message_proxy) > MAX_MESSAGE_PROXY_LENGTH) {
+		ofono_error("%s: Message proxy '%s' exceeds maximum length (%d).",
+                __func__, ap->message_proxy, MAX_MESSAGE_PROXY_LENGTH);
 		return;
+	}
 
 	if (ap->message_center &&
-			strlen(ap->message_center) > MAX_MESSAGE_CENTER_LENGTH)
+			strlen(ap->message_center) > MAX_MESSAGE_CENTER_LENGTH) {
+		ofono_error("%s: Message center '%s' exceeds maximum length (%d).",
+                __func__, ap->message_center, MAX_MESSAGE_CENTER_LENGTH);
 		return;
+	}
 
 	if (gprs->last_context_id)
 		id = l_uintset_find_unused(gprs->used_pids,
 							gprs->last_context_id);
 	else
 		id = l_uintset_find_unused_min(gprs->used_pids);
-	if (id > l_uintset_get_max(gprs->used_pids))
+
+	if (id > l_uintset_get_max(gprs->used_pids)) {
+		ofono_error("%s: Generated context ID (%u) exceeds maximum allowed (%ld).",
+                __func__, id, (long)l_uintset_get_max(gprs->used_pids));
 		return;
+	}
 
 	context = pri_context_create(gprs, ap->name, ap->type,
 		ap->apn, ap->username, ap->password, ap->proto, ap->auth_method);
-	if (context == NULL)
+	if (context == NULL) {
+		ofono_error("%s: Failed to create context with APN '%s'.",
+                __func__, ap->apn ? ap->apn : "(NULL)");
 		return;
+	}
 
 	l_uintset_put(gprs->used_pids, id);
 	context->id = id;
@@ -2985,8 +3372,11 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 
 	context->context.type = ap->type;
 
-	if (context_dbus_register(context) == FALSE)
+	if (context_dbus_register(context) == FALSE) {
+		ofono_error("%s: Failed to register context '%s' to D-Bus.",
+			__func__, context->name);
 		return;
+	}
 
 	gprs->last_context_id = id;
 
@@ -3005,11 +3395,13 @@ static void provision_contexts(struct ofono_gprs *gprs, const char *mcc,
 	int count;
 	int i;
 
-	ofono_info("provision_contexts  mcc = %s; mnc = %s", mcc, mnc);
+	ofono_debug("%s: Starting provisioning with MCC='%s', MNC='%s', SPN='%s'.",
+            __func__, mcc ? mcc : "(NULL)", mnc ? mnc : "(NULL)", spn ? spn : "(NULL)");
 
 	if (__ofono_gprs_provision_get_settings(mcc, mnc, spn,
 						&settings, &count) == FALSE) {
-		ofono_warn("Provisioning failed");
+		ofono_warn("%s: Provisioning failed for MCC='%s', MNC='%s', SPN='%s'.",
+                __func__, mcc ? mcc : "(NULL)", mnc ? mnc : "(NULL)", spn ? spn : "(NULL)");
 		return;
 	}
 
@@ -3026,7 +3418,8 @@ static void remove_context(struct ofono_gprs *gprs,
 	const char *atompath;
 
 	if (gprs->settings) {
-		ofono_debug("remove context context name:%s", ctx->key);
+		ofono_info("%s: Removing settings for context '%s'.",
+			__func__, ctx->name);
 		g_key_file_remove_group(gprs->settings, ctx->key, NULL);
 		storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
 	}
@@ -3053,8 +3446,11 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 	DBusMessage *reply;
 	GSList *l;
 
-	if (gprs->pending)
+	if (gprs->pending) {
+		ofono_error("%s: Cannot reset contexts - GPRS is currently "
+			"handling a pending operation.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	/*
 	 * We want __ofono_error_busy to take precedence over
@@ -3064,18 +3460,26 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 	for (l = gprs->contexts; l; l = l->next) {
 		struct pri_context *ctx = l->data;
 
-		if (ctx->pending)
+		if (ctx->pending) {
+			ofono_error("%s: Cannot reset contexts - context '%s' (ID: %u) "
+				"is currently pending.", __func__, ctx->name, ctx->id);
 			return __ofono_error_busy(msg);
+		}
 	}
 
-	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_INVALID))
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments. Expected no arguments.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	release_active_contexts(gprs);
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.", __func__);
 		return NULL;
+	}
 
 	/* Remove first the current contexts, re-provision after */
 
@@ -3109,15 +3513,24 @@ static DBusMessage *gprs_request_network(DBusConnection *conn,
 	const char *typestr;
 	enum ofono_gprs_context_type type;
 
-	if (gprs->pending)
+	if (gprs->pending) {
+		ofono_error("%s: Cannot setup network - GPRS is currently "
+			"handling a pending operation.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments. Expected a "
+			"single string argument for 'type'.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (gprs_context_string_to_type(typestr, &type) == FALSE)
+	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
+		ofono_error("%s: Invalid context type string '%s'.",
+			__func__, typestr ? typestr : "(NULL)");
 		return __ofono_error_invalid_format(msg);
+	}
 
 	ctx = gprs_context_by_type(gprs, type);
 	if (ctx != NULL) {
@@ -3137,15 +3550,24 @@ static DBusMessage *gprs_release_network(DBusConnection *conn,
 	const char *typestr;
 	enum ofono_gprs_context_type type;
 
-	if (gprs->pending)
+	if (gprs->pending) {
+		ofono_error("%s: Cannot release network - GPRS is "
+			"currently handling a pending operation.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments. "
+			"Expected a single string argument for 'type'.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (gprs_context_string_to_type(typestr, &type) == FALSE)
+	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
+		ofono_error("%s: Invalid context type string '%s'.",
+			__func__, typestr ? typestr : "(NULL)");
 		return __ofono_error_invalid_format(msg);
+	}
 
 	ctx = gprs_context_by_type(gprs, type);
 	if (ctx != NULL) {
@@ -3213,7 +3635,7 @@ static const GDBusSignalTable manager_signals[] = {
 
 void ofono_gprs_detached_notify(struct ofono_gprs *gprs)
 {
-	DBG("%s", __ofono_atom_get_path(gprs->atom));
+	ofono_info("%s: %s", __func__, __ofono_atom_get_path(gprs->atom));
 
 	gprs->driver_attached = FALSE;
 	gprs_attached_update(gprs);
@@ -3224,8 +3646,8 @@ void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path;
 
-	ofono_debug("%s status %s (%d)", __func__,
-			registration_status_to_string(status), status);
+	ofono_debug("%s: Current status: %s (%d).", __func__,
+		registration_status_to_string(status), status);
 
 	if (gprs->status != status) {
 		gprs->status = status;
@@ -3733,7 +4155,7 @@ static void free_contexts(struct ofono_gprs *gprs)
 {
 	GSList *l;
 
-	ofono_debug("free_contexts");
+	ofono_debug("%s: Starting to free all GPRS contexts.", __func__);
 
 	if (gprs->settings) {
 		storage_close(gprs->imsi, SETTINGS_STORE,
@@ -3948,7 +4370,8 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 
 	if (sscanf(group, "context%d", &id) != 1) {
 		if (sscanf(group, "primarycontext%d", &id) != 1) {
-			ofono_error("load_context primarycontext");
+			ofono_error("%s: Failed to parse group '%s'. Expected format "
+				"'context%d' or 'primarycontext%d'.", __func__, group, id, id);
 			goto error;
 		}
 
@@ -3956,24 +4379,28 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	}
 
 	if (id < 1 || id > MAX_CONTEXTS) {
-		ofono_error("load_context id invalid");
+		ofono_error("%s: Invalid context ID '%u' in group '%s'. Must be "
+			"between 1 and %d.", __func__, id, group, MAX_CONTEXTS);
 		goto error;
 	}
 
 	name = g_key_file_get_string(gprs->settings, group, "Name", NULL);
 	if (name == NULL) {
-		ofono_error("load_context name invalid");
+		ofono_error("%s: 'Name' field is missing or invalid in group '%s'.",
+			__func__, group);
 		goto error;
 	}
 
 	typestr = g_key_file_get_string(gprs->settings, group, "Type", NULL);
 	if (typestr == NULL) {
-		ofono_error("load_context type invalid");
+		ofono_error("%s: 'Type' field is missing or invalid in group '%s'.",
+			__func__, group);
 		goto error;
 	}
 
 	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
-		ofono_error("load_context type invalid1");
+		ofono_error("%s: Invalid Type string '%s' in group '%s'.",
+			__func__, typestr, group);
 		goto error;
 	}
 
@@ -3983,50 +4410,58 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 		protostr = g_strdup("IPV4V6");
 
 	if (gprs_proto_from_string(protostr, &proto) == FALSE) {
-		ofono_error("load_context protocol invalid");
+		ofono_error("%s: Invalid Protocol string '%s' in group '%s'.",
+			__func__, protostr, group);
 		goto error;
 	}
 
 	username = g_key_file_get_string(gprs->settings, group,
 						"Username", NULL);
 	if (username == NULL) {
-		ofono_error("load_context username invalid");
+		ofono_error("%s: 'Username' field is missing or invalid in group '%s'.",
+			__func__, group);
 		goto error;
 	}
 
 	if (strlen(username) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
-		ofono_error("load_context username invalid1");
+		ofono_error("%s: 'Username' length (%zu) exceeds maximum allowed (%d) in group '%s'.",
+			__func__, strlen(username), OFONO_GPRS_MAX_USERNAME_LENGTH, group);
 		goto error;
 	}
 
 	password = g_key_file_get_string(gprs->settings, group,
 						"Password", NULL);
 	if (password == NULL) {
-		ofono_error("load_context password invalid");
+		ofono_error("%s: 'Password' field is missing or invalid in group '%s'.",
+			__func__, group);
 		goto error;
 	}
 
 	authstr = g_key_file_get_string(gprs->settings, group,
 						"AuthenticationMethod", NULL);
 	if (authstr == NULL) {
-		ofono_error("load_context auth invalid");
+		ofono_warn("%s: 'AuthenticationMethod' field missing in group '%s'. "
+			"Defaulting to 'chap'.", __func__, group);
 		authstr = g_strdup("chap");
 	}
 
 	if (gprs_auth_method_from_string(authstr, &auth) == FALSE) {
-		ofono_error("load_context auth invalid1");
+		ofono_error("%s: Invalid AuthenticationMethod string '%s' in group '%s'.",
+			__func__, authstr, group);
 		goto error;
 	}
 
 	if (strlen(password) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
-		ofono_error("load_context password invalid");
+		ofono_error("%s: 'Password' length (%zu) exceeds maximum allowed (%d) "
+			"in group '%s'.", __func__, strlen(password), OFONO_GPRS_MAX_PASSWORD_LENGTH, group);
 		goto error;
 	}
 
 	apn = g_key_file_get_string(gprs->settings, group,
 					"AccessPointName", NULL);
 	if (apn == NULL) {
-		ofono_error("load_context apn invalid");
+		ofono_error("%s: 'AccessPointName' (APN) field is missing or "
+			"invalid in group '%s'.", __func__, group);
 		goto error;
 	}
 
@@ -4043,13 +4478,15 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	 * invalid ones
 	 */
 	if (apn[0] != '\0' && is_valid_apn(apn) == FALSE) {
-		ofono_error("load_context apn invalid1");
+		ofono_error("%s: APN '%s' in group '%s' is invalid.",
+			__func__, apn, group);
 		goto error;
 	}
 
 	context = pri_context_create(gprs, name, type, apn, username, password, proto, auth);
 	if (context == NULL) {
-		ofono_error("load_context context invalid");
+		ofono_error("%s: Failed to create context for group '%s'.",
+			__func__, group);
 		goto error;
 	}
 
@@ -4067,8 +4504,11 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	if (msgcenter != NULL)
 		strcpy(context->message_center, msgcenter);
 
-	if (context_dbus_register(context) == FALSE)
+	if (context_dbus_register(context) == FALSE) {
+		ofono_error("%s: Failed to register context '%s' to D-Bus.",
+			__func__, context->name);
 		goto error;
+	}
 
 	gprs->last_context_id = id;
 
@@ -4076,8 +4516,9 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 	ret = TRUE;
 
 	if (legacy) {
-		ofono_debug("load_context context name:%s", context->key);
 		write_context_settings(gprs, context);
+		ofono_info("%s: Wrote context settings for '%s' and removed group '%s'.",
+			__func__, context->key, group);
 		g_key_file_remove_group(gprs->settings, group, NULL);
 	}
 
@@ -4210,7 +4651,7 @@ static void gprs_load_settings(struct ofono_gprs *gprs, const char *imsi)
 		}
 
 remove:
-		ofono_debug("gprs_load_settings group name:%s", groups[i]);
+		ofono_debug("%s: Removing invalid group '%s' from settings.", __func__, groups[i]);
 		g_key_file_remove_group(gprs->settings, groups[i], NULL);
 	}
 
