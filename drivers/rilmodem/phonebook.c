@@ -1361,7 +1361,7 @@ static void ril_update_fdn_entry(struct ofono_phonebook *pb,
 
 	cbd = cb_data_new(cb, data, pb);
 
-	string_to_phone_number(new_number, &phone_number);
+	string_to_phone_number(new_number, &phone_number, TRUE);
 
 	sim_adn_build(effdn, rec_len, &phone_number, identifier);
 
