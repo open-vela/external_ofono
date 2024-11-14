@@ -787,10 +787,14 @@ const char *phone_number_to_string(const struct ofono_phone_number *ph)
 	return buffer;
 }
 
-void string_to_phone_number(const char *str, struct ofono_phone_number *ph)
+void string_to_phone_number(const char *str, struct ofono_phone_number *ph, gboolean skip_plus)
 {
 	if (str[0] == '+') {
-		strcpy(ph->number, str+1);
+		if (skip_plus) {
+			strcpy(ph->number, str + 1);
+		} else {
+			strcpy(ph->number, str);
+		}
 		ph->type = 145;	/* International */
 	} else {
 		strcpy(ph->number, str);
