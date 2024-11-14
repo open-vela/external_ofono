@@ -637,7 +637,7 @@ static DBusMessage *voicecall_deflect(DBusConnection *conn,
 
 	vc->pending = dbus_message_ref(msg);
 
-	string_to_phone_number(number, &ph);
+	string_to_phone_number(number, &ph, TRUE);
 
 	vc->driver->deflect(vc, &ph, generic_callback, vc);
 
@@ -1587,7 +1587,7 @@ static struct voicecall *synthesize_outgoing_call(struct ofono_voicecall *vc,
 	__ofono_modem_callid_hold(modem, call->id);
 
 	if (number)
-		string_to_phone_number(number, &call->phone_number);
+		string_to_phone_number(number, &call->phone_number, TRUE);
 
 	call->direction = CALL_DIRECTION_MOBILE_ORIGINATED;
 	call->status = CALL_STATUS_DIALING;
@@ -1774,7 +1774,7 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 		}
 	}
 
-	string_to_phone_number(number_dial, &ph);
+	string_to_phone_number(number_dial, &ph, TRUE);
 
 	if (vc->settings) {
 		g_key_file_set_string(vc->settings, SETTINGS_GROUP,
@@ -2691,7 +2691,7 @@ static DBusMessage *manager_deflect(DBusConnection *conn,
 
 	vc->pending = dbus_message_ref(msg);
 
-	string_to_phone_number(number, &ph);
+	string_to_phone_number(number, &ph, TRUE);
 
 	vc->driver->deflect(vc, &ph, generic_callback, vc);
 

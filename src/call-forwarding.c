@@ -796,7 +796,7 @@ static DBusMessage *cf_set_property(DBusConnection *conn, DBusMessage *msg,
 			return __ofono_error_not_available(msg);
 
 		if (number[0] != '\0')
-			string_to_phone_number(number, &ph);
+			string_to_phone_number(number, &ph, FALSE);
 
 		timeout = cf_cond_find_timeout(cf->cf_conditions[type], cls);
 
@@ -1005,12 +1005,15 @@ static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
 		strcpy(ph.number, number);
 	ph.type = OFONO_NUMBER_TYPE_UNKNOWN;
 
-	if (ph.number[0] != '\0')
+	if (ph.number[0] != '\0') {
+		if (ph.number[0] == '+') {
+			ph.type = OFONO_NUMBER_TYPE_INTERNATIONAL;
+		}
 		cf->driver->registration(cf, type, cls, &ph, DEFAULT_NO_REPLY_TIMEOUT,
-				set_call_forwarding_cb, cf);
-	else
+					 set_call_forwarding_cb, cf);
+	} else {
 		cf->driver->erasure(cf, type, cls, set_call_forwarding_cb, cf);
-
+	}
 	return NULL;
 }
 
@@ -1348,7 +1351,7 @@ static gboolean cf_ss_control(int type, const char *sc,
 
 	switch (cf->ss_req->ss_type) {
 	case SS_CONTROL_TYPE_REGISTRATION:
-		string_to_phone_number(sia, &ph);
+		string_to_phone_number(sia, &ph, FALSE);
 		cf->driver->registration(cf, cf_type, cls, &ph, timeout,
 					cf_ss_control_callback, cf);
 		break;

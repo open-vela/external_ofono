@@ -882,7 +882,7 @@ static DBusMessage *sim_set_property(DBusConnection *conn, DBusMessage *msg,
 				goto error;
 
 			own = g_new0(struct ofono_phone_number, 1);
-			string_to_phone_number(value, own);
+			string_to_phone_number(value, own, TRUE);
 
 			own_numbers = g_slist_prepend(own_numbers, own);
 
