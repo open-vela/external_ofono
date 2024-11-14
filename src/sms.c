@@ -581,7 +581,7 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 				sms->driver->sca_query == NULL)
 			return __ofono_error_not_implemented(msg);
 
-		string_to_phone_number(value, &sca);
+		string_to_phone_number(value, &sca, TRUE);
 
 		sms->pending = dbus_message_ref(msg);
 
