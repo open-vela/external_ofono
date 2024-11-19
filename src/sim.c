@@ -2258,20 +2258,28 @@ static void discover_apps_cb(const struct ofono_error *error,
 	}
 }
 
-static void sim_imsi_obtained(struct ofono_sim *sim, const char *imsi)
+static gboolean sim_mccmnc_update(const char *mcc, const char *mnc,
+		const char *imsi, int mnc_len)
 {
-	DBusConnection *conn = ofono_dbus_get_connection();
-	const char *path = __ofono_atom_get_path(sim->atom);
+	if (mcc == NULL || strlen(mcc) == 0 || mnc == NULL ||
+			strlen(mnc) == 0) {
+		return TRUE;
+	}
 
-	g_free(sim->imsi);
-	sim->imsi = g_strdup(imsi);
+	if ((strncmp(imsi, mcc, OFONO_MAX_MCC_LENGTH) == 0) &&
+			(strncmp(imsi, mnc, mnc_len) == 0)) {
+		return FALSE;
+	}
 
-	ofono_dbus_signal_property_changed(conn, path,
-						OFONO_SIM_MANAGER_INTERFACE,
-						"SubscriberIdentity",
-						DBUS_TYPE_STRING, &sim->imsi);
+	return TRUE;
+}
 
-	if (sim->mnc_length) {
+static void sim_mccmnc_obtained(struct ofono_sim *sim, const char *imsi)
+{
+	if (sim->mnc_length &&
+			sim_mccmnc_update(sim->mcc, sim->mnc, imsi, sim->mnc_length)) {
+		DBusConnection *conn = ofono_dbus_get_connection();
+		const char *path = __ofono_atom_get_path(sim->atom);
 		const char *str;
 
 		strncpy(sim->mcc, sim->imsi, OFONO_MAX_MCC_LENGTH);
@@ -2295,6 +2303,35 @@ static void sim_imsi_obtained(struct ofono_sim *sim, const char *imsi)
 
 	sim_set_ready(sim);
 
+}
+
+static void sim_imsi_obtained(struct ofono_sim *sim, const char *imsi)
+{
+	if (imsi == NULL || strlen(imsi) == 0) {
+		ofono_error("Unable to read IMSI, imsi is empty in %s ", __func__);
+		return;
+	}
+
+	if (sim->imsi != NULL && strcmp(sim->imsi, imsi) == 0) {
+		ofono_info("Imsi is exist so return in %s ", __func__);
+		return;
+	}
+
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(sim->atom);
+
+	g_free(sim->imsi);
+	sim->imsi = g_strdup(imsi);
+
+	ofono_dbus_signal_property_changed(conn, path,
+						OFONO_SIM_MANAGER_INTERFACE,
+						"SubscriberIdentity",
+						DBUS_TYPE_STRING, &sim->imsi);
+
+	if (strncmp(imsi, OFONO_CHINA_MCC_CODE, OFONO_MAX_MCC_LENGTH) == 0) {
+		sim->mnc_length = OFONO_CHINA_MNC_LENGTH;
+		sim_mccmnc_obtained(sim, imsi);
+	}
 }
 
 static void sim_efimsi_cb(const struct ofono_error *error,
@@ -2330,6 +2367,7 @@ static void sim_efimsi_cb(const struct ofono_error *error,
 		goto error;
 
 	sim_imsi_obtained(sim, imsi + 1);
+	sim_mccmnc_obtained(sim, imsi + 1);
 	return;
 
 error:
@@ -2343,26 +2381,22 @@ static void sim_imsi_cb(const struct ofono_error *error, const char *imsi,
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
 		sim_imsi_obtained(sim, imsi);
-		return;
 	}
-
-	/* Driver function failed, try via EF reads if possible */
-	if (sim->driver->read_file_transparent == NULL) {
-		ofono_error("Unable to read IMSI, emergency calls only");
-		return;
-	}
-
-	sim->driver->read_file_transparent(sim, SIM_EFIMSI_FILEID, 0, 9,
-						NULL, 0, sim_efimsi_cb, sim);
 }
 
-static void sim_retrieve_imsi(struct ofono_sim *sim)
+static void sim_get_imsi_info(struct ofono_sim *sim)
 {
+	if (sim == NULL || sim->driver == NULL)
+		return;
+
 	if (sim->driver->read_imsi) {
 		sim->driver->read_imsi(sim, sim_imsi_cb, sim);
 		return;
 	}
+}
 
+static void sim_efimsi_read(struct ofono_sim *sim)
+{
 	if (sim->driver->read_file_transparent == NULL) {
 		ofono_error("IMSI retrieval not implemented,"
 			" only emergency calls will be available");
@@ -2417,7 +2451,7 @@ static void sim_efbdn_info_read_cb(int ok, unsigned char file_status,
 
 out:
 	if (!sim->fixed_dialing && !sim->barred_dialing)
-		sim_retrieve_imsi(sim);
+		sim_efimsi_read(sim);
 }
 
 static gboolean check_bdn_status(struct ofono_sim *sim)
@@ -2454,7 +2488,7 @@ static void sim_efadn_info_read_cb(int ok, unsigned char file_status,
 out:
 	if (check_bdn_status(sim) != TRUE) {
 		if (!sim->fixed_dialing && !sim->barred_dialing)
-			sim_retrieve_imsi(sim);
+			sim_efimsi_read(sim);
 	}
 }
 
@@ -2493,7 +2527,7 @@ static void sim_efsst_read_cb(int ok, int length, int record,
 		return;
 
 out:
-	sim_retrieve_imsi(sim);
+	sim_efimsi_read(sim);
 }
 
 static void sim_efest_read_cb(int ok, int length, int record,
@@ -2538,7 +2572,7 @@ static void sim_efest_read_cb(int ok, int length, int record,
 
 out:
 	if (!sim->fixed_dialing && !sim->barred_dialing)
-		sim_retrieve_imsi(sim);
+		sim_efimsi_read(sim);
 }
 
 static void sim_efust_read_cb(int ok, int length, int record,
@@ -2581,7 +2615,7 @@ static void sim_efust_read_cb(int ok, int length, int record,
 	}
 
 out:
-	sim_retrieve_imsi(sim);
+	sim_efimsi_read(sim);
 }
 
 static void sim_cphs_information_read_cb(int ok, int length, int record,
@@ -2672,6 +2706,8 @@ static void sim_initialize_after_pin(struct ofono_sim *sim)
 	 */
 	if (sim->driver->list_apps)
 		sim->driver->list_apps(sim, discover_apps_cb, sim);
+
+	sim_get_imsi_info(sim);
 
 	ofono_sim_read(sim->context, SIM_EFPHASE_FILEID,
 			OFONO_SIM_FILE_STRUCTURE_TRANSPARENT,
