@@ -2307,18 +2307,13 @@ static void sim_mccmnc_obtained(struct ofono_sim *sim, const char *imsi)
 
 static void sim_imsi_obtained(struct ofono_sim *sim, const char *imsi)
 {
-	if (imsi == NULL || strlen(imsi) == 0) {
-		ofono_error("Unable to read IMSI, imsi is empty in %s ", __func__);
-		return;
-	}
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(sim->atom);
 
 	if (sim->imsi != NULL && strcmp(sim->imsi, imsi) == 0) {
 		ofono_info("Imsi is exist so return in %s ", __func__);
 		return;
 	}
-
-	DBusConnection *conn = ofono_dbus_get_connection();
-	const char *path = __ofono_atom_get_path(sim->atom);
 
 	g_free(sim->imsi);
 	sim->imsi = g_strdup(imsi);
@@ -2391,12 +2386,16 @@ static void sim_get_imsi_info(struct ofono_sim *sim)
 
 	if (sim->driver->read_imsi) {
 		sim->driver->read_imsi(sim, sim_imsi_cb, sim);
-		return;
 	}
 }
 
 static void sim_efimsi_read(struct ofono_sim *sim)
 {
+	if (sim->imsi) {
+		sim_mccmnc_obtained(sim, sim->imsi);
+		return;
+	}
+
 	if (sim->driver->read_file_transparent == NULL) {
 		ofono_error("IMSI retrieval not implemented,"
 			" only emergency calls will be available");
