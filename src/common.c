@@ -1025,6 +1025,8 @@ const char *registration_status_to_string(int status)
 		return "registered";
 	case NETWORK_REGISTRATION_STATUS_ROAMING_SMS_EUTRAN:
 		return "roaming";
+	case NETWORK_REGISTRATION_STATUS_REGISTED_EM:
+		return "registered_em";
 	case NETWORK_REGISTRATION_STATUS_NOT_REGISTERED_EM:
 		return "unregistered_em";
 	case NETWORK_REGISTRATION_STATUS_SEARCHING_EM:

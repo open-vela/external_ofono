@@ -186,6 +186,7 @@ int ril_util_registration_state_to_status(int reg_state)
 	case RIL_REG_STATE_ROAMING:
 		break;
 
+	case RIL_REG_STATE_EMERGENCY_REGISTED:
 	case RIL_REG_STATE_EMERGENCY_NOT_REGISTERED:
 	case RIL_REG_STATE_EMERGENCY_SEARCHING:
 	case RIL_REG_STATE_EMERGENCY_DENIED:
