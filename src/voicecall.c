@@ -39,7 +39,6 @@
 #include "storage.h"
 #include "missing.h"
 
-#define MAX_DTMF_BUFFER 32
 #define MAX_VOICE_CALLS 16
 #define MAX_IMS_CONFERENCE_CALLS 5
 
@@ -1767,7 +1766,7 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 				OFONO_VOICE, OFONO_NORMAL, "NA");
 	}
 
-	if (valid_actual_number_format(post_dial, MAX_DTMF_BUFFER)) {
+	if (strlen(post_dial) > 0) {
 		int err = tone_queue(vc, post_dial, NULL, data, NULL, FALSE);
 		if (err < 0) {
 			ofono_error("Failed to play post dial string %s", post_dial);
