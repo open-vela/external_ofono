@@ -78,6 +78,7 @@ struct ofono_error {
 
 #define OFONO_MAX_PHONE_NUMBER_LENGTH 80
 #define OFONO_MAX_CALLER_NAME_LENGTH 80
+#define MAX_DTMF_BUFFER 32
 
 /* Number types, 3GPP TS 24.008 subclause 10.5.4.7, octect 3 */
 /* Unknown, ISDN numbering plan */
