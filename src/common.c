@@ -543,7 +543,9 @@ void parse_post_dial_string(const char *str, char *target, char *postdial)
 			strcpy(target, post[0]);
 		}
 		if (post[1] != NULL && strlen(post[1]) > 0) {
-			strcpy(postdial, post[1]);
+			if (valid_actual_number_format(post[1], MAX_DTMF_BUFFER - 1)) {
+				strcpy(postdial, post[1]);
+			}
 		}
 		g_strfreev(post);
 	}
