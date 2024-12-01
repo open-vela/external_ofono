@@ -281,6 +281,8 @@ static void modem_load_settings(struct ofono_modem *modem)
 {
 	modem->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
 	if (modem->settings == NULL) {
+		ofono_info("%s: Failed to open Modem [%s] settings storage with key '%s' and store '%s'.",
+			__func__, ofono_modem_get_path(modem), SETTINGS_KEY, SETTINGS_STORE);
 		return;
 	}
 
@@ -427,7 +429,8 @@ static void radio_status_change(struct ofono_modem *modem,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_devinfo *info;
 
-	ofono_debug("%s old status : %d  new status : %d", __func__, old_status, new_status);
+	ofono_debug("%s, Modem [%s], old status : %d  new status : %d", __func__,
+		ofono_modem_get_path(modem), old_status, new_status);
 
 	/* radio state depends on modem state somehow */
 	if (modem->powered == FALSE
@@ -722,7 +725,8 @@ static void modem_change_state(struct ofono_modem *modem,
 	struct ofono_modem_driver const *driver = modem->driver;
 	enum modem_state old_state = modem->modem_state;
 
-	ofono_debug("%s, old state: %d, new state: %d", __func__, old_state, new_state);
+	ofono_debug("%s, Modem [%s], old state: %d, new state: %d",
+		__func__, ofono_modem_get_path(modem), old_state, new_state);
 
 	if (old_state == new_state)
 		return;
@@ -827,13 +831,16 @@ static void enable_modem_abnormal_event_default_cb(const struct ofono_error *err
 		ofono_debug("set_modem_abnormal_event_report_default_cb:%d", status);
 	}
 }
+
 static void common_online_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_modem *modem = data;
 	enum radio_status old_radio_state = modem->radio_status;
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		return;
+	}
 
 	modem->radio_status = RADIO_STATUS_ON;
 	radio_status_change(modem, old_radio_state, RADIO_STATUS_ON);
@@ -846,8 +853,10 @@ static void online_cb(const struct ofono_error *error, void *data)
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(modem->pending);
-	else
+	else {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		reply = __ofono_error_failed(modem->pending);
+	}
 
 	__ofono_dbus_pending_reply(&modem->pending, reply);
 }
@@ -857,8 +866,10 @@ static void common_offline_cb(const struct ofono_error *error, void *data)
 	struct ofono_modem *modem = data;
 	enum radio_status old_radio_state = modem->radio_status;
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		return;
+	}
 
 	modem->radio_status = RADIO_STATUS_OFF;
 	radio_status_change(modem, old_radio_state, RADIO_STATUS_OFF);
@@ -871,8 +882,10 @@ static void offline_cb(const struct ofono_error *error, void *data)
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(modem->pending);
-	else
+	else {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		reply = __ofono_error_failed(modem->pending);
+	}
 
 	__ofono_dbus_pending_reply(&modem->pending, reply);
 }
@@ -913,7 +926,8 @@ static void modem_activity_info_query_cb(const struct ofono_error *error,
 	DBusMessageIter args;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during modem access activity info query");
+		ofono_error("%s: Modem [%s] - Error occurred while querying modem activity info: %d", 
+                    __func__, ofono_modem_get_path(modem), (int)error->type);
 
 		reply = __ofono_error_failed(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
@@ -982,7 +996,7 @@ static void enable_modem_abnormal_event_cb(const struct ofono_error *error, int 
 		__ofono_dbus_pending_reply(&modem->pending, reply);
 
 		return;
-        }
+    }
 
 	reply = dbus_message_new_method_return(modem->pending);
 	dbus_message_iter_init_append(reply, &iter);
@@ -1119,7 +1133,7 @@ static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc
 	DBusMessageIter iter;
 	const char *key = "CarrierConfig";
 
-	ofono_info("provision_carrier_configs  mcc = %s; mnc = %s", mcc, mnc);
+	ofono_info("%s: Initiating carrier configuration provisioning for MCC: %s, MNC: %s", __func__, mcc, mnc);
 	if (modem->configs) {
 		__ofono_carrier_config_free_configs(modem->configs);
 		modem->configs = NULL;
@@ -1127,7 +1141,7 @@ static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc
 
 	if (__ofono_carrier_config_get_configs(mcc, mnc, 0, "",
 						&modem->configs) == FALSE) {
-		ofono_warn("provision_carrier_configs failed");
+		ofono_error("%s: Failed to provision carrier configurations for MCC: %s, MNC: %s", __func__, mcc, mnc);
 		return;
 	}
 
@@ -1135,8 +1149,10 @@ static void provision_carrier_configs(struct ofono_modem *modem, const char *mcc
 		signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
 				"PropertyChanged");
 
-		if (signal == NULL)
+		if (signal == NULL) {
+			ofono_error("%s: Failed to create D-Bus signal for 'PropertyChanged' event.", __func__);
 			return;
+		}
 
 		dbus_message_iter_init_append(signal, &iter);
 		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
@@ -1153,7 +1169,7 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 	struct ofono_sim *sim;
 	GSList *l;
 
-	ofono_info("modem - %s, sim state = %d", __func__, new_state);
+	ofono_info("%s: sim state = %d", __func__, new_state);
 
 	modem = user;
 	if (modem == NULL)
@@ -1183,32 +1199,55 @@ static DBusMessage *set_property_online(struct ofono_modem *modem,
 {
 	ofono_bool_t online;
 
-	if (modem->powered == FALSE
-		|| modem->radio_status == RADIO_STATUS_UNAVAILABLE)
+	if (modem->powered == FALSE) {
+		ofono_error("%s: Modem [%s] is not powered", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_available(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(var) != DBUS_TYPE_BOOLEAN)
+	if (modem->radio_status == RADIO_STATUS_UNAVAILABLE) {
+		ofono_error("%s: Modem [%s] radio state is unavailable", __func__, ofono_modem_get_path(modem));
+		return __ofono_error_not_available(msg);
+	}
+
+	if (dbus_message_iter_get_arg_type(var) != DBUS_TYPE_BOOLEAN) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(var));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(var, &online);
 
-	if (modem->pending != NULL)
+	if (modem->pending != NULL) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
-	if (modem->modem_state != MODEM_STATE_ALIVE)
+	if (modem->modem_state != MODEM_STATE_ALIVE) {
+		 ofono_error("%s: Modem [%s] state is not alive, cannot change online status",
+		 	__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_allowed(msg);
+	}
 
-	if (modem->online == online)
+	if (modem->online == online) {
+		ofono_debug("%s: Modem [%s]'s 'Online' is already set to '%s'. No changes needed.",
+			__func__, ofono_modem_get_path(modem), online ? "TRUE" : "FALSE");
 		return dbus_message_new_method_return(msg);
+	}
 
-	if (ofono_modem_get_emergency_mode(modem) == TRUE)
+	if (ofono_modem_get_emergency_mode(modem) == TRUE) {
+		  ofono_error("%s: Modem [%s] is in emergency mode, cannot change online status",
+		  	__func__, ofono_modem_get_path(modem));
 		return __ofono_error_emergency_active(msg);
+	}
 
 	if (modem_is_always_online(modem) == TRUE) {
 		if (online)
 			return dbus_message_new_method_return(msg);
-		else
+		else {
+			ofono_error("%s: Modem [%s] driver's 'set_online' function is not implemented.",
+				__func__, ofono_modem_get_path(modem));
 			return __ofono_error_not_implemented(msg);
+		}
 	}
 
 	modem->pending = dbus_message_ref(msg);
@@ -1322,8 +1361,11 @@ static DBusMessage *modem_get_properties(DBusConnection *conn,
 	DBusMessageIter dict;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Modem [%s] - Failed to create D-Bus reply message",
+			__func__, ofono_modem_get_path(modem));
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -1341,8 +1383,11 @@ static int set_powered(struct ofono_modem *modem, ofono_bool_t powered)
 	const struct ofono_modem_driver *driver = modem->driver;
 	int err = -EINVAL;
 
-	if (modem->powered_pending == powered)
+	if (modem->powered_pending == powered) {
+		ofono_debug("%s: Modem [%s]'s 'Powered' is already set to '%s'. No changes needed.",
+			__func__, ofono_modem_get_path(modem), powered ? "TRUE" : "FALSE");
 		return -EALREADY;
+	}
 
 	/* Remove the atoms even if the driver is no longer available */
 	if (powered == FALSE)
@@ -1350,8 +1395,11 @@ static int set_powered(struct ofono_modem *modem, ofono_bool_t powered)
 
 	modem->powered_pending = powered;
 
-	if (driver == NULL)
+	if (driver == NULL) {
+		ofono_error("%s: Modem [%s] - Driver is not available", __func__,
+		 	ofono_modem_get_path(modem));
 		return -EINVAL;
+	}
 
 	if (powered == TRUE) {
 		if (driver->enable)
@@ -1411,6 +1459,7 @@ static gboolean set_powered_timeout(gpointer user)
 	if (modem->pending != NULL) {
 		DBusMessage *reply;
 
+		ofono_error("%s: timed out", __func__);
 		reply = __ofono_error_timed_out(modem->pending);
 		__ofono_dbus_pending_reply(&modem->pending, reply);
 
@@ -1525,20 +1574,30 @@ static DBusMessage *modem_set_property(DBusConnection *conn,
 	DBusMessageIter iter, var;
 	const char *name;
 
-	if (dbus_message_iter_init(msg, &iter) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &name);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (powering_down == TRUE)
+	if (powering_down == TRUE) {
+		 ofono_error("%s: Cannot set property while powering down.", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
@@ -1549,30 +1608,47 @@ static DBusMessage *modem_set_property(DBusConnection *conn,
 		ofono_bool_t powered;
 		int err;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &powered);
 
-		if (modem->pending != NULL)
+		if (modem->pending != NULL) {
+			ofono_error("%s: Modem '%s' is currently busy.", __func__, ofono_modem_get_path(modem));
 			return __ofono_error_busy(msg);
+		}
 
-		if (modem->powered == powered)
+		if (modem->powered == powered) {
+			ofono_debug("%s: Modem [%s]'s 'Powered' is already set to '%s'. No changes needed.",
+			__func__, ofono_modem_get_path(modem), powered ? "TRUE" : "FALSE");
 			return dbus_message_new_method_return(msg);
+		}
 
-		if (ofono_modem_get_emergency_mode(modem) == TRUE)
+		if (ofono_modem_get_emergency_mode(modem) == TRUE) {
+			ofono_error("%s: Modem [%s] is in emergency mode, cannot change powered status",
+		  		__func__, ofono_modem_get_path(modem));
 			return __ofono_error_emergency_active(msg);
+		}
 
-		if (modem->lockdown)
+		if (modem->lockdown) {
+			ofono_error("%s: Modem [%s] is lock down, cannot change powered status",
+		  		__func__, ofono_modem_get_path(modem));
 			return __ofono_error_access_denied(msg);
+		}
 
 		if (!powered)
 			__ofono_sim_clear_cached_pins(modem->sim);
 
 		err = set_powered(modem, powered);
 		if (err < 0) {
-			if (err != -EINPROGRESS)
+			if (err != -EINPROGRESS) {
+				ofono_error("%s: Modem [%s] - Failed to set power state.",
+					__func__, ofono_modem_get_path(modem));
 				return __ofono_error_failed(msg);
+			}
 
 			modem->pending = dbus_message_ref(msg);
 			modem->timeout = g_timeout_add_seconds(
@@ -1606,6 +1682,7 @@ static DBusMessage *modem_set_property(DBusConnection *conn,
 	if (g_str_equal(name, "Lockdown"))
 		return set_property_lockdown(modem, msg, &var);
 
+	ofono_error("%s: Unknown property '%s'.", __func__, name);
 	return __ofono_error_invalid_args(msg);
 }
 
@@ -1614,11 +1691,16 @@ static DBusMessage *modem_get_activity_info(DBusConnection *conn, DBusMessage *m
 {
 	struct ofono_modem *modem = data;
 
-	if (modem->driver->query_activity_info == NULL)
+	if (modem->driver->query_activity_info == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'query_activity_info' function is not implemented.",
+				__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (modem->pending)
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
 	modem->pending = dbus_message_ref(msg);
 	modem->driver->query_activity_info(modem, modem_activity_info_query_cb, modem);
@@ -1629,23 +1711,40 @@ static DBusMessage *modem_get_activity_info(DBusConnection *conn, DBusMessage *m
 static DBusMessage *modem_enable_or_disable(struct ofono_modem *modem, ofono_bool_t enable,
 					DBusConnection *conn, DBusMessage *msg)
 {
-	if (modem->driver->enable_modem == NULL)
+	if (modem->driver->enable_modem == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'enable_modem' function is not implemented.",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (modem->pending)
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
-	if (modem->modem_state <= MODEM_STATE_POWER_OFF)
+	if (modem->modem_state <= MODEM_STATE_POWER_OFF) {
+		ofono_error("%s: Modem [%s] - Modem is not powered, cannot %s", 
+            __func__, ofono_modem_get_path(modem), enable ? "enable" : "disable");
 		return __ofono_error_not_allowed(msg);
+	}
 
-	if (enable && modem->modem_state >= MODEM_STATE_ALIVE)
+	if (enable && modem->modem_state >= MODEM_STATE_ALIVE) {
+		ofono_error("%s: Modem [%s] - Modem is already enabled, cannot enable again",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_allowed(msg);
+	}
 
-	if (!enable && modem->modem_state <= MODEM_STATE_AWARE)
+	if (!enable && modem->modem_state <= MODEM_STATE_AWARE) {
+		ofono_error("%s: Modem [%s] - Modem is already disabled, cannot disable again",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_allowed(msg);
+	}
 
-	if (!enable && ofono_modem_get_emergency_mode(modem))
+	if (!enable && ofono_modem_get_emergency_mode(modem)) {
+		ofono_error("%s: Modem [%s] - Cannot disable modem while in emergency mode",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_emergency_active(msg);
+	}
 
 	modem->pending = dbus_message_ref(msg);
 	modem->driver->enable_modem(modem, enable,
@@ -1699,30 +1798,37 @@ static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
 static DBusMessage *enable_modem_abnormal_event(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
-        struct ofono_modem *modem = data;
+    struct ofono_modem *modem = data;
 	int enable;
 	int module_mask;
 	int from_event_id;
 	int to_event_id;
 
-	if (modem->pending)
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
 	if (modem->powered != TRUE) {
-		ofono_error("modem is not powered");
+		ofono_error("%s: Modem [%s] is not powered", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_allowed(msg);
 	}
 
-	if (modem->driver->enable_modem_abnormal_event == NULL)
+	if (modem->driver->enable_modem_abnormal_event == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'enable_modem_abnormal_event' function is not implemented.",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 		DBUS_TYPE_INT32, &enable,
 		DBUS_TYPE_INT32, &module_mask,
 		DBUS_TYPE_INT32, &from_event_id,
 		DBUS_TYPE_INT32, &to_event_id,
-		DBUS_TYPE_INVALID) == FALSE)
-			return __ofono_error_invalid_args(msg);
+		DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
 
 	modem->enable = enable;
 	modem->module_mask = module_mask;
@@ -1754,11 +1860,16 @@ static DBusMessage *modem_get_status(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_modem *modem = data;
 
-	if (modem->driver->query_modem_status == NULL)
+	if (modem->driver->query_modem_status == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'query_modem_status' function is not implemented.",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (modem->pending)
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
 	modem->pending = dbus_message_ref(msg);
 	modem->driver->query_modem_status(modem, modem_status_query_cb, modem);
@@ -1804,27 +1915,42 @@ static DBusMessage *modem_invoke_oem_request_raw(DBusConnection *conn,
 	unsigned char *oem_req;
 	int req_len;
 
-	if (modem->driver->request_oem_raw == NULL)
+	if (modem->driver->request_oem_raw == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'request_oem_raw' function is not implemented.",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (modem->pending)
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__, ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
-	if (dbus_message_iter_init(msg, &iter) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_ARRAY ('a'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &array);
 
-	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE)
+	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_BYTE ('y'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&array));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_fixed_array(&array, &oem_req, &req_len);
 
-	if (req_len == 0)
+	if (req_len == 0) {
+		ofono_error("%s: Request length is invalid (zero length).", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	modem->pending = dbus_message_ref(msg);
 	modem->driver->request_oem_raw(modem, oem_req, req_len,
@@ -1871,24 +1997,38 @@ static DBusMessage *modem_invoke_oem_request_strings(DBusConnection *conn,
 	char *oem_req[DEFAULT_OEM_REQ_STRING_MAX_LEN];
 	int req_len;
 
-	if (modem->driver->request_oem_strings == NULL)
+	if (modem->driver->request_oem_strings == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'request_oem_strings' function is not implemented.",
+			__func__, ofono_modem_get_path(modem));
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (modem->pending)
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__,
+			ofono_modem_get_path(modem));
 		return __ofono_error_busy(msg);
+	}
 
-	if (dbus_message_iter_init(msg, &iter) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_ARRAY ('a'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &entry);
 
 	req_len = 0;
 	while (dbus_message_iter_get_arg_type(&entry) == DBUS_TYPE_STRING) {
-		if (req_len == DEFAULT_OEM_REQ_STRING_MAX_LEN)
+		if (req_len == DEFAULT_OEM_REQ_STRING_MAX_LEN) {
+			ofono_error("%s: Modem [%s] - Request length exceeds maximum allowed (%d).", 
+                __func__, ofono_modem_get_path(modem), DEFAULT_OEM_REQ_STRING_MAX_LEN);
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&entry, &oem_req[req_len++]);
 		dbus_message_iter_next(&entry);
@@ -1910,18 +2050,24 @@ static DBusMessage *modem_handle_command(DBusConnection *conn,
 	int atom_id, command_id;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Modem [%s] - Failed to create D-Bus reply message",
+		 	__func__, ofono_modem_get_path(modem));
 		return NULL;
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_INT32, &atom_id,
 				DBUS_TYPE_INT32, &command_id,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	atom = __ofono_modem_find_atom(modem, atom_id);
 	if (atom != NULL && atom->dispatch != NULL) {
-		ofono_debug("dispatch command to atom : %d with command : %d", atom_id, command_id);
+		ofono_debug("%s: Modem [%s] - Dispatching command to atom: %d, command: %d", 
+            __func__, ofono_modem_get_path(modem), atom_id, command_id);
 		atom->dispatch(command_id, atom);
 	}
 
@@ -2106,8 +2252,10 @@ void ofono_modem_set_powered(struct ofono_modem *modem, ofono_bool_t powered)
 
 		if (powered == modem->powered_pending)
 			reply = dbus_message_new_method_return(modem->pending);
-		else
+		else {
+			ofono_error("pending request failed in %s", __func__);
 			reply = __ofono_error_failed(modem->pending);
+		}
 
 		__ofono_dbus_pending_reply(&modem->pending, reply);
 	}
@@ -2168,8 +2316,10 @@ void ofono_modem_restart(struct ofono_modem *modem)
 	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
 					"ModemRestart");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create D-Bus signal for 'ModemRestart' event.", __func__);
 		return;
+	}
 
 	g_dbus_send_message(conn, signal);
 }
@@ -2192,8 +2342,10 @@ void ofono_oem_hook_raw(struct ofono_modem *modem, unsigned char *response, int 
 	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
 					"OemHookIndication");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create D-Bus signal for 'OemHookIndication' event.", __func__);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 
@@ -2333,8 +2485,10 @@ void ofono_query_device_info_done(struct ofono_devinfo *info)
 	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
 					"DeviceInfoChanged");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create D-Bus signal for 'DeviceInfoChanged' event.", __func__);
 		return;
+	}
 
 	g_dbus_send_message(conn, signal);
 }
@@ -2346,8 +2500,10 @@ static void query_svn_cb(const struct ofono_error *error,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(info->atom);
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		goto out;
+	}
 
 	g_free(info->svn);
 	info->svn = g_strdup(svn);
@@ -2361,8 +2517,11 @@ out:
 
 static void query_svn(struct ofono_devinfo *info)
 {
-	if (info->driver->query_svn == NULL)
+	if (info->driver->query_svn == NULL) {
+		ofono_info("%s: Driver does not implement 'query_svn' function for path %s",
+		 	__func__, __ofono_atom_get_path(info->atom));
 		return;
+	}
 
 	info->driver->query_svn(info, query_svn_cb, info);
 }
@@ -2374,8 +2533,10 @@ static void query_serial_cb(const struct ofono_error *error,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(info->atom);
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		goto out;
+	}
 
 	g_free(info->serial);
 	info->serial = g_strdup(serial);
@@ -2390,8 +2551,11 @@ out:
 
 static void query_serial(struct ofono_devinfo *info)
 {
-	if (info->driver->query_serial == NULL)
+	if (info->driver->query_serial == NULL) {
+		ofono_info("%s: Driver does not implement 'query_serial' function for path %s",
+		 	__func__, __ofono_atom_get_path(info->atom));
 		return;
+	}
 
 	info->driver->query_serial(info, query_serial_cb, info);
 }
@@ -2403,8 +2567,10 @@ static void query_revision_cb(const struct ofono_error *error,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(info->atom);
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		goto out;
+	}
 
 	g_free(info->revision);
 	info->revision = g_strdup(revision);
@@ -2421,6 +2587,8 @@ out:
 static void query_revision(struct ofono_devinfo *info)
 {
 	if (info->driver->query_revision == NULL) {
+		ofono_info("%s: Driver does not implement 'query_revision' function for path %s",
+		 	__func__, __ofono_atom_get_path(info->atom));
 		query_serial(info);
 		return;
 	}
@@ -2435,8 +2603,10 @@ static void query_model_cb(const struct ofono_error *error,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(info->atom);
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		goto out;
+	}
 
 	g_free(info->model);
 	info->model = g_strdup(model);
@@ -2453,6 +2623,8 @@ out:
 static void query_model(struct ofono_devinfo *info)
 {
 	if (info->driver->query_model == NULL) {
+		ofono_info("%s: Driver does not implement 'query_model' function for path %s",
+		 	__func__, __ofono_atom_get_path(info->atom));
 		/* If model is not supported, don't bother querying revision */
 		query_serial(info);
 		return;
@@ -2468,8 +2640,10 @@ static void query_manufacturer_cb(const struct ofono_error *error,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(info->atom);
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: %d", __func__, (int)error->type);
 		goto out;
+	}
 
 	g_free(info->manufacturer);
 	info->manufacturer = g_strdup(manufacturer);
@@ -2489,6 +2663,8 @@ static gboolean query_manufacturer(gpointer user)
 	struct ofono_devinfo *info = user;
 
 	if (info->driver->query_manufacturer == NULL) {
+		ofono_info("%s: Driver does not implement 'query_manufacturer' function for path %s",
+		 	__func__, __ofono_atom_get_path(info->atom));
 		query_model(info);
 		return FALSE;
 	}
