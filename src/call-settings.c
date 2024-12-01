@@ -479,7 +479,7 @@ static void cw_ss_query_callback(const struct ofono_error *error, int status,
 	struct ofono_call_settings *cs = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("setting CW via SS failed");
+		ofono_error("setting CW via SS failed");
 
 		cs->flags &= ~CALL_SETTINGS_FLAG_CACHED;
 		__ofono_dbus_pending_reply(&cs->pending,
@@ -498,7 +498,7 @@ static void cw_ss_set_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_settings *cs = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("setting CW via SS failed with error: %s",
+		ofono_error("setting CW via SS failed with error: %s",
 			telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cs->pending,
 			__ofono_error_from_error(error, cs->pending));
@@ -520,22 +520,38 @@ static gboolean cw_ss_control(int type,
 	int cls = BEARER_CLASS_SS_DEFAULT;
 	DBusMessage *reply;
 
-	if (cs == NULL)
+	if (cs == NULL) {
+		ofono_error("%s: Call setting instance is NULL. Initialization failed.",
+			__func__);
 		return FALSE;
+	}
 
-	if (strcmp(sc, "43"))
+	if (strcmp(sc, "43")) {
+		ofono_error("%s: Invalid service category: %s", __func__, sc);
 		return FALSE;
+	}
 
 	if (__ofono_call_settings_is_busy(cs)) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		reply = __ofono_error_busy(msg);
 		goto error;
 	}
 
-	if (strlen(sib) || strlen(sib) || strlen(dn))
+	if (strlen(sib) || strlen(dn)) {
+		ofono_error("%s, sib: %s, dn: %s", __func__, sib, dn);
 		goto bad_format;
+	}
 
-	if ((type == SS_CONTROL_TYPE_QUERY && cs->driver->cw_query == NULL) ||
-		(type != SS_CONTROL_TYPE_QUERY && cs->driver->cw_set == NULL)) {
+	if ((type == SS_CONTROL_TYPE_QUERY && cs->driver->cw_query == NULL)) {
+		ofono_error("%s: Call setting driver's 'cw_query' function is not implemented.",
+			__func__);
+		reply = __ofono_error_not_implemented(msg);
+		goto error;
+	}
+
+	if ((type != SS_CONTROL_TYPE_QUERY && cs->driver->cw_set == NULL)) {
+		ofono_error("%s: Call setting driver's 'cw_set' function is not implemented.",
+			__func__);
 		reply = __ofono_error_not_implemented(msg);
 		goto error;
 	}
@@ -546,12 +562,23 @@ static gboolean cw_ss_control(int type,
 
 		service_code = strtoul(sia, &end, 10);
 
-		if (end == sia || *end != '\0')
+		if (end == sia) {
+			ofono_error("%s: Invalid sia format - no digits found.", __func__);
 			goto bad_format;
+		}
+
+		if (*end != '\0') {
+			ofono_error("%s: Invalid sia format - extra non-digit characters found.",
+				__func__);
+			goto bad_format;
+		}
 
 		cls = mmi_service_code_to_bearer_class(service_code);
-		if (cls == 0)
+		if (cls == 0) {
+			ofono_error("%s: Invalid service code - no corresponding bearer class.",
+				__func__);
 			goto bad_format;
+		}
 	}
 
 	cs->ss_req_cls = cls;
@@ -590,6 +617,7 @@ static gboolean cw_ss_control(int type,
 
 bad_format:
 	reply = __ofono_error_invalid_format(msg);
+
 error:
 	g_dbus_send_message(conn, reply);
 	return TRUE;
@@ -636,7 +664,7 @@ static void clip_cnap_colp_colr_ss_query_cb(const struct ofono_error *error,
 	const char *value;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("SS control query failed with error: %s",
+		ofono_error("SS control query failed with error: %s",
 			telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cs->pending,
 			__ofono_error_from_error(error, cs->pending));
@@ -690,10 +718,14 @@ static gboolean clip_cnap_colp_colr_ss(int type,
 	void (*query_op)(struct ofono_call_settings *cs,
 				ofono_call_settings_status_cb_t cb, void *data);
 
-	if (cs == NULL)
+	if (cs == NULL) {
+		ofono_error("%s: Call setting instance is NULL. Initialization failed.",
+			__func__);
 		return FALSE;
+	}
 
 	if (__ofono_call_settings_is_busy(cs)) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		DBusMessage *reply = __ofono_error_busy(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -718,6 +750,8 @@ static gboolean clip_cnap_colp_colr_ss(int type,
 
 	if (type != SS_CONTROL_TYPE_QUERY || strlen(sia) || strlen(sib) ||
 		strlen(sic) || strlen(dn)) {
+		ofono_error("%s, invalid format, type: %d, sia: %s, sib: %s, sic: %s, dn: %s",
+			__func__, type, sia, sib, sic, dn);
 		DBusMessage *reply = __ofono_error_invalid_format(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -725,13 +759,14 @@ static gboolean clip_cnap_colp_colr_ss(int type,
 	}
 
 	if (query_op == NULL) {
+		ofono_error("%s: Call setting driver is not implemented.", __func__);
 		DBusMessage *reply = __ofono_error_not_implemented(msg);
 		g_dbus_send_message(conn, reply);
 
 		return TRUE;
 	}
 
-	DBG("Received CLIP/CNAP/COLR/COLP query ss control");
+	ofono_debug("Received CLIP/CNAP/COLR/COLP query ss control");
 
 	cs->pending = dbus_message_ref(msg);
 
@@ -747,7 +782,7 @@ static void clir_ss_query_callback(const struct ofono_error *error,
 	const char *value;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("clir query via SS failed with error: %s",
+		ofono_error("clir query via SS failed with error: %s",
 					telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cs->pending,
 				__ofono_error_from_error(error, cs->pending));
@@ -796,7 +831,7 @@ static void clir_ss_set_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_settings *cs = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("setting clir via SS failed with error: %s",
+		ofono_error("setting clir via SS failed with error: %s",
 			telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cs->pending,
 			__ofono_error_from_error(error, cs->pending));
@@ -815,13 +850,20 @@ static gboolean clir_ss_control(int type,
 	struct ofono_call_settings *cs = data;
 	DBusConnection *conn = ofono_dbus_get_connection();
 
-	if (cs == NULL)
+	if (cs == NULL) {
+		ofono_error("%s: Call setting instance is NULL. Initialization failed.",
+			__func__);
 		return FALSE;
+	}
 
-	if (strcmp(sc, "31"))
+	if (strcmp(sc, "31")) {
+		ofono_error("%s, Invalid clir service code: %s, must be 31.",
+			__func__, sc);
 		return FALSE;
+	}
 
 	if (__ofono_call_settings_is_busy(cs)) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		DBusMessage *reply = __ofono_error_busy(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -834,6 +876,8 @@ static gboolean clir_ss_control(int type,
 		return FALSE;
 
 	if (strlen(sia) || strlen(sib) || strlen(sic) || strlen(dn)) {
+		ofono_error("%s, invalid format, sia: %s, sib: %s, sic: %s, dn: %s",
+			__func__, sia, sib, sic, dn);
 		DBusMessage *reply = __ofono_error_invalid_format(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -841,6 +885,8 @@ static gboolean clir_ss_control(int type,
 	}
 
 	if (type == SS_CONTROL_TYPE_QUERY && cs->driver->clir_query == NULL) {
+		ofono_error("%s: Call setting driver's 'cw_query' function is not implemented.",
+			__func__);
 		DBusMessage *reply = __ofono_error_not_implemented(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -848,6 +894,8 @@ static gboolean clir_ss_control(int type,
 	}
 
 	if (type != SS_CONTROL_TYPE_QUERY && cs->driver->clir_set == NULL) {
+		ofono_error("%s: Call setting driver's 'clir_set' function is not implemented.",
+			__func__);
 		DBusMessage *reply = __ofono_error_not_implemented(msg);
 		g_dbus_send_message(conn, reply);
 
@@ -925,8 +973,11 @@ static DBusMessage *generate_get_properties_reply(struct ofono_call_settings *cs
 	const char *str;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message for call forwarding", 
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -974,8 +1025,10 @@ static void cs_clir_callback(const struct ofono_error *error,
 {
 	struct ofono_call_settings *cs = data;
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("query clir failed in %s", __func__);
 		goto out;
+	}
 
 	set_clir_network(cs, network_setting);
 	set_clir_override(cs, override_setting);
@@ -994,6 +1047,7 @@ static void query_clir(struct ofono_call_settings *cs)
 {
 	if (cs->driver->clir_query == NULL) {
 		if (cs->pending) {
+			ofono_info("%s: Call setting is currently busy.", __func__);
 			DBusMessage *reply =
 				generate_get_properties_reply(cs,
 								cs->pending);
@@ -1020,6 +1074,8 @@ static void cs_cdip_callback(const struct ofono_error *error,
 static void query_cdip(struct ofono_call_settings *cs)
 {
 	if (cs->driver->cdip_query == NULL) {
+		ofono_info("%s: Call setting driver's 'cdip_query' function is not implemented.",
+			__func__);
 		query_clir(cs);
 		return;
 	}
@@ -1063,6 +1119,8 @@ static void cs_clip_callback(const struct ofono_error *error,
 static void query_clip(struct ofono_call_settings *cs)
 {
 	if (cs->driver->clip_query == NULL) {
+		ofono_info("%s: Call setting driver's 'clip_query' function is not implemented.",
+			__func__);
 		query_clir(cs);
 		return;
 	}
@@ -1084,6 +1142,8 @@ static void cs_colp_callback(const struct ofono_error *error,
 static void query_colp(struct ofono_call_settings *cs)
 {
 	if (cs->driver->colp_query == NULL) {
+		ofono_info("%s: Call setting driver's 'colp_query' function is not implemented.",
+			__func__);
 		query_clip(cs);
 		return;
 	}
@@ -1105,6 +1165,8 @@ static void cs_colr_callback(const struct ofono_error *error,
 static void query_colr(struct ofono_call_settings *cs)
 {
 	if (cs->driver->colr_query == NULL) {
+		ofono_info("%s: Call setting driver's 'colr_query' function is not implemented.",
+			__func__);
 		query_colp(cs);
 		return;
 	}
@@ -1126,6 +1188,8 @@ static void cs_cw_callback(const struct ofono_error *error, int status,
 static void query_cw(struct ofono_call_settings *cs)
 {
 	if (cs->driver->cw_query == NULL) {
+		ofono_info("%s: Call setting driver's 'cw_query' function is not implemented.",
+			__func__);
 		query_colr(cs);
 		return;
 	}
@@ -1138,8 +1202,15 @@ static DBusMessage *cs_get_properties(DBusConnection *conn, DBusMessage *msg,
 {
 	struct ofono_call_settings *cs = data;
 
-	if (__ofono_call_settings_is_busy(cs) || __ofono_ussd_is_busy(cs->ussd))
+	if (__ofono_call_settings_is_busy(cs)) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (__ofono_ussd_is_busy(cs->ussd)) {
+		ofono_error("%s: USSD service is currently busy.", __func__);
+		return __ofono_error_busy(msg);
+	}
 
 	if (cs->flags & CALL_SETTINGS_FLAG_CACHED)
 		return generate_get_properties_reply(cs, msg);
@@ -1184,7 +1255,7 @@ static void clir_set_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_settings *cs = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("setting clir failed");
+		ofono_error("setting clir failed");
 		__ofono_dbus_pending_reply(&cs->pending,
 					__ofono_error_failed(cs->pending));
 
@@ -1200,8 +1271,11 @@ static DBusMessage *set_clir(DBusMessage *msg, struct ofono_call_settings *cs,
 {
 	int clir = -1;
 
-	if (cs->driver->clir_set == NULL)
+	if (cs->driver->clir_set == NULL) {
+		ofono_error("%s: Call setting driver's 'clir_set' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (!strcmp(setting, "default"))
 		clir = CLIR_STATUS_NOT_PROVISIONED;
@@ -1210,8 +1284,10 @@ static DBusMessage *set_clir(DBusMessage *msg, struct ofono_call_settings *cs,
 	else if (!strcmp(setting, "disabled"))
 		clir = CLIR_STATUS_UNKNOWN;
 
-	if (clir == -1)
+	if (clir == -1) {
+		ofono_error("%s: Invalid CLIR setting '%s'", __func__, setting);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	cs->pending = dbus_message_ref(msg);
 
@@ -1246,7 +1322,7 @@ static void cw_set_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_settings *cs = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during CW set");
+		ofono_error("Error occurred during CW set");
 
 		__ofono_dbus_pending_reply(&cs->pending,
 					__ofono_error_failed(cs->pending));
@@ -1263,15 +1339,21 @@ static DBusMessage *set_cw_req(DBusMessage *msg, struct ofono_call_settings *cs,
 {
 	int cw;
 
-	if (cs->driver->cw_set == NULL)
+	if (cs->driver->cw_set == NULL) {
+		ofono_error("%s: Call setting driver's 'cw_set' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (!strcmp(setting, "enabled"))
 		cw = 1;
 	else if (!strcmp(setting, "disabled"))
 		cw = 0;
-	else
+	else {
+		ofono_error("%s: Invalid cw setting '%s', must be 'enabled' or 'disabled'.",
+			__func__, setting);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	cs->pending = dbus_message_ref(msg);
 
@@ -1315,28 +1397,46 @@ static DBusMessage *cs_set_property(DBusConnection *conn, DBusMessage *msg,
 	const char *property;
 	int cls;
 
-	if (__ofono_call_settings_is_busy(cs) || __ofono_ussd_is_busy(cs->ussd))
+	if (__ofono_call_settings_is_busy(cs)) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_iter_init(msg, &iter))
-		return __ofono_error_invalid_args(msg);
+	if (__ofono_ussd_is_busy(cs->ussd)) {
+		ofono_error("%s: USSD service is currently busy.", __func__);
+		return __ofono_error_busy(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
+		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
 	if (!strcmp(property, "HideCallerId")) {
 		const char *setting;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [HideCallerId] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &setting);
 
@@ -1344,14 +1444,18 @@ static DBusMessage *cs_set_property(DBusConnection *conn, DBusMessage *msg,
 	} else if (is_cw_property(property, BEARER_CLASS_VOICE, &cls)) {
 		const char *setting;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [cw setting] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &setting);
 
 		return set_cw_req(msg, cs, setting, cls);
 	}
 
+	ofono_error("property %s in %s is invalid", property, __func__);
 	return __ofono_error_invalid_args(msg);
 }
 
@@ -1417,18 +1521,30 @@ static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
 	struct ofono_call_settings *cs = data;
 	int enable;
 
-	if (cs->driver == NULL || cs->driver->cw_set == NULL)
+	if (cs->driver == NULL) {
+		ofono_error("%s: Call setting driver is not available.", __func__);
 		return __ofono_error_not_implemented(msg);
+	}
+
+	if (cs->driver->cw_set == NULL) {
+		ofono_error("%s: Call setting driver's 'cw_set' function is not implemented.",
+			__func__);
+		return __ofono_error_not_implemented(msg);
+	}
 
 	if (cs->pending) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		OFONO_DFX_SS_INFO("ss:set call waiting", "busy");
 		return __ofono_error_busy(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_INT32, &enable,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to retrieve int32 argument from D-Bus message.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	cs->pending = dbus_message_ref(msg);
 
@@ -1443,10 +1559,19 @@ static DBusMessage *cs_get_call_waiting(DBusConnection *conn,
 {
 	struct ofono_call_settings *cs = data;
 
-	if (cs->driver == NULL || cs->driver->cw_query == NULL)
+	if (cs->driver == NULL) {
+		ofono_error("%s: Call setting driver is not available.", __func__);
 		return __ofono_error_not_implemented(msg);
+	}
+
+	if (cs->driver->cw_query == NULL) {
+		ofono_error("%s: Call setting driver's 'cw_query' function is not implemented.",
+			__func__);
+		return __ofono_error_not_implemented(msg);
+	}
 
 	if (cs->pending) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		OFONO_DFX_SS_INFO("ss:get call waiting", "busy");
 		return __ofono_error_busy(msg);
 	}
@@ -1508,22 +1633,36 @@ static DBusMessage *cs_set_clir(DBusConnection *conn,
 	char *status;
 	int clir = -1;
 
-	if (cs->driver == NULL || cs->driver->clir_set == NULL)
+	if (cs->driver == NULL) {
+		ofono_error("%s: Call setting driver is not available.", __func__);
 		return __ofono_error_not_implemented(msg);
+	}
+
+	if (cs->driver->clir_set == NULL) {
+		ofono_error("%s: Call setting driver's 'clir_set' function is not implemented.",
+			__func__);
+		return __ofono_error_not_implemented(msg);
+	}
 
 	if (cs->pending) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		OFONO_DFX_SS_INFO("ss:set clir", "busy");
 		return __ofono_error_busy(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_STRING, &status,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to retrieve string argument from D-Bus message.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	clir = clir_status_from_string(status);
-	if (clir == -1)
+	if (clir == -1) {
+		ofono_error("%s: Invalid CLIR status '%s'.", __func__, status);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	cs->pending = dbus_message_ref(msg);
 
@@ -1537,10 +1676,19 @@ static DBusMessage *cs_get_clir(DBusConnection *conn,
 {
 	struct ofono_call_settings *cs = data;
 
-	if (cs->driver == NULL || cs->driver->clir_query == NULL)
+	if (cs->driver == NULL) {
+		ofono_error("%s: Call setting driver is not available.", __func__);
 		return __ofono_error_not_implemented(msg);
+	}
+
+	if (cs->driver->clir_query == NULL) {
+		ofono_error("%s: Call setting driver's 'clir_query' function is not implemented.",
+			__func__);
+		return __ofono_error_not_implemented(msg);
+	}
 
 	if (cs->pending) {
+		ofono_error("%s: Call setting is currently busy.", __func__);
 		OFONO_DFX_SS_INFO("ss:get clir", "busy");
 		return __ofono_error_busy(msg);
 	}
