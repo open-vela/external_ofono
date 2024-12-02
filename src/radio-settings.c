@@ -261,8 +261,11 @@ static DBusMessage *radio_get_properties_reply(DBusMessage *msg,
 	const char *mode = radio_access_mode_to_string(rs->mode);
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create a new D-Bus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -339,10 +342,9 @@ static void radio_fast_dormancy_set_callback(const struct ofono_error *error,
 {
 	struct ofono_radio_settings *rs = data;
 	DBusMessage *reply;
-	ofono_debug("%s, error_type: %d", __func__, (int)error->type);
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error setting fast dormancy");
+		ofono_error("Error setting fast dormancy");
 
 		rs->fast_dormancy_pending = rs->fast_dormancy;
 
@@ -406,7 +408,7 @@ static void radio_band_set_callback(const struct ofono_error *error,
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error setting radio frequency band");
+		ofono_error("Error setting radio frequency band");
 
 		rs->pending_band_gsm = rs->band_gsm;
 		rs->pending_band_umts = rs->band_umts;
@@ -450,7 +452,7 @@ static void radio_mode_set_callback(const struct ofono_error *error, void *data)
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error setting radio access mode");
+		ofono_error("Error setting radio access mode");
 
 		rs->pending_mode = rs->mode;
 
@@ -491,7 +493,7 @@ static void radio_available_rats_query_callback(const struct ofono_error *error,
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		rs->available_rats = available_rats & 0x7;
 	else
-		DBG("Error while querying available rats");
+		ofono_error("Error while querying available rats");
 
 	radio_send_properties_reply(rs);
 }
@@ -500,6 +502,8 @@ static void radio_query_available_rats(struct ofono_radio_settings *rs)
 {
 	/* Modem technology is not supposed to change, so one query is enough */
 	if (rs->driver->query_available_rats == NULL || rs->available_rats) {
+		ofono_info("%s: RadioSetting driver's 'query_available_rats' function is not implemented.",
+			__func__);
 		radio_send_properties_reply(rs);
 		return;
 	}
@@ -515,7 +519,7 @@ static void radio_fast_dormancy_query_callback(const struct ofono_error *error,
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during fast dormancy query");
+		ofono_error("Error during fast dormancy query");
 
 		reply = __ofono_error_failed(rs->pending);
 		__ofono_dbus_pending_reply(&rs->pending, reply);
@@ -530,6 +534,8 @@ static void radio_fast_dormancy_query_callback(const struct ofono_error *error,
 static void radio_query_fast_dormancy(struct ofono_radio_settings *rs)
 {
 	if (rs->driver->query_fast_dormancy == NULL) {
+		ofono_info("%s: RadioSetting driver's 'query_fast_dormancy' function is not implemented.",
+			__func__);
 		radio_query_available_rats(rs);
 		return;
 	}
@@ -547,7 +553,7 @@ static void radio_band_query_callback(const struct ofono_error *error,
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during radio frequency band query");
+		ofono_error("Error during radio frequency band query");
 
 		reply = __ofono_error_failed(rs->pending);
 		__ofono_dbus_pending_reply(&rs->pending, reply);
@@ -565,6 +571,8 @@ static void radio_band_query_callback(const struct ofono_error *error,
 static void radio_query_band(struct ofono_radio_settings *rs)
 {
 	if (rs->driver->query_band == NULL) {
+		ofono_info("%s: RadioSetting driver's 'query_band' function is not implemented.",
+			__func__);
 		radio_query_fast_dormancy(rs);
 		return;
 	}
@@ -579,7 +587,7 @@ static void radio_rat_mode_query_callback(const struct ofono_error *error,
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error during radio access mode query");
+		ofono_error("Error during radio access mode query");
 
 		reply = __ofono_error_failed(rs->pending);
 		__ofono_dbus_pending_reply(&rs->pending, reply);
@@ -596,14 +604,21 @@ static DBusMessage *radio_get_properties(DBusConnection *conn,
 {
 	struct ofono_radio_settings *rs = data;
 
-	if (rs->flags & RADIO_SETTINGS_FLAG_CACHED)
+	if (rs->flags & RADIO_SETTINGS_FLAG_CACHED) {
+		ofono_debug("%s: Returning cached radio properties", __func__);
 		return radio_get_properties_reply(msg, rs);
+	}
 
-	if (rs->driver->query_rat_mode == NULL)
+	if (rs->driver->query_rat_mode == NULL) {
+		ofono_info("%s: RadioSetting driver's 'query_rat_mode' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (rs->pending)
+	if (rs->pending) {
+		ofono_error("%s: RadioSetting is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	rs->pending = dbus_message_ref(msg);
 	rs->driver->query_rat_mode(rs, radio_rat_mode_query_callback, rs);
@@ -619,20 +634,30 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 	DBusMessageIter var;
 	const char *property;
 
-	if (rs->pending)
+	if (rs->pending) {
+		ofono_error("%s: RadioSetting is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_iter_init(msg, &iter))
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
@@ -640,18 +665,29 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *value;
 		int mode;
 
-		if (rs->driver->set_rat_mode == NULL)
+		if (rs->driver->set_rat_mode == NULL) {
+			ofono_info("%s: RadioSetting driver's 'set_rat_mode' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [TechnologyPreference] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
-		if (radio_access_mode_from_string(value, &mode) == FALSE)
+		if (radio_access_mode_from_string(value, &mode) == FALSE) {
+			ofono_error("%s: Invalid rdio access mode, value: %s, mode: %d", __func__, value , mode);
 			return __ofono_error_invalid_args(msg);
+		}
 
-		if (rs->mode == mode)
+		if (rs->mode == mode) {
+			ofono_debug("%s: 'TechnologyPreference' property is already set to '%s'. No changes needed.",
+				__func__, value);
 			return dbus_message_new_method_return(msg);
+		}
 
 		rs->pending = dbus_message_ref(msg);
 		rs->pending_mode = mode;
@@ -663,18 +699,29 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *value;
 		enum ofono_radio_band_gsm band;
 
-		if (rs->driver->set_band == NULL)
+		if (rs->driver->set_band == NULL) {
+			ofono_info("%s: RadioSetting driver's 'set_band' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [GsmBand] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
-		if (radio_band_gsm_from_string(value, &band) == FALSE)
+		if (radio_band_gsm_from_string(value, &band) == FALSE) {
+			ofono_error("%s: Invalid gsm band, value: %s", __func__, value);
 			return __ofono_error_invalid_args(msg);
+		}
 
-		if (rs->band_gsm == band)
+		if (rs->band_gsm == band) {
+			ofono_debug("%s: 'GsmBand' property is already set to '%s'. No changes needed.",
+				__func__, value);
 			return dbus_message_new_method_return(msg);
+		}
 
 		rs->pending = dbus_message_ref(msg);
 		rs->pending_band_gsm = band;
@@ -687,18 +734,29 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *value;
 		enum ofono_radio_band_umts band;
 
-		if (rs->driver->set_band == NULL)
+		if (rs->driver->set_band == NULL) {
+			ofono_info("%s: RadioSetting driver's 'set_band' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [UmtsBand] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
-		if (radio_band_umts_from_string(value, &band) == FALSE)
+		if (radio_band_umts_from_string(value, &band) == FALSE) {
+			ofono_error("%s: Invalid umts band, value: %s", __func__, value);
 			return __ofono_error_invalid_args(msg);
+		}
 
-		if (rs->band_umts == band)
+		if (rs->band_umts == band) {
+			ofono_debug("%s: 'UmtsBand' property is already set to '%s'. No changes needed.",
+				__func__, value);
 			return dbus_message_new_method_return(msg);
+		}
 
 		rs->pending = dbus_message_ref(msg);
 		rs->pending_band_umts = band;
@@ -711,11 +769,17 @@ static DBusMessage *radio_set_property(DBusConnection *conn, DBusMessage *msg,
 		dbus_bool_t value;
 		int target;
 
-		if (rs->driver->set_fast_dormancy == NULL)
+		if (rs->driver->set_fast_dormancy == NULL) {
+			ofono_info("%s: RadioSetting driver's 'set_fast_dormancy' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [UmtsBand] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 		target = value;
@@ -889,14 +953,14 @@ static void radio_mode_set_callback_at_reg(const struct ofono_error *error,
 						void *data)
 {
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
-		DBG("Error setting radio access mode register time");
+		ofono_error("Error setting radio access mode register time");
 }
 
 static void radio_band_set_callback_at_reg(const struct ofono_error *error,
 						void *data)
 {
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
-		DBG("Error setting radio access mode register time");
+		ofono_error("Error setting radio band register time");
 	/*
 	 * Continue with atom register even if request fail at modem
 	 * ofono_radio_finish_register called by radio_mode_set_callback_at_reg
@@ -914,7 +978,7 @@ static void radio_load_settings(struct ofono_radio_settings *rs)
 	 * Default RAT mode: ANY (LTE > UMTS > GSM)
 	 */
 	if (rs->settings == NULL) {
-		DBG("radiosetting storage open failed");
+		ofono_error("radiosetting storage open failed");
 		rs->mode = OFONO_RADIO_ACCESS_MODE_LTE_GSM_WCDMA;
 		rs->band_gsm = OFONO_RADIO_BAND_GSM_ANY;
 		rs->band_umts = OFONO_RADIO_BAND_UMTS_ANY;
@@ -976,7 +1040,7 @@ static void radio_load_settings(struct ofono_radio_settings *rs)
 		error = NULL;
 	}
 
-	DBG("TechnologyPreference: %d", rs->mode);
+	ofono_info("TechnologyPreference: %d", rs->mode);
 	DBG("GsmBand: %d", rs->band_gsm);
 	DBG("UmtsBand: %d", rs->band_umts);
 }
