@@ -192,8 +192,11 @@ void ofono_netmon_serving_cell_notify(struct ofono_netmon *netmon,
 	signal = dbus_message_new_signal(path, OFONO_NETMON_INTERFACE,
 						"PropertyChanged");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create D-Bus signal for 'PropertyChanged' event.",
+			__func__);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
@@ -229,7 +232,7 @@ static void serving_cell_info_callback(const struct ofono_error *error,
 	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during cell list");
+		ofono_error("Error occurred during cell list");
 		__ofono_dbus_pending_reply(&netmon->pending,
 					__ofono_error_failed(netmon->pending));
 		return;
@@ -265,11 +268,16 @@ static DBusMessage *netmon_get_serving_cell_info(DBusConnection *conn,
 {
 	struct ofono_netmon *netmon = data;
 
-	if (!netmon->driver->request_update)
+	if (!netmon->driver->request_update) {
+		ofono_error("%s: Netmon driver's 'request_update' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (netmon->pending)
+	if (netmon->pending) {
+		ofono_error("%s: Netmon is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	netmon->pending = dbus_message_ref(msg);
 
@@ -318,23 +326,34 @@ static DBusMessage *netmon_register_agent(DBusConnection *conn,
 	const unsigned int enable = 1;
 	unsigned int period;
 
-	if (netmon->agent)
+	if (netmon->agent) {
+		ofono_error("%s: Agent is currently busy", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!netmon->driver->enable_periodic_update)
+	if (!netmon->driver->enable_periodic_update) {
+		ofono_error("%s: Netmon driver's 'enable_periodic_update' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_OBJECT_PATH, &agent_path,
 				DBUS_TYPE_UINT32, &period,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (!dbus_validate_path(agent_path, NULL))
+	if (!dbus_validate_path(agent_path, NULL)) {
+		ofono_error("%s: Agent path (%s) is invalid", __func__, agent_path);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (!period)
+	if (!period) {
+		ofono_error("%s: Period (%u) is invalid", __func__, period);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	/* minimum period is 5 seconds, to avoid frequent updates*/
 	if (period < 5)
@@ -343,8 +362,10 @@ static DBusMessage *netmon_register_agent(DBusConnection *conn,
 	netmon->agent = netmon_agent_new(agent_path,
 					dbus_message_get_sender(msg));
 
-	if (netmon->agent == NULL)
+	if (netmon->agent == NULL) {
+		ofono_error("%s: Agent creation failed.", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	netmon_agent_set_removed_notify(netmon->agent, agent_removed_cb, netmon);
 
@@ -361,19 +382,29 @@ static DBusMessage *netmon_unregister_agent(DBusConnection *conn,
 	const char *agent_path;
 	const char *agent_bus = dbus_message_get_sender(msg);
 
-	if (!netmon->driver->enable_periodic_update)
+	if (!netmon->driver->enable_periodic_update) {
+		ofono_error("%s: Netmon driver's 'enable_periodic_update' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 					DBUS_TYPE_OBJECT_PATH, &agent_path,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (netmon->agent == NULL)
+	if (netmon->agent == NULL) {
+		ofono_error("%s: No agent registered", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (!netmon_agent_matches(netmon->agent, agent_path, agent_bus))
+	if (!netmon_agent_matches(netmon->agent, agent_path, agent_bus)) {
+		ofono_error("%s: Agent does not match the given path %s or bus %s",
+			__func__, agent_path, agent_bus);
 		return __ofono_error_access_denied(msg);
+	}
 
 	netmon_agent_free(netmon->agent);
 
@@ -387,19 +418,28 @@ static DBusMessage *netmon_periodic_update(DBusConnection *conn,
 	const unsigned int enable = 1;
 	unsigned int period;
 
-	if (!netmon->driver->enable_periodic_update)
+	if (!netmon->driver->enable_periodic_update) {
+		ofono_error("%s: Netmon driver's 'enable_periodic_update' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (netmon->pending)
+	if (netmon->pending) {
+		ofono_error("%s: Netmon is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_UINT32, &period,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (!period)
+	if (!period) {
+		ofono_error("%s: Period (%u) is invalid", __func__, period);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	/* minimum period is 5 seconds, to avoid frequent updates*/
 	if (period < 5)
@@ -434,7 +474,7 @@ static void neighbouring_cell_info_callback(const struct ofono_error *error,
 	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during neighbouring cell list");
+		ofono_error("Error occurred during neighbouring cell list");
 		__ofono_dbus_pending_reply(&netmon->pending,
 					__ofono_error_failed(netmon->pending));
 		return;
@@ -468,11 +508,16 @@ static DBusMessage *netmon_get_neighbouring_cell_info(DBusConnection *conn,
 {
 	struct ofono_netmon *netmon = data;
 
-	if (!netmon->driver->neighbouring_cell_update)
+	if (!netmon->driver->neighbouring_cell_update) {
+		ofono_error("%s: Netmon driver's 'neighbouring_cell_update' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (netmon->pending)
+	if (netmon->pending) {
+		ofono_error("%s: Netmon is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	netmon->pending = dbus_message_ref(msg);
 

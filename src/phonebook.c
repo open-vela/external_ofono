@@ -285,8 +285,11 @@ static DBusMessage *generate_export_entries_reply(struct ofono_phonebook *pb,
 	DBusMessageIter iter;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, pb->vcards);
@@ -465,6 +468,7 @@ static DBusMessage *import_entries(DBusConnection *conn, DBusMessage *msg,
 	DBusMessage *reply;
 
 	if (phonebook->pending) {
+		ofono_error("%s: Phonebook is currently busy.", __func__);
 		reply = __ofono_error_busy(phonebook->pending);
 		g_dbus_send_message(conn, reply);
 		return NULL;
@@ -508,8 +512,11 @@ static DBusMessage *generate_fdn_export_entries_reply(struct ofono_phonebook *pb
 	DBusMessageIter iter, array;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -534,7 +541,7 @@ static void export_fdn_entries_cb(const struct ofono_error *error, void *data)
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during fdn entries export");
+		ofono_error("Error occurred during fdn entries export");
 		reply = __ofono_error_failed(phonebook->pending);
 		__ofono_dbus_pending_reply(&phonebook->pending, reply);
 		return;
@@ -542,6 +549,7 @@ static void export_fdn_entries_cb(const struct ofono_error *error, void *data)
 
 	reply = generate_fdn_export_entries_reply(phonebook, phonebook->pending);
 	if (reply == NULL) {
+		ofono_error("%s: Failed to generate reply message", __func__);
 		dbus_message_unref(phonebook->pending);
 		return;
 	}
@@ -556,10 +564,14 @@ static DBusMessage *import_fdn_entries(DBusConnection *conn, DBusMessage *msg,
 	struct ofono_phonebook *phonebook = data;
 	DBusMessage *reply;
 
-	if (phonebook->driver->read_fdn_entries == NULL)
+	if (phonebook->driver->read_fdn_entries == NULL) {
+		ofono_error("%s: Phonebook driver's 'read_fdn_entries' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (phonebook->pending) {
+		ofono_error("%s: Phonebook is currently busy.", __func__);
 		reply = __ofono_error_busy(phonebook->pending);
 		g_dbus_send_message(conn, reply);
 		return NULL;
@@ -588,7 +600,7 @@ static void insert_fdn_entry_cb(const struct ofono_error *error, int record, voi
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during fdn entry insert");
+		ofono_error("Error occurred during fdn entry insert");
 		reply = __ofono_error_failed(phonebook->pending);
 		__ofono_dbus_pending_reply(&phonebook->pending, reply);
 		return;
@@ -600,6 +612,7 @@ static void insert_fdn_entry_cb(const struct ofono_error *error, int record, voi
 			DBUS_TYPE_STRING, &new_number,
 			DBUS_TYPE_STRING, &pin2,
 			DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		reply = __ofono_error_invalid_format(phonebook->pending);
 		__ofono_dbus_pending_reply(&phonebook->pending, reply);
 		return;
@@ -627,29 +640,41 @@ static DBusMessage *insert_fdn_entry(DBusConnection *conn, DBusMessage *msg,
 	char *new_name, *new_number, *pin2;
 	DBusMessage *reply;
 
-	if (phonebook->driver->insert_fdn_entry == NULL)
+	if (phonebook->driver->insert_fdn_entry == NULL) {
+		ofono_error("%s: Phonebook driver's 'insert_fdn_entry' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (phonebook->pending) {
+		ofono_error("%s: Phonebook is currently busy.", __func__);
 		reply = __ofono_error_busy(phonebook->pending);
 		g_dbus_send_message(conn, reply);
 		return NULL;
 	}
 
 	if (phonebook->fdn_flags ^ PHONEBOOK_FLAG_CACHED) {
-		ofono_error("%s: read fdn file first ! \n", __func__);
+		ofono_error("%s: FDN file not cached, read it first!", __func__);
 		return __ofono_error_failed(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &new_name,
 				DBUS_TYPE_STRING, &new_number,
 				DBUS_TYPE_STRING, &pin2,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if ( !valid_phone_number_format(new_number) ||
-		!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2))
+	if (!valid_phone_number_format(new_number)) {
+		ofono_error("%s: Invalid phone number format.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
+
+	if (!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2)) {
+		ofono_error("%s: Invalid PIN2 format.", __func__);
+		return __ofono_error_invalid_format(msg);
+	}
 
 	phonebook->pending = dbus_message_ref(msg);
 	phonebook->driver->insert_fdn_entry(phonebook, new_name, new_number,
@@ -667,7 +692,7 @@ static void update_fdn_entry_cb(const struct ofono_error *error, int record, voi
 	int fdn_idx;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during fdn entry update");
+		ofono_error("Error occurred during fdn entry update");
 		reply = __ofono_error_failed(phonebook->pending);
 		__ofono_dbus_pending_reply(&phonebook->pending, reply);
 		return;
@@ -680,6 +705,7 @@ static void update_fdn_entry_cb(const struct ofono_error *error, int record, voi
 			DBUS_TYPE_STRING, &pin2,
 			DBUS_TYPE_INT32, &fdn_idx,
 			DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		reply = __ofono_error_invalid_format(phonebook->pending);
 		__ofono_dbus_pending_reply(&phonebook->pending, reply);
 		return;
@@ -710,17 +736,21 @@ static DBusMessage *update_fdn_entry(DBusConnection *conn, DBusMessage *msg,
 	DBusMessage *reply;
 	int fdn_idx;
 
-	if (phonebook->driver->update_fdn_entry == NULL)
+	if (phonebook->driver->update_fdn_entry == NULL) {
+		ofono_error("%s: Phonebook driver's 'update_fdn_entry' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (phonebook->pending) {
+		ofono_error("%s: Phonebook is currently busy.", __func__);
 		reply = __ofono_error_busy(phonebook->pending);
 		g_dbus_send_message(conn, reply);
 		return NULL;
 	}
 
 	if (phonebook->fdn_flags ^ PHONEBOOK_FLAG_CACHED) {
-		ofono_error("%s: read fdn file first ! \n", __func__);
+		ofono_error("%s: FDN file not cached, read it first!", __func__);
 		return __ofono_error_failed(msg);
 	}
 
@@ -728,12 +758,20 @@ static DBusMessage *update_fdn_entry(DBusConnection *conn, DBusMessage *msg,
 				DBUS_TYPE_STRING, &new_number,
 				DBUS_TYPE_STRING, &pin2,
 				DBUS_TYPE_INT32, &fdn_idx,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if ( !valid_phone_number_format(new_number) ||
-		!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2))
+	if (!valid_phone_number_format(new_number)) {
+		ofono_error("%s: Invalid phone number format.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
+
+	if (!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2)) {
+		ofono_error("%s: Invalid PIN2 format.", __func__);
+		return __ofono_error_invalid_format(msg);
+	}
 
 	phonebook->pending = dbus_message_ref(msg);
 	phonebook->driver->update_fdn_entry(phonebook, fdn_idx,
@@ -750,7 +788,7 @@ static void delete_fdn_entry_cb(const struct ofono_error *error, int record, voi
 	struct fdn_entry *entry;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Error occurred during fdn entry delete");
+		ofono_error("Error occurred during fdn entry delete");
 		reply = __ofono_error_failed(phonebook->pending);
 		__ofono_dbus_pending_reply(&phonebook->pending, reply);
 		return;
@@ -779,27 +817,35 @@ static DBusMessage *delete_fdn_entry(DBusConnection *conn, DBusMessage *msg,
 	char *pin2;
 	int fdn_idx;
 
-	if (phonebook->driver->delete_fdn_entry == NULL)
+	if (phonebook->driver->delete_fdn_entry == NULL) {
+		ofono_error("%s: Phonebook driver's 'delete_fdn_entry' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (phonebook->pending) {
+		ofono_error("%s: Phonebook is currently busy.", __func__);
 		reply = __ofono_error_busy(phonebook->pending);
 		g_dbus_send_message(conn, reply);
 		return NULL;
 	}
 
 	if (phonebook->fdn_flags ^ PHONEBOOK_FLAG_CACHED) {
-		ofono_error("%s: read fdn file first ! \n", __func__);
+		ofono_error("%s: FDN file not cached, read it first!", __func__);
 		return __ofono_error_failed(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &pin2,
 				DBUS_TYPE_INT32, &fdn_idx,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2))
+	if (!__ofono_is_valid_sim_pin(pin2, OFONO_SIM_PASSWORD_SIM_PIN2)) {
+		ofono_error("%s: Invalid PIN2 format.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	phonebook->pending = dbus_message_ref(msg);
 	phonebook->driver->delete_fdn_entry(phonebook, fdn_idx, pin2,

@@ -51,6 +51,8 @@ static inline void netmon_agent_send_release(struct netmon_agent *agent)
 ofono_bool_t netmon_agent_matches(struct netmon_agent *agent,
 				const char *path, const char *sender)
 {
+	ofono_debug("%s: Current agent path: %s, bus: %s", __func__,
+		agent->path, agent->bus);
 	return g_str_equal(agent->path, path) &&
 			g_str_equal(agent->bus, sender);
 }
