@@ -4985,7 +4985,7 @@ static void ssn_mt_remote_held_notify(struct ofono_voicecall *vc,
 }
 
 static void ssn_mt_remote_multiparty_notify(struct ofono_voicecall *vc,
-					unsigned int id,
+					unsigned int id, gboolean mpty,
 					const struct ofono_phone_number *ph)
 {
 	struct voicecall *v = voicecall_select(vc, id);
@@ -4995,10 +4995,10 @@ static void ssn_mt_remote_multiparty_notify(struct ofono_voicecall *vc,
 	if (v == NULL)
 		return;
 
-	if (v->remote_multiparty == TRUE)
+	if (v->remote_multiparty == mpty)
 		return;
 
-	v->remote_multiparty = TRUE;
+	v->remote_multiparty = mpty;
 
 	path = voicecall_build_path(vc, v->call);
 
@@ -5024,7 +5024,10 @@ void ofono_voicecall_ssn_mt_notify(struct ofono_voicecall *vc,
 		ssn_mt_remote_held_notify(vc, id, FALSE, ph);
 		break;
 	case SS_MT_MULTIPARTY_VOICECALL:
-		ssn_mt_remote_multiparty_notify(vc, id, ph);
+		ssn_mt_remote_multiparty_notify(vc, id, TRUE, ph);
+		break;
+	case SS_MT_MULTIPARTY_VOICECALL_CANCELED:
+		ssn_mt_remote_multiparty_notify(vc, id, FALSE, ph);
 		break;
 	}
 }
