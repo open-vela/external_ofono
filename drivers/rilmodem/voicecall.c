@@ -205,6 +205,20 @@ void ril_update_call_duration(struct ofono_voicecall *vc, int signal_level)
 	}
 }
 
+static gint call_compare_by_id(gconstpointer a, gconstpointer b)
+{
+	const unsigned int call_id = GPOINTER_TO_UINT(a);
+	unsigned int id = GPOINTER_TO_UINT(b);
+
+	if (id < call_id)
+		return -1;
+
+	if (id > call_id)
+		return 1;
+
+	return 0;
+}
+
 static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_voicecall *vc = user_data;
@@ -313,7 +327,8 @@ no_calls:
 
 		/* TODO: Add comments explaining call id handling */
 		if (oc && (nc == NULL || (nc->id > oc->id))) {
-			if (vd->local_release & (1 << oc->id)) {
+			if (g_slist_find_custom(vd->local_release_call_ids,
+						GUINT_TO_POINTER(oc->id), call_compare_by_id)) {
 				ofono_voicecall_disconnected(vc, oc->id,
 					OFONO_DISCONNECT_REASON_LOCAL_HANGUP,
 					NULL);
@@ -340,7 +355,8 @@ no_calls:
 			}
 
 			clear_dtmf_queue(vd);
-			vd->local_release &= ~(1 << oc->id);
+			vd->local_release_call_ids = g_slist_remove(vd->local_release_call_ids,
+				GUINT_TO_POINTER(oc->id));
 			o = o->next;
 		} else if (nc && (oc == NULL || (nc->id < oc->id))) {
 			/* new call, signal it */
@@ -421,8 +437,10 @@ no_calls:
 	g_slist_free_full(vd->calls, g_free);
 
 	vd->calls = calls;
-	if (calls == NULL)
-		vd->local_release = 0;
+	if (calls == NULL) {
+		g_slist_free(vd->local_release_call_ids);
+		vd->local_release_call_ids = NULL;
+	}
 }
 
 gboolean ril_poll_clcc(gpointer user_data)
@@ -461,7 +479,8 @@ static void generic_cb(struct ril_msg *message, gpointer user_data)
 			call = l->data;
 
 			if (req->affected_types & (1 << call->status))
-				vd->local_release |= (1 << call->id);
+				vd->local_release_call_ids = g_slist_append(vd->local_release_call_ids,
+					GUINT_TO_POINTER(call->id));
 		}
 	}
 
@@ -858,7 +877,8 @@ void ril_hangup_specific(struct ofono_voicecall *vc,
 
 	g_ril_append_print_buf(vd->ril, "(%u)", id);
 
-	vd->local_release |= (1 << id);
+	vd->local_release_call_ids = g_slist_append(vd->local_release_call_ids,
+		GUINT_TO_POINTER(id));
 
 	/* Send request to RIL */
 	ret = ril_template(RIL_REQUEST_HANGUP, vc, hangup_generic_cb,
