@@ -29,8 +29,8 @@ struct ofono_voicecall_duration_info {
 
 struct ril_voicecall_data {
 	GSList *calls;
-	/* Call local hangup indicator, one bit per call (1 << call_id) */
-	unsigned int local_release;
+	/* Call local hangup indicator, save call ids */
+	GSList *local_release_call_ids;
 	unsigned int clcc_source;
 	unsigned int hold_source;
 	GRil *ril;
