@@ -1120,6 +1120,46 @@ void ril_hold_all_active(struct ofono_voicecall *vc,
 			generic_cb, 0, NULL, cb, data);
 }
 
+static void ril_call_redirection_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct change_state_req *req = user_data;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(req->vc);
+	struct ofono_error error;
+
+	if (message->error == RIL_E_SUCCESS) {
+		decode_ril_error(&error, "OK");
+	} else {
+		decode_ril_error(&error, "FAIL");
+	}
+
+	g_ril_print_response_no_args(vd->ril, message);
+
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+			clcc_poll_cb, req->vc, NULL);
+
+	/* We have to callback after we schedule a poll if required */
+	if (req->cb)
+		req->cb(&error, req->data);
+}
+
+void ril_transfer(struct ofono_voicecall *vc,
+				ofono_voicecall_cb_t cb, void *data)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct ofono_call *call;
+
+	for (GSList *l = vd->calls; l; l = l->next) {
+		call = l->data;
+
+		if (call->status == CALL_STATUS_HELD || call->status == CALL_STATUS_ACTIVE)
+			vd->local_release_call_ids = g_slist_append(vd->local_release_call_ids,
+				GUINT_TO_POINTER(call->id));
+	}
+
+	ril_template(RIL_REQUEST_EXPLICIT_CALL_TRANSFER, vc,
+			ril_call_redirection_cb, 0, NULL, cb, data);
+}
+
 void ril_release_all_held(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
@@ -1392,6 +1432,7 @@ static const struct ofono_voicecall_driver driver = {
 	.set_cust_ecc		= ril_set_emergency_number,
 	.play_dtmf		= ril_play_dtmf,
 	.update_call_duration   = ril_update_call_duration,
+	.transfer 		= ril_transfer,
 };
 
 void ril_voicecall_init(void)
