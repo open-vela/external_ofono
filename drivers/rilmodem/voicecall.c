@@ -1160,6 +1160,28 @@ void ril_transfer(struct ofono_voicecall *vc,
 			ril_call_redirection_cb, 0, NULL, cb, data);
 }
 
+void ril_deflect(struct ofono_voicecall *vc, const struct ofono_phone_number *ph,
+				ofono_voicecall_cb_t cb, void *data)
+{
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	struct ofono_call *call;
+	struct parcel rilp;
+
+	parcel_init(&rilp);
+	parcel_w_string(&rilp, phone_number_to_string(ph));
+
+	for (GSList *l = vd->calls; l; l = l->next) {
+		call = l->data;
+
+		if (call->status == CALL_STATUS_INCOMING || call->status == CALL_STATUS_WAITING)
+			vd->local_release_call_ids = g_slist_append(vd->local_release_call_ids,
+				GUINT_TO_POINTER(call->id));
+	}
+
+	ril_template(RIL_REQUEST_DEFLECT_CALL, vc,
+			ril_call_redirection_cb, 0, &rilp, cb, data);
+}
+
 void ril_release_all_held(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
@@ -1433,6 +1455,7 @@ static const struct ofono_voicecall_driver driver = {
 	.play_dtmf		= ril_play_dtmf,
 	.update_call_duration   = ril_update_call_duration,
 	.transfer 		= ril_transfer,
+	.deflect		= ril_deflect,
 };
 
 void ril_voicecall_init(void)
