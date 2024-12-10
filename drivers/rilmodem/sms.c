@@ -156,6 +156,24 @@ static void ril_csca_query(struct ofono_sms *sms, ofono_sms_sca_query_cb_t cb,
 	}
 }
 
+static void ril_get_covered_plmn(void *driver_data, char *covered_plmn)
+{
+	struct sms_data *sd = (struct sms_data *) driver_data;
+	char *ptr = covered_plmn;
+
+	if (sd->mcc[0] == '\0' || sd->mnc[0] == '\0') {
+		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		return;
+	}
+	for (int i = 0; sd->mcc[i] != '\0'; i++) {
+		*ptr++ = sd->mcc[i] - '0' + 'a';
+	}
+	for (int i = 0; sd->mnc[i] != '\0'; i++) {
+		*ptr++ = sd->mnc[i] - '0' + 'a';
+	}
+	*ptr = '\0';
+}
+
 static int ril_get_op_code(void *driver_data)
 {
 	struct sms_data *sd = (struct sms_data *)driver_data;
@@ -203,7 +221,7 @@ void ril_save_mcc_mnc(void *driver_data, const char *mcc, const char *mnc)
 			sd->mcc[0] = '\0';
 		}
 		if (mnc != NULL) {
-			strncpy(sd->mnc, mnc, OFONO_MAX_MCC_LENGTH);
+			strncpy(sd->mnc, mnc, OFONO_MAX_MNC_LENGTH);
 		} else {
 			sd->mnc[0] = '\0';
 		}
@@ -576,10 +594,12 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	size_t ril_pdu_len;
 	unsigned char pdu[176];
 	gboolean fail_flag = FALSE;
+	char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
 
 	ofono_debug("req: %d; data_len: %d", message->req, (int) message->buf_len);
-	OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
-			OFONO_SMS_RECEIVE, OFONO_SMS_NORMAL);
+	ril_get_covered_plmn(sd, covered_plmn);
+	OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
+			   OFONO_SMS_NORMAL, covered_plmn);
 
 	g_ril_init_parcel(message, &rilp);
 
@@ -627,8 +647,8 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 
 fail:
 	if (fail_flag) {
-		OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW,
-				OFONO_SMS_RECEIVE, OFONO_SMS_FAIL);
+		OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
+				   OFONO_SMS_FAIL, covered_plmn);
 	}
 	g_free(ril_pdu);
 }
@@ -687,6 +707,7 @@ static const struct ofono_sms_driver driver = {
 	.sms_write_to_sim   = ril_sms_write_to_sim,
 	.sms_delete_on_sim  = ril_sms_delete_on_sim,
 	.get_op_code    = ril_get_op_code,
+	.get_covered_plmn = ril_get_covered_plmn,
 	.save_mcc_mnc   = ril_save_mcc_mnc,
 };
 
