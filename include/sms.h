@@ -68,6 +68,7 @@ struct ofono_sms_driver {
 	void (*sms_delete_on_sim)(struct ofono_sms *sms, int index,
 				ofono_sms_delete_on_sim_cb_t cb, void *user_data);
 	int (*get_op_code)(void *driver_data);
+	void (*get_covered_plmn)(void *driver_data, char *covered_plmn);
 	void (*save_mcc_mnc)(void *driver_data, const char *mcc, const char *mnc);
 };
 
