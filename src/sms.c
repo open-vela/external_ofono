@@ -810,12 +810,19 @@ next_q:
 	}
 
 	if (ok == FALSE) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
 		if (sms->driver != NULL && sms->driver->get_op_code) {
 			op_code = sms->driver->get_op_code(sms->driver_data);
 		}
 
-		OFONO_DFX_SMS_INFO(op_code, OFONO_SMS_TYPE_UNKNOW,
-				   OFONO_SMS_SEND, OFONO_SMS_FAIL);
+		if (sms->driver != NULL && sms->driver->get_covered_plmn) {
+			sms->driver->get_covered_plmn(sms->driver_data, covered_plmn);
+		} else {
+			strncpy(covered_plmn, "unknow",
+				OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		}
+		OFONO_DFX_SMS_INFO(op_code, OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_SEND, OFONO_SMS_FAIL,
+				   covered_plmn);
 	}
 	message_sent_cb(sms, &entry_uuid, error, sms->pending);
 }
@@ -1089,11 +1096,19 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 	int op_code = OFONO_OPERATOR_UNKNOW;
 
 	if (sms->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
 		if (sms->driver != NULL && sms->driver->get_op_code) {
 			op_code = sms->driver->get_op_code(sms->driver_data);
 		}
-		OFONO_DFX_SMS_INFO(op_code, OFONO_CS_SMS,
-				OFONO_SMS_SEND, OFONO_SMS_FAIL);
+		if (sms->driver != NULL && sms->driver->get_covered_plmn) {
+			sms->driver->get_covered_plmn(sms->driver_data, covered_plmn);
+		} else {
+			strncpy(covered_plmn, "unknow",
+				OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		}
+		OFONO_DFX_SMS_INFO(op_code, OFONO_CS_SMS, OFONO_SMS_SEND, OFONO_SMS_FAIL,
+				   covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1161,11 +1176,19 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 	int op_code = OFONO_OPERATOR_UNKNOW;
 
 	if (sms->pending) {
-                if (sms->driver != NULL && sms->driver->get_op_code) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		if (sms->driver != NULL && sms->driver->get_op_code) {
 			op_code = sms->driver->get_op_code(sms->driver_data);
 		}
-		OFONO_DFX_SMS_INFO(op_code, OFONO_IMS_SMS,
-				OFONO_SMS_SEND, OFONO_SMS_FAIL);
+		if (sms->driver != NULL && sms->driver->get_covered_plmn) {
+			sms->driver->get_covered_plmn(sms->driver_data, covered_plmn);
+		} else {
+			strncpy(covered_plmn, "unknow",
+				OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		}
+		OFONO_DFX_SMS_INFO(op_code, OFONO_IMS_SMS, OFONO_SMS_SEND, OFONO_SMS_FAIL,
+				   covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
