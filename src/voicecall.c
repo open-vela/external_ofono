@@ -2681,10 +2681,6 @@ static DBusMessage *manager_deflect(DBusConnection *conn,
 	if (vc->pending || vc->dial_req || vc->pending_em)
 		return __ofono_error_busy(msg);
 
-	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &number,
-					DBUS_TYPE_INVALID) == FALSE)
-		return __ofono_error_invalid_args(msg);
-
 	if (!valid_phone_number_format(number))
 		return __ofono_error_invalid_format(msg);
 
@@ -3114,14 +3110,13 @@ static void generic_callback(const struct ofono_error *error, void *data)
 	struct ofono_voicecall *vc = data;
 	DBusMessage *reply;
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
-		DBG("command failed with error: %s",
-				telephony_error_to_str(error));
-
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(vc->pending);
-	else
+	else {
+		ofono_error("command failed with error: %s",
+				telephony_error_to_str(error));
 		reply = __ofono_error_failed(vc->pending);
+	}
 
 	__ofono_dbus_pending_reply(&vc->pending, reply);
 }
