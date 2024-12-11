@@ -475,13 +475,13 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			(struct ofono_ue_camp_cell_info *) covert_data;
 
 		memcpy(&g_camped_cell_info, ue_camp_cell_data,
-			sizeof(struct ofono_ue_camp_cell_info));
+		       sizeof(struct ofono_ue_camp_cell_info));
 		ofono_debug("%s,sub=%u,plmn=%u,tac=%u,cell_id=%u,band=%u,"
-			"earfcn=%u,pci=%u",
-			KEY_NAME, ue_camp_cell_data->sub, ue_camp_cell_data->plmn,
-			ue_camp_cell_data->tac, ue_camp_cell_data->cell_id,
-			ue_camp_cell_data->band, ue_camp_cell_data->earfcn,
-			ue_camp_cell_data->pci);
+			    "earfcn=%u,pci=%u",
+			    KEY_NAME, ue_camp_cell_data->sub, ue_camp_cell_data->plmn,
+			    ue_camp_cell_data->tac, ue_camp_cell_data->cell_id,
+			    ue_camp_cell_data->band, ue_camp_cell_data->earfcn,
+			    ue_camp_cell_data->pci);
 		if (!ofono_modem_check_and_save_band(modem, ue_camp_cell_data->band)) {
 			OFONO_DFX_BAND_INFO(ue_camp_cell_data->band);
 		}
