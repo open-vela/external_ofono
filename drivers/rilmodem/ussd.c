@@ -190,7 +190,7 @@ static void ril_ussd_notify(struct ril_msg *message, gpointer user_data)
 	 * UCS-2 string, uncompressed, and with unspecified message class. For
 	 * the DCS coding, see 3gpp 23.038, sect. 5.
 	 */
-	ucs2 = g_convert(str, -1, "UCS-2BE//TRANSLIT",
+	ucs2 = g_convert(str, -1, "UCS-2BE",
 					"UTF-8", NULL, &written, NULL);
 	g_free(str);
 

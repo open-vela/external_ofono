@@ -4779,7 +4779,7 @@ char *ussd_decode(int dcs, int len, const unsigned char *data)
 		break;
 	case SMS_CHARSET_UCS2:
 		utf8 = g_convert((const gchar *) data, len,
-					"UTF-8//TRANSLIT", "UCS-2BE",
+					"UTF-8", "UCS-2BE",
 					NULL, NULL, NULL);
 		break;
 	default:
