@@ -559,12 +559,12 @@ static void ussd_callback(const struct ofono_error *error, void *data)
 		reply = __ofono_error_failed(ussd->pending);
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
 		OFONO_DFX_SS_INFO("ss:ussd:request", reason_desc);
+		if (ussd->pending == NULL)
+			return;
+		__ofono_dbus_pending_reply(&ussd->pending, reply);
 	} else {
 		ussd_change_state(ussd, USSD_STATE_ACTIVE);
-		reply = dbus_message_new_method_return(ussd->pending);
 	}
-
-	__ofono_dbus_pending_reply(&ussd->pending, reply);
 }
 
 static DBusMessage *ussd_initiate(DBusConnection *conn, DBusMessage *msg,
