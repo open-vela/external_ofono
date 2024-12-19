@@ -58,12 +58,23 @@ static ofono_bool_t default_modem_can_set(const char *path)
 	struct ofono_sim *sim;
 
 	modem = ofono_modem_find(modem_path_compare, (void *)path);
-	if (modem == NULL || !ofono_modem_get_online(modem))
+	if (modem == NULL) {
+		ofono_error("%s: No modem found matching path '%s'. Cannot proceed.", __func__, path);
 		return FALSE;
+	}
+
+	if (!ofono_modem_get_online(modem)) {
+		ofono_error("%s: Modem '%s' is not online. Cannot set default attach info.",
+		 	__func__, ofono_modem_get_path(modem));
+		return FALSE;
+	}
 
 	sim = ofono_modem_get_sim(modem);
-	if (ofono_sim_get_state(sim) != OFONO_SIM_STATE_READY)
+	if (ofono_sim_get_state(sim) != OFONO_SIM_STATE_READY) {
+		ofono_warn("%s: SIM card state is '%d'. Expected '3'. Cannot set default attach info.",
+            __func__, ofono_sim_get_state(sim));
 		return FALSE;
+	}
 
 	return TRUE;
 }
@@ -117,8 +128,10 @@ static DBusMessage *manager_get_modems(DBusConnection *conn,
 	DBusMessageIter array;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create D-Bus reply message.", __func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -152,29 +165,45 @@ static DBusMessage *manager_set_property(DBusConnection *conn,
 	DBusMessageIter iter, var;
 	const char *name, *new_dds, *new_dcs, *new_dss;
 
-	if (dbus_message_iter_init(msg, &iter) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &name);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
 	if (g_str_equal(name, "DataSlot") == TRUE) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [DataSlot] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &new_dds);
-		if (!default_modem_can_set(new_dds))
+		if (!default_modem_can_set(new_dds)) {
+			ofono_error("%s: Cannot set 'DataSlot' to '%s'. Modem not ready.",
+				__func__, new_dds);
 			return __ofono_error_invalid_args(msg);
+		}
 
 		if (g_str_equal(new_dds, manager->data_slot) == TRUE) {
+			ofono_info("%s: 'DataSlot' value '%s' is unchanged. No update needed.",
+				__func__, new_dds);
 			return NULL;
 		}
 
@@ -188,14 +217,22 @@ static DBusMessage *manager_set_property(DBusConnection *conn,
 			OFONO_MANAGER_INTERFACE, "DataSlot", DBUS_TYPE_STRING, &new_dds);
 		return NULL;
 	} else if (g_str_equal(name, "VoiceCallSlot")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [VoiceCallSlot] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &new_dcs);
-		if (!default_modem_can_set(new_dcs) && !g_str_equal(new_dcs, SLOT_NOT_SET))
+		if (!default_modem_can_set(new_dcs) && !g_str_equal(new_dcs, SLOT_NOT_SET)) {
+			ofono_error("%s: Cannot set 'VoiceCallSlot' to '%s'. Modem not ready or invalid value.",
+			 	__func__, new_dcs);
 			return __ofono_error_invalid_args(msg);
+		}
 
 		if (g_str_equal(new_dcs, manager->voicecall_slot) == TRUE) {
+			ofono_info("%s: 'VoiceCallSlot' value '%s' is unchanged. No update needed.",
+				__func__, new_dcs);
 			return NULL;
 		}
 
@@ -210,14 +247,22 @@ static DBusMessage *manager_set_property(DBusConnection *conn,
 			OFONO_MANAGER_INTERFACE, "VoiceCallSlot", DBUS_TYPE_STRING, &new_dcs);
 		return NULL;
 	} else if (g_str_equal(name, "SmsSlot")) {
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [SmsSlot] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &new_dss);
-		if (!default_modem_can_set(new_dss) && !g_str_equal(new_dss, SLOT_NOT_SET))
+		if (!default_modem_can_set(new_dss) && !g_str_equal(new_dss, SLOT_NOT_SET)) {
+			ofono_error("%s: Cannot set 'SmsSlot' to '%s'. Modem not ready or invalid value.",
+				__func__, new_dss);
 			return __ofono_error_invalid_args(msg);
+		}
 
 		if (g_str_equal(new_dss, manager->sms_slot) == TRUE) {
+			ofono_info("%s: 'SmsSlot' value '%s' is unchanged. No update needed.",
+				__func__, new_dss);
 			return NULL;
 		}
 
@@ -234,6 +279,7 @@ static DBusMessage *manager_set_property(DBusConnection *conn,
 		return NULL;
 	}
 
+	ofono_error("%s: Unknown property '%s'.", __func__, name);
 	return __ofono_error_invalid_args(msg);
 }
 
@@ -246,8 +292,11 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	struct ofono_manager *manager = data;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create a new D-Bus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -266,8 +315,11 @@ void __ofono_manager_data_log(char *data)
 	DBusMessageIter iter;
 	signal = dbus_message_new_signal(OFONO_MANAGER_PATH,
 					 OFONO_MANAGER_INTERFACE, "DataLogInd");
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create DBus 'DataLogInd' signal for path '%s'.",
+			__func__, OFONO_MANAGER_PATH);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &data);

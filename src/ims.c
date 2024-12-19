@@ -74,19 +74,22 @@ static void extract_number_from_uris(const char *uri, char *ph_number)
 	int ssp_length;
 
 	if (uri == NULL) {
-		ofono_error("uri is null, return! \n");
+		ofono_error("%s: Received NULL URI pointer. Cannot "
+			"extract phone number.", __func__);
 		return;
 	}
 
 	if (strstr(uri, "tel") == NULL && strstr(uri, "sip") == NULL) {
-		ofono_error("invaild uri, return! \n");
+		ofono_error("%s: Invalid URI '%s'. Expected to start with 'tel:' or "
+			"'sip:'.", __func__, uri);
 		return;
 	}
 
 	/* ssp: SchemeSpecificPart */
 	ssp_start = strchr(uri, '+');
 	if (ssp_start == NULL) {
-		ofono_error("uri does not contain a phone number! \n");
+		ofono_error("%s: URI '%s' does not contain a '+' indicating the start "
+			"of the phone number.", __func__, uri);
 		return;
 	}
 
@@ -100,7 +103,8 @@ static void extract_number_from_uris(const char *uri, char *ph_number)
 		strncpy(ph_number, ssp_start, ssp_length);
 		ph_number[ssp_length] = '\0';
 	} else {
-		ofono_error("extract phone number from uri failed !");
+		ofono_error("%s: Failed to extract phone number from URI '%s'. Reason: length (%d) %s.",
+               __func__, uri, ssp_length, (ssp_length <= 0) ? "is invalid" : "exceeds maximum allowed");
 	}
 
 	return;
@@ -112,7 +116,8 @@ static void ims_load_settings(struct ofono_ims *ims)
 
 	ims->settings = storage_open(SETTINGS_KEY, SETTINGS_STORE);
 	if (ims->settings == NULL) {
-		ofono_warn("ims setting storage open failed");
+		ofono_warn("%s: Failed to open IMS settings storage with key '%s' and store '%s'. "
+			"Defaulting 'user_setting' to TRUE.", __func__, SETTINGS_KEY, SETTINGS_STORE);
 		ims->user_setting = TRUE;
 		return;
 	}
@@ -121,7 +126,8 @@ static void ims_load_settings(struct ofono_ims *ims)
 	ims->user_setting = g_key_file_get_boolean(ims->settings, SETTINGS_GROUP,
 					"ImsOn", &error);
 	if (error) {
-		ofono_error("ims switcher storage read failed");
+		ofono_error("%s: Failed to read 'ImsOn' from settings group '%s'. Error: %s. "
+			"Defaulting 'user_setting' to TRUE.", __func__, SETTINGS_GROUP, error->message);
 
 		g_error_free(error);
 		ims->user_setting = TRUE;
@@ -140,12 +146,16 @@ static void ims_load_settings_from_imsi(struct ofono_ims *ims)
 	ims->sim = sim;
 
 	imsi = ofono_sim_get_imsi(ims->sim);
-	if (imsi == NULL)
+	if (imsi == NULL) {
+		ofono_error("%s: Received NULL ims pointer. Cannot load IMS "
+			"settings from IMSI.", __func__);
 		return;
+	}
 
 	ims->imsi_settings = storage_open(imsi, SETTINGS_STORE);
 	if (ims->imsi_settings == NULL) {
-		ofono_error("ims imsi setting storage open failed");
+		ofono_error("%s: Failed to open IMSI settings storage with IMSI '%s' and store '%s'.",
+            __func__, imsi, SETTINGS_STORE);
 		return;
 	}
 
@@ -204,8 +214,10 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 	const char *ph_number;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus reply message.", __func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -390,11 +402,15 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 	dbus_bool_t new_voice_capable, new_sms_capable;
 	char *number;
 
-	if (ims == NULL)
+	if (ims == NULL) {
+		ofono_error("%s: Received NULL ims pointer. Cannot notify IMS status.",
+			__func__);
 		return;
-
-	ofono_debug("%s reg_info:%d ext_info:%d", __ofono_atom_get_path(ims->atom),
-						reg_info, ext_info);
+	}
+	
+	ofono_debug("%s: Called with path='%s', reg_info=%d, ext_info=%d, subscriber_uri='%s'",
+            __func__, __ofono_atom_get_path(ims->atom), reg_info, ext_info,
+				subscriber_uri ? subscriber_uri : "NULL");
 
 	if (ims->ext_info == ext_info && ims->reg_info == reg_info)
 		return;
@@ -454,13 +470,19 @@ static void register_cb(const struct ofono_error *error, void *data)
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(ims->pending);
-	else
+	else {
+		ofono_error("%s: Registration failed with error type=%d.",
+			__func__, error->type);
 		reply = __ofono_error_failed(ims->pending);
+	}
 
 	__ofono_dbus_pending_reply(&ims->pending, reply);
 
-	if (ims->driver->registration_status == NULL)
+	if (ims->driver->registration_status == NULL) {
+		ofono_error("%s: IMS driver's 'registration_status' function is not implemented.",
+			__func__);
 		return;
+	}
 
 	ims->driver->registration_status(ims, registration_status_cb, ims);
 }
@@ -471,11 +493,16 @@ static DBusMessage *ofono_ims_send_register(DBusConnection *conn,
 	struct ofono_ims *ims = data;
 	const char *path = __ofono_atom_get_path(ims->atom);
 
-	if (ims->pending)
+	if (ims->pending) {
+		ofono_error("%s: IMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (ims->driver->ims_register == NULL)
+	if (ims->driver->ims_register == NULL) {
+		ofono_error("%s: IMS driver's 'ims_register' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	ims->pending = dbus_message_ref(msg);
 
@@ -500,11 +527,16 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 	struct ofono_ims *ims = data;
 	const char *path = __ofono_atom_get_path(ims->atom);
 
-	if (ims->pending)
+	if (ims->pending) {
+		ofono_error("%s: IMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (ims->driver->ims_unregister == NULL)
+	if (ims->driver->ims_unregister == NULL) {
+		ofono_error("%s: IMS driver's 'ims_unregister' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	ims->pending = dbus_message_ref(msg);
 
@@ -539,11 +571,17 @@ static void send_ims_config(struct ofono_ims *ims)
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(ims->atom);
 
-	if (driver == NULL)
+	if (driver == NULL) {
+		ofono_warn("%s: IMS driver is NULL. Cannot send IMS configuration.",
+			__func__);
 		return;
+	}
 
-	if (driver->ims_register == NULL)
+	if (driver->ims_register == NULL) {
+		ofono_error("%s: IMS driver's 'ims_register' function is not implemented.",
+			__func__);
 		return;
+	}
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_IMS_INTERFACE,
@@ -570,8 +608,11 @@ static void set_capability_cb(const struct ofono_error *error, void *data)
 	reply = dbus_message_new_method_return(ims->pending);
 	__ofono_dbus_pending_reply(&ims->pending, reply);
 
-	if (ims->driver->registration_status == NULL)
+	if (ims->driver->registration_status == NULL) {
+		ofono_error("%s: IMS driver's 'registration_status' function is not implemented.",
+			__func__);
 		return;
+	}
 
 	ims->driver->registration_status(ims, registration_status_cb, ims);
 }
@@ -582,15 +623,23 @@ static DBusMessage *ofono_ims_set_capability(DBusConnection *conn,
 	struct ofono_ims *ims = data;
 	int cap;
 
-	if (ims->pending)
+	if (ims->pending) {
+		ofono_error("%s: IMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (ims->driver->set_capable == NULL)
+	if (ims->driver->set_capable == NULL) {
+		ofono_error("%s: IMS driver's 'set_capable' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &cap,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to retrieve integer argument from D-Bus message.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	ims->pending = dbus_message_ref(msg);
 
