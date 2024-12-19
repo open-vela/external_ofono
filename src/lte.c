@@ -70,14 +70,16 @@ static void lte_load_settings(struct ofono_lte *lte)
 	char **groups;
 	ofono_bool_t ia_apn_exiting = FALSE;
 
-	if (lte->imsi == NULL)
+	if (lte->imsi == NULL) {
+		ofono_error("%s: IMSI is NULL. Cannot load LTE settings.", __func__);
 		return;
+	}
 
 	lte->settings = storage_open(lte->imsi, SETTINGS_STORE);
 
 	if (lte->settings == NULL) {
-		ofono_error("LTE: Can't open settings file, "
-				"changes won't be persistent");
+		ofono_error("%s: Cannot open settings file. Changes will not be persistent.",
+			__func__);
 		return;
 	}
 
@@ -155,8 +157,10 @@ static DBusMessage *lte_get_properties(DBusConnection *conn,
 	DBusMessageIter dict;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		 ofono_error("%s: Failed to create D-Bus method return message.", __func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -189,9 +193,9 @@ static void lte_set_default_attach_info_cb(const struct ofono_error *error,
 	DBusMessageIter iter;
 	DBusMessageIter var;
 
-	DBG("%s error %d", path, error->type);
-
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: Received error of type %d. Sending failure reply.",
+			__func__, error->type);
 		__ofono_dbus_pending_reply(&lte->pending,
 				__ofono_error_failed(lte->pending));
 		return;
@@ -252,79 +256,123 @@ static DBusMessage *lte_set_property(DBusConnection *conn,
 	enum ofono_gprs_auth_method auth_method;
 	enum ofono_gprs_proto proto;
 
-	if (lte->driver->set_default_attach_info == NULL)
+	if (lte->driver->set_default_attach_info == NULL) {
+		ofono_error("%s: LTE driver's 'set_default_attach_info' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (lte->pending)
+	if (lte->pending) {
+		ofono_error("%s: LTE is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_iter_init(msg, &iter))
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
-	if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid variant type for property '%s' value. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, property, dbus_message_iter_get_arg_type(&var));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&var, &str);
 
 	memcpy(&lte->pending_info, &lte->info, sizeof(lte->info));
 
 	if ((strcmp(property, LTE_APN) == 0)) {
-		if (g_str_equal(str, lte->info.apn))
+		if (g_str_equal(str, lte->info.apn)) {
+			ofono_info("%s: APN value unchanged ('%s'). No action needed.", __func__, str);
 			return dbus_message_new_method_return(msg);
+		}
 
 		/* We do care about empty value: it can be used for reset. */
-		if (is_valid_apn(str) == FALSE && str[0] != '\0')
+		if (is_valid_apn(str) == FALSE && str[0] != '\0') {
+			ofono_error("%s: Invalid APN format '%s'.", __func__, str);
 			return __ofono_error_invalid_format(msg);
+		}
 
 		g_strlcpy(lte->pending_info.apn, str,
 					OFONO_GPRS_MAX_APN_LENGTH + 1);
 	} else if ((strcmp(property, LTE_PROTO) == 0)) {
-		if (!gprs_proto_from_string(str, &proto))
+		if (!gprs_proto_from_string(str, &proto)) {
+			ofono_error("%s: Invalid protocol string '%s', must be IP, IPV6 or IPV4V6",
+				__func__, str);
 			return __ofono_error_invalid_format(msg);
+		}
 
-		if (proto == lte->info.proto)
+		if (proto == lte->info.proto) {
+			ofono_info("%s: PROTO value unchanged ('%s'). No action needed.", __func__, str);
 			return dbus_message_new_method_return(msg);
+		}
 
 		lte->pending_info.proto = proto;
 	} else if (strcmp(property, LTE_AUTH_METHOD) == 0) {
-		if (!gprs_auth_method_from_string(str, &auth_method))
+		if (!gprs_auth_method_from_string(str, &auth_method)) {
+			ofono_error("%s: Invalid authentication method string '%s', must be chap, pap or none.",
+				__func__, str);
 			return __ofono_error_invalid_format(msg);
+		}
 
-		if (auth_method == lte->info.auth_method)
+		if (auth_method == lte->info.auth_method) {
+			ofono_info("%s: AUTH_METHOD value unchanged ('%s'). No action needed.",
+				__func__, str);
 			return dbus_message_new_method_return(msg);
+		}
 
 		lte->pending_info.auth_method = auth_method;
 	} else if (strcmp(property, LTE_USERNAME) == 0) {
-		if (strlen(str) > OFONO_GPRS_MAX_USERNAME_LENGTH)
+		if (strlen(str) > OFONO_GPRS_MAX_USERNAME_LENGTH) {
+			ofono_error("%s: Username length exceeds maximum limit (%d). Received '%s'.", __func__, 
+                OFONO_GPRS_MAX_USERNAME_LENGTH, str);
 			return __ofono_error_invalid_format(msg);
+		}
 
-		if (g_str_equal(str, lte->info.username))
+		if (g_str_equal(str, lte->info.username)) {
+			ofono_info("%s: USERNAME value unchanged ('%s'). No action needed.", __func__, str);
 			return dbus_message_new_method_return(msg);
+		}
 
 		g_strlcpy(lte->pending_info.username, str,
 					OFONO_GPRS_MAX_USERNAME_LENGTH + 1);
 	} else if (strcmp(property, LTE_PASSWORD) == 0) {
-		if (strlen(str) > OFONO_GPRS_MAX_PASSWORD_LENGTH)
+		if (strlen(str) > OFONO_GPRS_MAX_PASSWORD_LENGTH) {
+			ofono_error("%s: Password length exceeds maximum limit (%d). Received '%s'.", __func__, 
+                OFONO_GPRS_MAX_PASSWORD_LENGTH, str);
 			return __ofono_error_invalid_format(msg);
+		}
 
-		if (g_str_equal(str, lte->info.password))
+		if (g_str_equal(str, lte->info.password)) {
+			ofono_info("%s: PASSWORD value unchanged (%s). No action needed.", __func__, str);
 			return dbus_message_new_method_return(msg);
+		}
 
 		g_strlcpy(lte->pending_info.password, str,
 					OFONO_GPRS_MAX_PASSWORD_LENGTH + 1);
-	} else
+	} else {
+		ofono_error("%s: Unknown property '%s'.", __func__, property);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	lte->pending = dbus_message_ref(msg);
 	lte->driver->set_default_attach_info(lte, &lte->pending_info,
