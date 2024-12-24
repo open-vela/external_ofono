@@ -488,7 +488,7 @@ static void remove_dialing_ecc_info(struct ofono_voicecall *vc,
 					    GINT_TO_POINTER(count));
 		}
 	} else {
-		ofono_debug("unexpected,no %s exist in dialing_ecc_info",
+		ofono_debug("unexpected, no %s exist in dialing_ecc_info",
 			    number);
 	}
 }
@@ -544,7 +544,7 @@ static void append_voicecall_properties(struct voicecall *v,
 	if (call->direction == CALL_DIRECTION_MOBILE_TERMINATED) {
 		callerid = phone_and_clip_to_string(&call->phone_number,
 							call->clip_validity);
-        } else {
+    } else {
 		if (strlen(call->original_number.number) > 0) {
 			callerid = phone_number_to_string(&call->original_number);
 		} else {
@@ -622,8 +622,11 @@ static DBusMessage *voicecall_get_properties(DBusConnection *conn,
 	DBusMessageIter dict;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -647,21 +650,47 @@ static DBusMessage *voicecall_deflect(DBusConnection *conn,
 	const char *number;
 
 	if (call->status != CALL_STATUS_INCOMING &&
-			call->status != CALL_STATUS_WAITING)
+			call->status != CALL_STATUS_WAITING) {
+		ofono_error("%s: Call status not suitable for deflection (Required status: "
+			"INCOMING or WAITING, current status: %d).", __func__, call->status);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->deflect == NULL)
+	if (vc->driver->deflect == NULL) {
+		ofono_error("%s: Voicecall driver's 'deflect' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &number,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments. Expected no arguments.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (!valid_phone_number_format(number))
+	if (!valid_phone_number_format(number)) {
+		ofono_error("%s: Phone number format is invalid.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -680,20 +709,36 @@ static DBusMessage *voicecall_hangup(DBusConnection *conn,
 	struct ofono_call *call = v->call;
 	gboolean single_call = vc->call_list->next == 0;
 
-	if (vc->pending || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (vc->dial_req && vc->dial_req->call != v)
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req && vc->dial_req->call != v) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request for "
+			"another call.", __func__);
+		return __ofono_error_busy(msg);
+	}
 
 	switch (call->status) {
 	case CALL_STATUS_DISCONNECTED:
+		ofono_error("%s: Cannot hang up a call that is already disconnected.", __func__);
 		return __ofono_error_failed(msg);
 
 	case CALL_STATUS_INCOMING:
 		if (vc->driver->hangup_all == NULL &&
-				vc->driver->hangup_active == NULL)
+				vc->driver->hangup_active == NULL) {
+			ofono_error("%s: No hangup functionality implemented for incoming calls.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
 		vc->pending = dbus_message_ref(msg);
 
@@ -705,8 +750,11 @@ static DBusMessage *voicecall_hangup(DBusConnection *conn,
 		return NULL;
 
 	case CALL_STATUS_WAITING:
-		if (vc->driver->set_udub == NULL)
+		if (vc->driver->set_udub == NULL) {
+			ofono_error("%s: Voicecall driver's 'set_udub' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
 		vc->pending = dbus_message_ref(msg);
 		vc->driver->set_udub(vc, generic_callback, vc);
@@ -759,8 +807,11 @@ static DBusMessage *voicecall_hangup(DBusConnection *conn,
 		break;
 	}
 
-	if (vc->driver->release_specific == NULL)
+	if (vc->driver->release_specific == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_specific' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 	vc->driver->release_specific(vc, call->id,
@@ -776,14 +827,35 @@ static DBusMessage *voicecall_answer(DBusConnection *conn,
 	struct ofono_voicecall *vc = v->vc;
 	struct ofono_call *call = v->call;
 
-	if (call->status != CALL_STATUS_INCOMING)
+	if (call->status != CALL_STATUS_INCOMING) {
+		ofono_error("%s: Cannot answer call; not in incoming state (current status: %d).",
+            __func__, call->status);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->answer == NULL)
+	if (vc->driver->answer == NULL) {
+		ofono_error("%s: Voicecall driver's 'answer' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -1396,8 +1468,11 @@ static void voicecalls_emit_call_added(struct ofono_voicecall *vc,
 					OFONO_VOICECALL_MANAGER_INTERFACE,
 					"CallAdded");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create DBus 'CallAdded' signal for path '%s'.",
+			__func__, path);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 
@@ -1431,8 +1506,11 @@ static void voicecalls_emit_call_changed(struct ofono_voicecall *vc,
 					OFONO_VOICECALL_MANAGER_INTERFACE,
 					"CallChanged");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create DBus 'CallChanged' signal for path '%s'.",
+			__func__, path);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 
@@ -1529,8 +1607,11 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	gpointer key, value;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -1581,12 +1662,16 @@ void ofonocall_set_original_number(struct voicecall **v, struct ofono_voicecall 
 {
 	char *number = NULL;
 
-	if (!vc->pending)
+	if (!vc->pending) {
+		ofono_debug("%s: No pending operation, skipping number setting.", __func__);
 		return;
+	}
 
 	if (dbus_message_get_args(vc->pending, NULL, DBUS_TYPE_STRING, &number,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return;
+	}
 
 	if ((*v)->call->direction == CALL_DIRECTION_MOBILE_ORIGINATED
 		&& number && strlen(number) > 0) {
@@ -1603,13 +1688,15 @@ static struct voicecall *synthesize_outgoing_call(struct ofono_voicecall *vc,
 	struct voicecall *v;
 
 	call = g_try_new0(struct ofono_call, 1);
-	if (call == NULL)
+	if (call == NULL) {
+		ofono_error("%s: Failed to allocate memory for new call", __func__);
 		return NULL;
+	}
 
 	call->id = __ofono_modem_callid_next(modem);
 
 	if (call->id == 0) {
-		ofono_error("Failed to alloc callid, too many calls");
+		ofono_error("%s: Failed to alloc callid, too many calls.", __func__);
 		g_free(call);
 		return NULL;
 	}
@@ -1625,13 +1712,14 @@ static struct voicecall *synthesize_outgoing_call(struct ofono_voicecall *vc,
 
 	v = voicecall_create(vc, call);
 	if (v == NULL) {
+		ofono_error("%s: Failed to create voicecall structure", __func__);
 		g_free(call);
 		return NULL;
 	}
 
 	v->detect_time = time(NULL);
 
-	DBG("Registering new call: %d", call->id);
+	ofono_info("Registering new call: %d", call->id);
 	if (!voicecall_dbus_register(v)) {
 		g_free(call);
 		ofono_error("Unable to register voice call");
@@ -1656,7 +1744,7 @@ static struct voicecall *dial_handle_result(struct ofono_voicecall *vc,
 	*need_to_emit = FALSE;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Dial callback returned error: %s",
+		ofono_error("Dial callback returned error: %s",
 			telephony_error_to_str(error));
 
 		return NULL;
@@ -1705,8 +1793,10 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 	struct voicecall *v;
 
 	if (dbus_message_get_args(vc->pending, NULL, DBUS_TYPE_STRING, &number,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		number = NULL;
+	}
 
 	v = dial_handle_result(vc, error, number, &need_to_emit);
 
@@ -1760,35 +1850,58 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 	memset(number_dial, 0, sizeof(number_dial));
 	memset(post_dial, 0, sizeof(post_dial));
 
-	if (g_slist_length(vc->call_list) >= MAX_VOICE_CALLS)
+	if (g_slist_length(vc->call_list) >= MAX_VOICE_CALLS) {
+		ofono_error("%s: Maximum number of calls reached", __func__);
 		return -EPERM;
+	}
 
 	if (!is_valid_ecc_number_in_whitelist(number)) {
-		if ((valid_ussd_string(number, vc->call_list != NULL)) ||
-			!valid_long_phone_number_format(number))
+		ofono_info("%s: Number is not a valid emergency number in whitelist", __func__);
+		if (valid_ussd_string(number, vc->call_list != NULL)) {
+			ofono_info("%s: Number recognized as USSD string, dialing not allowed", __func__);
 			return -EINVAL;
+		}
+
+		if (!valid_long_phone_number_format(number)) {
+			ofono_error("%s: Number format is invalid for normal phone number: %s",
+				__func__, number);
+			return -EINVAL;
+		}
 	}
 
 	parse_post_dial_string(number, number_dial, post_dial);
 
-	if (!valid_actual_number_format(number_dial, OFONO_MAX_PHONE_NUMBER_LENGTH))
+	if (!valid_actual_number_format(number_dial, OFONO_MAX_PHONE_NUMBER_LENGTH)) {
+		ofono_error("%s: Dial number format invalid: %s", __func__, number_dial);
 		return -EINVAL;
+	}
 
-	if (ofono_modem_get_online(modem) == FALSE)
+	if (ofono_modem_get_online(modem) == FALSE) {
+		ofono_error("%s: Modem is not online.", __func__);
 		return -ENETDOWN;
+	}
 
-	if (vc->driver->dial == NULL)
+	if (vc->driver->dial == NULL) {
+		ofono_error("%s: Voicecall driver's 'dial' function is not implemented.",
+			__func__);
 		return -ENOTSUP;
+	}
 
-	if (voicecalls_have_incoming(vc))
+	if (voicecalls_have_incoming(vc)) {
+		ofono_error("%s: Cannot dial due to incoming call", __func__);
 		return -EBUSY;
+	}
 
 	/* We can't have two dialing/alerting calls, reject outright */
-	if (voicecalls_num_connecting(vc) > 0)
+	if (voicecalls_num_connecting(vc) > 0) {
+		ofono_error("%s: Cannot dial, a call is already connecting", __func__);
 		return -EBUSY;
+	}
 
-	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
+	if (voicecalls_have_active(vc) && voicecalls_have_held(vc)) {
+		ofono_error("%s: Cannot dial with both active and held calls", __func__);
 		return -EBUSY;
+	}
 
 	if (is_emergency_number(vc, number) == TRUE) {
 		__ofono_modem_inc_emergency_mode(modem);
@@ -1826,26 +1939,48 @@ static DBusMessage *manager_dial(DBusConnection *conn,
 	enum ofono_clir_option clir;
 	int err;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &number,
 					DBUS_TYPE_STRING, &clirstr,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (clir_string_to_clir(clirstr, &clir) == FALSE)
+	if (clir_string_to_clir(clirstr, &clir) == FALSE) {
+		 ofono_error("%s: Invalid CLIR string: %s", __func__, clirstr);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
 	err = voicecall_dial(vc, number, clir, manager_dial_callback, vc);
 
-	if (err >= 0)
+	if (err >= 0) {
+		ofono_info("%s: Dial request initiated successfully", __func__);
 		return NULL;
+	}
 
 	vc->pending = NULL;
 	dbus_message_unref(msg);
+	ofono_error("%s: Dial request failed with error: %d", __func__, err);
 
 	switch (err) {
 	case -EINVAL:
@@ -2016,8 +2151,23 @@ static DBusMessage *manager_transfer(DBusConnection *conn,
 	int numactive;
 	int numheld;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	numactive = voicecalls_num_active(vc);
 
@@ -2030,11 +2180,17 @@ static DBusMessage *manager_transfer(DBusConnection *conn,
 
 	numheld = voicecalls_num_held(vc);
 
-	if (numactive != 1 || numheld != 1)
+	if (numactive != 1 || numheld != 1) {
+		ofono_error("%s: Cannot transfer; requires exactly one active (%d) and one held (%d) call",
+			__func__, numactive, numheld);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->transfer == NULL)
+	if (vc->driver->transfer == NULL) {
+		ofono_error("%s: Voicecall driver's 'transfer' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2049,8 +2205,23 @@ static DBusMessage *manager_swap_without_accept(DBusConnection *conn,
 	struct ofono_voicecall *vc = data;
 	ofono_voicecall_cb_t cb;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2074,14 +2245,34 @@ static DBusMessage *manager_swap_calls(DBusConnection *conn,
 	if (vc->driver->swap_without_accept)
 		return manager_swap_without_accept(conn, msg, data);
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (voicecalls_have_waiting(vc))
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (voicecalls_have_waiting(vc)) {
+		ofono_error("%s: Cannot swap calls; there's a waiting call", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->hold_all_active == NULL)
+	if (vc->driver->hold_all_active == NULL) {
+		ofono_error("%s: Voicecall driver's 'hold_all_active' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2100,14 +2291,34 @@ static DBusMessage *manager_release_and_answer(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!voicecalls_have_waiting(vc))
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (!voicecalls_have_waiting(vc)) {
+		ofono_error("%s: No waiting call to answer, operation failed", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->release_all_active == NULL)
+	if (vc->driver->release_all_active == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_all_active' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2121,14 +2332,34 @@ static DBusMessage *manager_release_and_swap(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (voicecalls_have_waiting(vc))
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (voicecalls_have_waiting(vc)) {
+		ofono_error("%s: Cannot release and swap; there's a waiting call", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->release_all_active == NULL)
+	if (vc->driver->release_all_active == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_all_active' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2142,21 +2373,43 @@ static DBusMessage *manager_hold_and_answer(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (voicecalls_have_waiting(vc) == FALSE)
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (voicecalls_have_waiting(vc) == FALSE) {
+		ofono_error("%s: No waiting call to answer, operation failed", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	/*
 	 * We have waiting call and both an active and held call.  According
 	 * to 22.030 we cannot use CHLD=2 in this situation.
 	 */
-	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
+	if (voicecalls_have_active(vc) && voicecalls_have_held(vc)) {
+		ofono_error("%s: Cannot hold and answer; there's both an active and held call", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->hold_all_active == NULL)
+	if (vc->driver->hold_all_active == NULL) {
+		ofono_error("%s: Voicecall driver's 'hold_all_active' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2170,16 +2423,30 @@ static DBusMessage *manager_hangup_all(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 
-	if (vc->pending || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (vc->dial_req && vc->dial_req->call == NULL)
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req && vc->dial_req->call == NULL) {
+		ofono_error("%s: Voicecall service is busy due to an ongoing dial request with no associated call.",
+            __func__);
+		return __ofono_error_busy(msg);
+	}
 
 	if (vc->driver->hangup_all == NULL &&
 		(vc->driver->release_specific == NULL ||
-			vc->driver->hangup_active == NULL))
+			vc->driver->hangup_active == NULL)) {
+		ofono_error("%s: No method available to hang up all calls", __func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	if (vc->call_list == NULL) {
 		DBusMessage *reply = dbus_message_new_method_return(msg);
@@ -2235,7 +2502,7 @@ static void private_chat_callback(const struct ofono_error *error, void *data)
 	GSList *old;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("command failed with error: %s",
+		ofono_error("command failed with error: %s",
 				telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&vc->pending,
 					__ofono_error_failed(vc->pending));
@@ -2282,23 +2549,46 @@ static DBusMessage *multiparty_private_chat(DBusConnection *conn,
 	unsigned int id;
 	GSList *l;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH, &callpath,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (strlen(callpath) == 0)
+	if (strlen(callpath) == 0) {
+		ofono_error("%s: Empty call path provided.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	c = strrchr(callpath, '/');
 
-	if (c == NULL || strncmp(path, callpath, c-callpath))
+	if (c == NULL || strncmp(path, callpath, c-callpath)) {
+		ofono_error("%s: Invalid call path: %s", __func__, callpath);
 		return __ofono_error_not_found(msg);
+	}
 
-	if (!sscanf(c, "/voicecall%2u", &id))
+	if (!sscanf(c, "/voicecall%2u", &id)) {
+		ofono_error("%s: Failed to extract call ID from path: %s", __func__, callpath);
 		return __ofono_error_not_found(msg);
+	}
 
 	for (l = vc->multiparty_list; l; l = l->next) {
 		struct voicecall *v = l->data;
@@ -2306,19 +2596,26 @@ static DBusMessage *multiparty_private_chat(DBusConnection *conn,
 			break;
 	}
 
-	if (l == NULL)
+	if (l == NULL) {
+		ofono_error("%s: Call ID %u not found in multiparty list", __func__, id);
 		return __ofono_error_not_found(msg);
+	}
 
 	/*
 	 * If we found id on the list of multiparty calls, then by definition
 	 * the multiparty call exists.	Only thing to check is whether we have
 	 * held calls
 	 */
-	if (voicecalls_have_held(vc))
+	if (voicecalls_have_held(vc)) {
+		ofono_error("%s: Cannot start private chat with held calls present", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->private_chat == NULL)
+	if (vc->driver->private_chat == NULL) {
+		ofono_error("%s: Voicecall driver's 'private_chat' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2335,7 +2632,7 @@ static void multiparty_create_callback(const struct ofono_error *error,
 	GSList *old;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("command failed with error: %s",
+		ofono_error("command failed with error: %s",
 				telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&vc->pending,
 					__ofono_error_failed(vc->pending));
@@ -2380,14 +2677,34 @@ static DBusMessage *multiparty_create(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!voicecalls_have_held(vc) || !voicecalls_have_active(vc))
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (!voicecalls_have_held(vc) || !voicecalls_have_active(vc)) {
+		ofono_error("%s: Cannot create multiparty call; requires both held and active calls", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->create_multiparty == NULL)
+	if (vc->driver->create_multiparty == NULL) {
+		ofono_error("%s: Voicecall driver's 'create_multiparty' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2401,17 +2718,41 @@ static DBusMessage *multiparty_hangup(DBusConnection *conn,
 {
 	struct ofono_voicecall *vc = data;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (vc->driver->release_specific == NULL)
-		return __ofono_error_not_implemented(msg);
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
-	if (vc->driver->release_all_held == NULL)
-		return __ofono_error_not_implemented(msg);
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
-	if (vc->driver->release_all_active == NULL)
+	if (vc->driver->release_specific == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_specific' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
+
+	if (vc->driver->release_all_held == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_all_held' function is not implemented.",
+			__func__);
+		return __ofono_error_not_implemented(msg);
+	}
+
+	if (vc->driver->release_all_active == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_all_active' function is not implemented.",
+			__func__);
+		return __ofono_error_not_implemented(msg);
+	}
 
 	if (vc->multiparty_list == NULL) {
 		DBusMessage *reply = dbus_message_new_method_return(msg);
@@ -2456,9 +2797,10 @@ static void tone_callback(int error, void *data)
 	struct ofono_voicecall *vc = data;
 	DBusMessage *reply;
 
-	if (error)
+	if (error) {
+		ofono_error("%s: Tone playback failed with error: %d", __func__, error);
 		reply = __ofono_error_failed(vc->pending);
-	else
+	} else
 		reply = dbus_message_new_method_return(vc->pending);
 
 	__ofono_dbus_pending_reply(&vc->pending, reply);
@@ -2472,24 +2814,35 @@ static DBusMessage *manager_tone(DBusConnection *conn,
 	char *tones;
 	int err, len;
 
-	if (vc->pending)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (vc->driver->send_tones == NULL)
+	if (vc->driver->send_tones == NULL) {
+		ofono_error("%s: Voicecall driver's 'send_tones' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	/* Send DTMFs only if we have at least one connected call */
-	if (!voicecalls_can_dtmf(vc))
+	if (!voicecalls_can_dtmf(vc)) {
+		ofono_error("%s: No connected call available to send DTMF tones", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &in_tones,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	len = strlen(in_tones);
 
-	if (len == 0)
+	if (len == 0) {
+		ofono_error("%s: Empty tone string provided", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	tones = g_ascii_strup(in_tones, len);
 
@@ -2497,8 +2850,10 @@ static DBusMessage *manager_tone(DBusConnection *conn,
 
 	g_free(tones);
 
-	if (err < 0)
+	if (err < 0) {
+		ofono_error("%s: Failed to queue tones: %s, error: %d", __func__, tones, err);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2512,8 +2867,10 @@ static int manager_conference(DBusMessage *msg,
 	DBusMessageIter iter, entry;
 	int index;
 
-	if (dbus_message_iter_init(msg, &iter) == FALSE)
+	if (dbus_message_iter_init(msg, &iter) == FALSE) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return -EINVAL;
+	}
 
 	dbus_message_iter_recurse(&iter, &entry);
 
@@ -2524,15 +2881,20 @@ static int manager_conference(DBusMessage *msg,
 			dbus_message_iter_next(&entry);
 		}
 	}
+
 	ofono_debug("manager_conference %d", index);
 
 	for (int i = 0; i < index; i++) {
 		ofono_debug("manager_conference ***");
-		if (!valid_long_phone_number_format(dial_number[i]))
+		if (!valid_long_phone_number_format(dial_number[i])) {
+			ofono_error("%s: Invalid phone number format for participant %d", __func__, i + 1);
 			return -EINVAL;
+		}
 
-		if (is_emergency_number(vc, dial_number[i]) == TRUE)
+		if (is_emergency_number(vc, dial_number[i]) == TRUE) {
+			ofono_error("%s: Attempt to use emergency number in conference.", __func__);
 			return -EPERM;
+		}
 	}
 
 	return index;
@@ -2546,32 +2908,63 @@ static DBusMessage *dial_conference(DBusConnection *conn,
 	char* dial_str[MAX_IMS_CONFERENCE_CALLS];
 	int num_size;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	modem = __ofono_atom_get_modem(vc->atom);
-	if (ofono_modem_get_online(modem) == FALSE)
+	if (ofono_modem_get_online(modem) == FALSE) {
+		ofono_error("%s: Modem is offline, cannot initiate conference call", __func__);
 		return __ofono_error_not_available(msg);
+	}
 
 	/* We can't have two dialing/alerting calls, reject outright */
-	if (voicecalls_num_connecting(vc) > 0 ||
-			g_slist_length(vc->call_list) >= MAX_VOICE_CALLS)
+	if (voicecalls_num_connecting(vc) > 0) {
+		ofono_error("%s: Cannot dial conference; a call is already connecting", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
+	if (g_slist_length(vc->call_list) >= MAX_VOICE_CALLS) {
+		ofono_error("%s: Maximum number of voice calls reached", __func__);
+		return __ofono_error_failed(msg);
+	}
+
+	if (voicecalls_have_active(vc) && voicecalls_have_held(vc)) {
+		ofono_error("%s: Cannot dial conference with both active and held calls", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (vc->driver->dial_conferece == NULL)
+	if (vc->driver->dial_conferece == NULL) {
+		ofono_error("%s: Voicecall driver's 'dial_conferece' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	num_size = manager_conference(msg, dial_str, data);
 
 	if (num_size > 0) {
+		ofono_info("%s: Validating and dialing conference with %d participants", __func__, num_size);
 		vc->pending = dbus_message_ref(msg);
 		vc->driver->dial_conferece(vc, num_size, dial_str, generic_callback, vc);
 
 		return NULL;
 	}
+
+	ofono_error("%s: Unspecified error (%d) during conference call setup.", __func__, num_size);
 
 	switch (num_size) {
 	case -EINVAL:
@@ -2594,28 +2987,51 @@ static DBusMessage *invite_participants(DBusConnection *conn,
 	char* dial_str[MAX_IMS_CONFERENCE_CALLS];
 	int num_size;
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (voicecalls_have_waiting(vc))
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (voicecalls_have_waiting(vc)) {
+		ofono_error("%s: Cannot invite participants; there is a waiting call", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	if (vc->multiparty_list == NULL) {
 		DBusMessage *reply = dbus_message_new_method_return(msg);
 		return reply;
 	}
 
-	if (vc->driver->invite_participants == NULL)
+	if (vc->driver->invite_participants == NULL) {
+		ofono_error("%s: Voicecall driver's 'invite_participants' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	num_size = manager_conference(msg, dial_str, data);
 
 	if (num_size > 0) {
+		ofono_info("%s: Inviting %d participants to conference", __func__, num_size);
 		vc->pending = dbus_message_ref(msg);
 		vc->driver->invite_participants(vc, num_size, dial_str, generic_callback, vc);
 
 		return NULL;
 	}
+
+	ofono_error("%s: Unspecified error (%d) during conference call setup.", __func__, num_size);
 
 	switch (num_size) {
 	case -EINVAL:
@@ -2644,8 +3060,11 @@ static DBusMessage *manager_get_calls(DBusConnection *conn,
 	struct voicecall *v;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create a new D-Bus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -2695,25 +3114,52 @@ static DBusMessage *manager_deflect(DBusConnection *conn,
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_OBJECT_PATH, &path,
 				DBUS_TYPE_STRING, &number,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	call = voicecall_by_path(vc, path);
-	if (call == NULL)
+	if (call == NULL) {
+		ofono_error("%s: Call not found for path: %s", __func__, path);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	if (call->call->status != CALL_STATUS_INCOMING &&
-			call->call->status != CALL_STATUS_WAITING)
+			call->call->status != CALL_STATUS_WAITING) {
+		ofono_error("%s: Call deflection not possible; status is %d, not INCOMING or WAITING", 
+            __func__, call->call->status);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->deflect == NULL)
+	if (vc->driver->deflect == NULL) {
+		ofono_error("%s: Voicecall driver's 'deflect' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!valid_phone_number_format(number))
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (!valid_phone_number_format(number)) {
+		ofono_error("%s: Invalid phone number format for deflection.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 
@@ -2731,26 +3177,46 @@ static DBusMessage *manager_hangup(DBusConnection *conn,
 	struct voicecall *call;
 	const char *path;
 
-	if(vc->call_list == NULL)
+	if(vc->call_list == NULL) {
+		ofono_error("%s: No active calls to hang up.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_OBJECT_PATH, &path,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	call = voicecall_by_path(vc, path);
-	if (call == NULL)
+	if (call == NULL) {
+		ofono_error("%s: Call not found for path: %s", __func__, path);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (vc->pending || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (call->call->status == CALL_STATUS_DISCONNECTED)
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (call->call->status == CALL_STATUS_DISCONNECTED) {
+		ofono_error("%s: Cannot hang up; call is already disconnected", __func__);
 		return __ofono_error_failed(msg);
+	}
 
-	if (vc->driver->release_specific == NULL)
+	if (vc->driver->release_specific == NULL) {
+		ofono_error("%s: Voicecall driver's 'release_specific' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 	vc->driver->release_specific(vc, call->call->id,
@@ -2768,33 +3234,60 @@ static DBusMessage *manager_answer(DBusConnection *conn,
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_OBJECT_PATH, &path,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	call = voicecall_by_path(vc, path);
-	if (call == NULL)
+	if (call == NULL) {
+		ofono_error("%s: Call not found for path: %s", __func__, path);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (vc->pending || vc->dial_req || vc->pending_em)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy due to a pending operation.",
+			__func__);
 		return __ofono_error_busy(msg);
+	}
+
+	if (vc->dial_req) {
+		ofono_error("%s: Voicecall service is currently busy due to an ongoing dial request.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
+
+	if (vc->pending_em) {
+		ofono_error("%s: Voicecall service is currently busy due to pending emergency call operations.",
+			__func__);
+		return __ofono_error_busy(msg);
+	}
 
 	/*
 	 * We have waiting call and both an active and held call.  According
 	 * to 22.030 we cannot use CHLD=2 in this situation.
 	 */
-	if (voicecalls_have_active(vc) && voicecalls_have_held(vc))
+	if (voicecalls_have_active(vc) && voicecalls_have_held(vc)) {
+		ofono_error("%s: Cannot answer; there's both an active and held call", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	if (call->call->status == CALL_STATUS_INCOMING) {
-		if (vc->driver->answer == NULL)
+		if (vc->driver->answer == NULL) {
+			ofono_error("%s: Voicecall driver's 'answer' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
 		vc->pending = dbus_message_ref(msg);
 
 		vc->driver->answer(vc, generic_callback, vc);
 	} else if (call->call->status == CALL_STATUS_WAITING) {
-		if (vc->driver->hold_all_active == NULL)
+		if (vc->driver->hold_all_active == NULL) {
+			ofono_error("%s: Voicecall driver's 'hold_all_active' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
 		vc->pending = dbus_message_ref(msg);
 
@@ -2811,21 +3304,30 @@ static DBusMessage *manager_dtmf(DBusConnection *conn,
 	unsigned char digit;
 	int flag;
 
-	if (vc->pending)
+	if (vc->pending) {
+		ofono_error("%s: Voicecall service is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (vc->driver->play_dtmf == NULL)
+	if (vc->driver->play_dtmf == NULL) {
+		ofono_error("%s: Voicecall driver's 'play_dtmf' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	/* Send DTMFs only if we have at least one connected call */
-	if (!voicecalls_can_dtmf(vc))
+	if (!voicecalls_can_dtmf(vc)) {
+		ofono_error("%s: No connected call available to send DTMF", __func__);
 		return __ofono_error_failed(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL,
 				DBUS_TYPE_BYTE, &digit,
 				DBUS_TYPE_INT32, &flag,
-				DBUS_TYPE_INVALID) == FALSE)
+				DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	vc->pending = dbus_message_ref(msg);
 	vc->driver->play_dtmf(vc, flag, digit, generic_callback, vc);
@@ -3182,7 +3684,7 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	enum call_status prev_status;
 	const char *number;
 
-	DBG("Got disconnection event for id: %d, reason: %d", id, reason);
+	ofono_info("Got disconnection event for id: %d, reason: %d", id, reason);
 
 	__ofono_modem_callid_release(modem, id);
 
@@ -3250,7 +3752,7 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 	struct voicecall *v = NULL;
 	struct ofono_call *newcall;
 
-	DBG("Got a voicecall event, status: %s (%d), id: %u, number: %s"
+	ofono_info("Got a voicecall event, status: %s (%d), id: %u, number: %s"
 			" called_number: %s, called_name %s",
 			call_status_to_string(call->status),
 			call->status, call->id, call->phone_number.number,
@@ -3260,7 +3762,7 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 				call_compare_by_id);
 
 	if (l) {
-		DBG("Found call with id: %d", call->id);
+		ofono_info("Found call with id: %d", call->id);
 		voicecall_set_call_status(l->data, call->status);
 		voicecall_set_call_lineid(l->data, &call->phone_number,
 						call->clip_validity);
@@ -3273,7 +3775,7 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 		return;
 	}
 
-	DBG("Did not find a call with id: %d", call->id);
+	ofono_info("Did not find a call with id: %d", call->id);
 
 	__ofono_modem_callid_hold(modem, call->id);
 
@@ -3397,7 +3899,7 @@ static void send_ciev_after_swap_callback(const struct ofono_error *error,
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
-		DBG("command failed with error: %s",
+		ofono_error("command failed with error: %s",
 				telephony_error_to_str(error));
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
@@ -3431,6 +3933,7 @@ static void hangup_all_active(const struct ofono_error *error, void *data)
 	struct ofono_voicecall *vc = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: Error occurs during hangup all active.", __func__);
 		__ofono_dbus_pending_reply(&vc->pending,
 					__ofono_error_failed(vc->pending));
 		return;

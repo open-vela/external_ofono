@@ -385,8 +385,11 @@ static void set_sca(struct ofono_sms *sms,
 	const char *value;
 
 	if (sms->sca.type == sca->type &&
-			!strcmp(sms->sca.number, sca->number))
+			!strcmp(sms->sca.number, sca->number)) {
+		ofono_info("%s: SCA remains unchanged (type: %d, number: %s), function exit", 
+           __func__, sms->sca.type, sms->sca.number);
 		return;
+	}
 
 	sms->sca.type = sca->type;
 	strncpy(sms->sca.number, sca->number, OFONO_MAX_PHONE_NUMBER_LENGTH);
@@ -411,8 +414,10 @@ static DBusMessage *generate_get_properties_reply(struct ofono_sms *sms,
 	const char *alphabet;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create D-Bus method return message.", __func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -465,14 +470,22 @@ static DBusMessage *sms_get_properties(DBusConnection *conn,
 {
 	struct ofono_sms *sms = data;
 
-	if (sms->flags & MESSAGE_MANAGER_FLAG_CACHED)
+	if (sms->flags & MESSAGE_MANAGER_FLAG_CACHED) {
+		ofono_info("%s: Properties are cached, returning cached response", 
+            __func__);
 		return generate_get_properties_reply(sms, msg);
+	}
 
-	if (sms->pending)
+	if (sms->pending) {
+		ofono_error("%s: SMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (sms->driver->sca_query == NULL)
+	if (sms->driver->sca_query == NULL) {
+		ofono_error("%s: SMS driver's 'sca_query' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	sms->pending = dbus_message_ref(msg);
 
@@ -505,7 +518,7 @@ static void bearer_set_callback(const struct ofono_error *error, void *data)
 	struct ofono_sms *sms = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Setting Bearer failed");
+		ofono_error("Setting Bearer failed");
 		__ofono_dbus_pending_reply(&sms->pending,
 					__ofono_error_failed(sms->pending));
 		return;
@@ -540,7 +553,7 @@ static void sca_set_callback(const struct ofono_error *error, void *data)
 	struct ofono_sms *sms = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		DBG("Setting SCA failed");
+		ofono_error("Setting SCA failed");
 		__ofono_dbus_pending_reply(&sms->pending,
 					__ofono_error_failed(sms->pending));
 		return;
@@ -557,20 +570,30 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 	DBusMessageIter var;
 	const char *property;
 
-	if (sms->pending)
+	if (sms->pending) {
+		ofono_error("%s: SMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (!dbus_message_iter_init(msg, &iter))
+	if (!dbus_message_iter_init(msg, &iter)) {
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_get_basic(&iter, &property);
 	dbus_message_iter_next(&iter);
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT)
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
+	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
@@ -578,17 +601,35 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *value;
 		struct ofono_phone_number sca;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [ServiceCenterAddress] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (strlen(value) == 0 || !valid_phone_number_format(value))
+		if (strlen(value) == 0) {
+			ofono_error("%s: [ServiceCenterAddress] Phone number is empty.", __func__);
 			return __ofono_error_invalid_format(msg);
+		}
 
-		if (sms->driver->sca_set == NULL ||
-				sms->driver->sca_query == NULL)
+		if (!valid_phone_number_format(value)) {
+			ofono_error("%s: [ServiceCenterAddress] Phone number format is invalid.", __func__);
+			return __ofono_error_invalid_format(msg);
+		}
+
+		if (sms->driver->sca_set == NULL) {
+			ofono_error("%s: SMS driver's 'sca_set' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
+
+		if (sms->driver->sca_query == NULL) {
+			ofono_error("%s: SMS driver's 'sca_query' function is not implemented.",
+				__func__);
+			return __ofono_error_not_implemented(msg);
+		}
 
 		string_to_phone_number(value, &sca, TRUE);
 
@@ -602,17 +643,30 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *value;
 		int bearer;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Bearer] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (sms_bearer_from_string(value, &bearer) != TRUE)
+		if (sms_bearer_from_string(value, &bearer) != TRUE) {
+			ofono_error("%s: Invalid bearer, value: %s", __func__, value);
 			return __ofono_error_invalid_format(msg);
+		}
 
-		if (sms->driver->bearer_set == NULL ||
-				sms->driver->bearer_query == NULL)
+		if (sms->driver->bearer_set == NULL) {
+			ofono_error("%s: SMS driver's 'bearer_set' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
+
+		if (sms->driver->bearer_query == NULL) {
+			ofono_error("%s: SMS driver's 'bearer_query' function is not implemented.",
+				__func__);
+			return __ofono_error_not_implemented(msg);
+		}
 
 		sms->pending = dbus_message_ref(msg);
 
@@ -624,8 +678,11 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *path = __ofono_atom_get_path(sms->atom);
 		dbus_bool_t value;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_BOOLEAN) {
+			ofono_error("%s: [UseDeliveryReports] Invalid argument type. Expected DBUS_TYPE_BOOLEAN ('b'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
@@ -646,13 +703,18 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 		const char *value;
 		enum sms_alphabet alphabet;
 
-		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING)
+		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
+			ofono_error("%s: [Alphabet] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
+		}
 
 		dbus_message_iter_get_basic(&var, &value);
 
-		if (!sms_alphabet_from_string(value, &alphabet))
+		if (!sms_alphabet_from_string(value, &alphabet)) {
+			ofono_error("%s: Invalid alphabet, value: %s", __func__, value);
 			return __ofono_error_invalid_format(msg);
+		}
 
 		set_alphabet(sms, alphabet);
 
@@ -660,6 +722,7 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 		return NULL;
 	}
 
+	ofono_error("%s: Unknown property '%s'.", __func__, property);
 	return __ofono_error_invalid_args(msg);
 }
 
@@ -838,7 +901,7 @@ next_q:
 
 static void tx_write_to_sim_finish(const struct ofono_error *error, void *data)
 {
-	DBG("tx_write_to_sim_finish result: %d", error->type == OFONO_ERROR_TYPE_NO_ERROR);
+	ofono_info("tx_write_to_sim_finish result: %d", error->type == OFONO_ERROR_TYPE_NO_ERROR);
 }
 
 static gboolean tx_next(gpointer user_data)
@@ -870,7 +933,7 @@ static gboolean tx_write_to_sim(gpointer user_data)
 	struct tx_queue_entry *entry = g_queue_peek_head(sms->txq);
 	struct pending_pdu *pdu = &entry->pdus[entry->cur_pdu];
 
-	DBG("tx_write_to_sim: %p", entry);
+	ofono_info("tx_write_to_sim: %p", entry);
 
 	sms->tx_source = 0;
 
@@ -1118,24 +1181,32 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 		}
 		OFONO_DFX_SMS_INFO(op_code, OFONO_CS_SMS, OFONO_SMS_SEND, OFONO_SMS_FAIL,
 				   covered_plmn);
+		ofono_error("%s: SMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
 					DBUS_TYPE_STRING, &text,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (valid_phone_number_format(to) == FALSE)
+	if (valid_phone_number_format(to) == FALSE) {
+		ofono_error("%s: Phone number format is invalid.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	msg_list = sms_text_prepare_with_alphabet(to, text, sms->ref,
 						use_16bit_ref,
 						sms->use_delivery_reports,
 						sms->alphabet);
 
-	if (msg_list == NULL)
+	if (msg_list == NULL) {
+		ofono_error("%s: Failed to prepare SMS message for sending - message list creation failed.",
+			__func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	flags = OFONO_SMS_SUBMIT_FLAG_RECORD_HISTORY;
 	flags |= OFONO_SMS_SUBMIT_FLAG_RETRY;
@@ -1148,8 +1219,10 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 
 	g_slist_free_full(msg_list, g_free);
 
-	if (err < 0)
+	if (err < 0) {
+		ofono_error("%s: SMS submission failed with error: %d", __func__, err);
 		return __ofono_error_failed(msg);
+	}
 
 	modem = __ofono_atom_get_modem(sms->atom);
 	__ofono_history_sms_send_pending(modem, &uuid, to, time(NULL), text);
@@ -1198,27 +1271,36 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 		}
 		OFONO_DFX_SMS_INFO(op_code, OFONO_IMS_SMS, OFONO_SMS_SEND, OFONO_SMS_FAIL,
 				   covered_plmn);
+		ofono_error("%s: SMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
 					DBUS_TYPE_UINT32, &port,
 					DBUS_TYPE_STRING, &text,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (valid_phone_number_format(to) == FALSE)
+	if (valid_phone_number_format(to) == FALSE) {
+		ofono_error("%s: Phone number format is invalid.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (port > 65535)
+	if (port > 65535) {
+		ofono_error("%s: Invalid port number: %u. Must be <= 65535", __func__, port);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	msg_list = sms_datagram_prepare(to, text, strlen((char*)text), sms->ref,
 						use_16bit_ref, 0, port, true,
 						sms->use_delivery_reports);
 
-	if (msg_list == NULL)
+	if (msg_list == NULL) {
+		ofono_error("%s: Failed to prepare data SMS message for sending.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	flags = OFONO_SMS_SUBMIT_FLAG_RECORD_HISTORY;
 	flags |= OFONO_SMS_SUBMIT_FLAG_RETRY;
@@ -1231,8 +1313,10 @@ static DBusMessage *sms_send_data_message(DBusConnection *conn, DBusMessage *msg
 
 	g_slist_free_full(msg_list, g_free);
 
-	if (err < 0)
+	if (err < 0) {
+		ofono_error("%s: Data SMS submission failed with error: %d", __func__, err);
 		return __ofono_error_failed(msg);
+	}
 
 	return NULL;
 }
@@ -1262,27 +1346,35 @@ static DBusMessage *copy_message_to_sim(DBusConnection *conn, DBusMessage *msg,
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &phone_num,
 					DBUS_TYPE_STRING, &text, DBUS_TYPE_INT32, &type,
 					DBUS_TYPE_STRING, &time_stamp,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (valid_phone_number_format(phone_num) == FALSE)
+	if (valid_phone_number_format(phone_num) == FALSE) {
+		ofono_error("%s: Phone number format is invalid.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	msg_list = sms_text_prepare_with_alphabet(phone_num, text, sms->ref,
 						use_16bit_ref,
 						sms->use_delivery_reports,
 						sms->alphabet);
 
-	if (msg_list == NULL)
+	if (msg_list == NULL) {
+		ofono_error("%s: Failed to prepare message for SIM storage.", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	err = __ofono_sms_txq_write_to_sim(sms, msg_list, flags, &uuid, time_stamp, type,
 					message_queued, msg);
 
 	g_slist_free_full(msg_list, g_free);
 
-	if (err < 0)
+	if (err < 0) {
+		ofono_error("%s: Failed to write message to SIM - Error: %d", __func__, err);
 		return __ofono_error_failed(msg);
+	}
 
 	return NULL;
 }
@@ -1313,14 +1405,18 @@ static void sim_sms_read_cb(int ok, int total_length, int record,
 	guint8 seq;
 
 	if (!ok) {
+		ofono_error("%s: Failed to read SMS from SIM", __func__);
 		reply = __ofono_error_failed(sms->pending);
 		__ofono_dbus_pending_reply(&sms->pending, reply);
 		return;
 	}
 
 	reply = dbus_message_new_method_return(sms->pending);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.",
+			__func__);
 		return;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -1414,16 +1510,23 @@ static DBusMessage *delete_message_from_sim(DBusConnection *conn, DBusMessage *m
 	struct ofono_sms *sms = data;
 	int index;
 
-	if (sms->pending)
+	if (sms->pending) {
+		ofono_error("%s: SMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (!dbus_message_get_args(msg, NULL,
 					DBUS_TYPE_INT32, &index,
-					DBUS_TYPE_INVALID))
+					DBUS_TYPE_INVALID)) {
+		ofono_error("%s: Failed to parse DBus message arguments. Expected no arguments.",
+			__func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (index < 0)
+	if (index < 0) {
+		ofono_error("%s: Invalid SMS index: %d", __func__, index);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	sms->pending = dbus_message_ref(msg);
 
@@ -1448,8 +1551,10 @@ static DBusMessage *get_all_messages_from_sim(DBusConnection *conn, DBusMessage 
 	struct ofono_sim *sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
 	struct ofono_sim_context *sim_context = ofono_sim_context_create(sim);
 
-	if (sms->pending)
+	if (sms->pending) {
+		ofono_error("%s: SMS is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	sms->pending = dbus_message_ref(msg);
 
@@ -1475,8 +1580,10 @@ static DBusMessage *sms_get_messages(DBusConnection *conn, DBusMessage *msg,
 	const struct ofono_uuid *uuid;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.", __func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -1914,7 +2021,7 @@ static void sms_dispatch(struct ofono_sms *sms, GSList *sms_list)
 			}
 		}
 
-		DBG("dst %d src %d", cdst, csrc);
+		ofono_info("dst %d src %d", cdst, csrc);
 
 		if (srcport != csrc || dstport != cdst) {
 			ofono_error("Source / Destination ports across "
