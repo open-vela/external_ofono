@@ -381,7 +381,7 @@ static gboolean cb_ss_control(int type, const char *sc,
 		return TRUE;
 	}
 
-	DBG("Received call barring ss control request");
+	ofono_debug("%s: Received call barring ss control request", __func__);
 
 	ofono_debug("type: %d, sc: %s, sia: %s, sib: %s, sic: %s, dn: %s",
 		type, sc, sia, sib, sic, dn);
@@ -512,14 +512,14 @@ static gboolean cb_ss_passwd(const char *sc,
 	const char *fac;
 
 	if (__ofono_call_barring_is_busy(cb)) {
-		ofono_error("cb in %s is busy", __func__);
+		ofono_error("%s: CallBarring is currently busy.", __func__);
 		reply = __ofono_error_busy(msg);
 		g_dbus_send_message(conn, reply);
 
 		return TRUE;
 	}
 
-	DBG("Received call barring ss password change request");
+	ofono_info("%s: Received call barring ss password change request", __func__);
 
 	ofono_debug("sc: %s", sc);
 
@@ -529,17 +529,17 @@ static gboolean cb_ss_passwd(const char *sc,
 		fac = cb_ss_service_to_fac(sc);
 
 	if (fac == NULL) {
-		ofono_error("fac in %s is null", __func__);
+		ofono_error("%s: Facility code is NULL for service code %s", __func__, sc);
 		return FALSE;
 	}
 
 	if (!__ofono_is_valid_net_pin(old)) {
-		ofono_error("invalid old passwd in %s", __func__);
+		ofono_error("%s: Invalid old password", __func__);
 		goto bad_format;
 	}
 
 	if (!__ofono_is_valid_net_pin(new)) {
-		ofono_error("invalid new passwd in %s", __func__);
+		ofono_error("%s: Invalid new password", __func__);
 		goto bad_format;
 	}
 
@@ -547,6 +547,7 @@ static gboolean cb_ss_passwd(const char *sc,
 	cb->driver->set_passwd(cb, fac, old, new, cb_set_passwd_callback, cb);
 
 	return TRUE;
+
 bad_format:
 	reply = __ofono_error_invalid_format(msg);
 	g_dbus_send_message(conn, reply);
@@ -635,7 +636,7 @@ static void cb_get_properties_reply(struct ofono_call_barring *cb, int mask)
 
 	reply = dbus_message_new_method_return(cb->pending);
 	if (reply == NULL) {
-		ofono_error("failed to allocate reply message in %s", __func__);
+		ofono_error("%s: Failed to create DBus method return message.", __func__);
 		return;
 	}
 
@@ -696,17 +697,18 @@ static DBusMessage *cb_get_properties(DBusConnection *conn, DBusMessage *msg,
 	struct ofono_call_barring *cb = data;
 
 	if (__ofono_call_barring_is_busy(cb)) {
-		ofono_error("cb in %s is busy", __func__);
+		ofono_error("%s: CallBarring is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (__ofono_ussd_is_busy(cb->ussd)) {
-		ofono_error("ussd in %s is busy", __func__);
+		ofono_error("%s: USSD service is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (cb->driver->query == NULL) {
-		ofono_error("query in %s is null", __func__);
+		ofono_error("%s: CallBarring driver's 'query' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
@@ -861,22 +863,23 @@ static DBusMessage *cb_set_property(DBusConnection *conn, DBusMessage *msg,
 	int mode;
 
 	if (__ofono_call_barring_is_busy(cb)) {
-		ofono_error("cb in %s is busy", __func__);
+		ofono_error("%s: CallBarring is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (__ofono_ussd_is_busy(cb->ussd)) {
-		ofono_error("ussd in %s is busy", __func__);
+		ofono_error("%s: USSD service is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (!dbus_message_iter_init(msg, &iter)) {
-		ofono_error("dbus iterator init fail in %s", __func__);
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
-		ofono_error("iter type is not string in %s", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -885,14 +888,16 @@ static DBusMessage *cb_set_property(DBusConnection *conn, DBusMessage *msg,
 	dbus_message_iter_next(&iter);
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
-		ofono_error("iter type is not variant in %s", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_recurse(&iter, &var);
 
 	if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_STRING) {
-		ofono_error("variant type is not string in %s", __func__);
+		ofono_error("%s: [Property Name] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -900,25 +905,27 @@ static DBusMessage *cb_set_property(DBusConnection *conn, DBusMessage *msg,
 
 	if (!cb_lock_property_lookup(name, value, BEARER_CLASS_VOICE,
 					&lock, &cls, &mode)) {
-		ofono_error("lock property lookup fail in %s", __func__);
+		ofono_error("%s: Lock property lookup failed", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (dbus_message_iter_next(&iter)) {
 		if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
-			ofono_error("iter type is invalid in %s", __func__);
+			ofono_error("%s: [Property Value] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 			return __ofono_error_invalid_args(msg);
 		}
 
 		dbus_message_iter_get_basic(&iter, &passwd);
 		if (!__ofono_is_valid_net_pin(passwd)) {
-			ofono_error("invalid pin format in %s", __func__);
+			ofono_error("%s: Invalid PIN format", __func__);
 			return __ofono_error_invalid_format(msg);
 		}
 	}
 
 	if (cb->driver->set == NULL) {
-		ofono_error("set in %s is null", __func__);
+		ofono_error("%s: CallBarring driver's 'set' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
@@ -954,28 +961,29 @@ static DBusMessage *cb_disable_all(DBusConnection *conn, DBusMessage *msg,
 	const char *passwd;
 
 	if (cb->driver->set == NULL) {
-		ofono_error("set in %s is null", __func__);
+		ofono_error("%s: CallBarring driver's 'set' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (__ofono_call_barring_is_busy(cb)) {
-		ofono_error("cb in %s is busy ", __func__);
+		ofono_error("%s: CallBarring is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (__ofono_ussd_is_busy(cb->ussd)) {
-		ofono_error("ussd in %s is busy ", __func__);
+		ofono_error("%s: USSD service is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &passwd,
 					DBUS_TYPE_INVALID) == FALSE) {
-		ofono_error("dbus message get args fail in %s", __func__);
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (!__ofono_is_valid_net_pin(passwd)) {
-		ofono_error("invalid pin format in %s", __func__);
+		ofono_error("%s: Invalid PIN format", __func__);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -1014,34 +1022,35 @@ static DBusMessage *cb_set_passwd(DBusConnection *conn, DBusMessage *msg,
 	const char *new_passwd;
 
 	if (cb->driver->set_passwd == NULL) {
-		ofono_error("set_passwd in %s is null", __func__);
+		ofono_error("%s: CallBarring driver's 'set_passwd' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (__ofono_call_barring_is_busy(cb)) {
-		ofono_error("cb in %s is busy ", __func__);
+		ofono_error("%s: CallBarring is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (__ofono_ussd_is_busy(cb->ussd)) {
-		ofono_error("ussd in %s is busy ", __func__);
+		ofono_error("%s: USSD service is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &old_passwd,
 					DBUS_TYPE_STRING, &new_passwd,
 					DBUS_TYPE_INVALID) == FALSE) {
-		ofono_error("dbus message get args fail in %s", __func__);
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (!__ofono_is_valid_net_pin(old_passwd)) {
-		ofono_error("old passwd in %s is invalid", __func__);
+		ofono_error("%s: Old password is invalid", __func__);
 		return __ofono_error_invalid_format(msg);
 	}
 
 	if (!__ofono_is_valid_net_pin(new_passwd)) {
-		ofono_error("new passwd in %s is invalid", __func__);
+		ofono_error("%s: New password is invalid", __func__);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -1156,17 +1165,13 @@ struct ofono_call_barring *ofono_call_barring_create(struct ofono_modem *modem,
 		return NULL;
 	}
 
-	if (driver == NULL) {
-		ofono_error("driver in %s is null", __func__);
+	if (driver == NULL)
 		return NULL;
-	}
 
 	cb = g_try_new0(struct ofono_call_barring, 1);
 
-	if (cb == NULL) {
-		ofono_error("cb in %s is null", __func__);
+	if (cb == NULL)
 		return NULL;
-	}
 
 	cb->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_CALL_BARRING,
 						call_barring_remove, cb);
