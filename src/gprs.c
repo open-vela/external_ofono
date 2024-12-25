@@ -1935,6 +1935,7 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
 		return pri_set_message_center(ctx, conn, msg, str);
 	}
 
+	ofono_error("%s: Unknown property '%s'.", __func__, property);
 	return __ofono_error_invalid_args(msg);
 }
 
@@ -2528,6 +2529,7 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 						property, DBUS_TYPE_BOOLEAN, &value);
 	}
 
+	ofono_error("%s: Unknown property '%s'.", __func__, property);
 	return dbus_message_new_method_return(msg);
 }
 
