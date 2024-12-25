@@ -439,7 +439,8 @@ static DBusMessage *sim_get_properties(DBusConnection *conn,
 
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL) {
-		ofono_error("reply in %s is NULL", __func__);
+		ofono_error("%s: Failed to create DBus method return message.",
+			__func__);
 		return NULL;
 	}
 
@@ -598,7 +599,10 @@ static void pin_cache_enter_cb(const struct ofono_error *error, void *data)
 	struct ofono_sim *sim = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("error->type in %s is not OFONO_ERROR_TYPE_NO_ERROR", __func__);
+		ofono_error("%s: Error occurred during PIN entry (Error Type: %d)",
+			__func__, error->type);
+		ofono_debug("%s: Removing PIN from cache for ICCID: %s", __func__,
+			sim->iccid);
 		pin_cache_remove(sim->iccid);
 
 		__ofono_sim_recheck_pin(sim);
@@ -607,7 +611,7 @@ static void pin_cache_enter_cb(const struct ofono_error *error, void *data)
 	}
 
 	sim->wait_initialized = true;
-	DBG("Waiting for ofono_sim_initialized_notify");
+	ofono_info("Waiting for ofono_sim_initialized_notify");
 }
 
 static void sim_pin_retries_query_cb(const struct ofono_error *error,
@@ -626,7 +630,7 @@ static void sim_pin_retries_query_cb(const struct ofono_error *error,
 	}
 
 	if (!memcmp(retries, sim->pin_retries, sizeof(sim->pin_retries))) {
-		ofono_info("use memcmp in %s is not equal", __func__);
+		ofono_info("%s: PIN retries have not changed", __func__);
 		return;
 	}
 
@@ -643,7 +647,8 @@ static void sim_pin_retries_query_cb(const struct ofono_error *error,
 static void sim_pin_retries_check(struct ofono_sim *sim)
 {
 	if (sim->driver->query_pin_retries == NULL) {
-		ofono_error("query_pin_retries in %s is NULL", __func__);
+		ofono_error("%s: SIM driver's 'query_pin_retries' function is not implemented.",
+			__func__);
 		return;
 	}
 
@@ -654,9 +659,10 @@ static void msisdn_set_done(struct msisdn_set_request *req)
 {
 	DBusMessage *reply;
 
-	if (req->failed)
+	if (req->failed) {
+		ofono_error("%s: MSISDN set operation failed", __func__);
 		reply = __ofono_error_failed(req->msg);
-	else
+	} else
 		reply = dbus_message_new_method_return(req->msg);
 
 	__ofono_dbus_pending_reply(&req->msg, reply);
@@ -672,14 +678,15 @@ static void msisdn_set_cb(int ok, int record, void *data)
 	struct msisdn_set_request *req = data;
 
 	if (!ok) {
-		ofono_error("ok in %s is false", __func__);
+		ofono_error("%s: MSISDN set operation failed for record %d",
+			__func__, record);
 		req->failed++;
 	}
 
 	req->pending--;
 
 	if (!req->pending) {
-		ofono_debug("req->pending in %s is NULL", __func__);
+		ofono_debug("%s: All pending operations completed", __func__);
 		msisdn_set_done(req);
 	}
 }
@@ -693,7 +700,7 @@ static gboolean set_own_numbers(struct ofono_sim *sim,
 	struct ofono_phone_number *number;
 
 	if (new_numbers && g_slist_length(new_numbers) > sim->efmsisdn_records) {
-		ofono_error("the new numbers list length does not match in %s", __func__);
+		ofono_error("%s: New numbers list length exceeds available records", __func__);
 		return FALSE;
 	}
 
@@ -724,7 +731,8 @@ static gboolean set_own_numbers(struct ofono_sim *sim,
 	}
 
 	if (!req->pending) {
-		ofono_debug("req->pending in %s is NULL", __func__);
+		ofono_debug("%s: No pending operations, finalizing immediately",
+			__func__);
 		msisdn_set_done(req);
 	}
 
@@ -819,31 +827,35 @@ static DBusMessage *set_property_uicc_enabled(struct ofono_sim *sim,
 	dbus_message_iter_next(iter);
 
 	if (sim->driver->enable_uicc == NULL) {
-		ofono_error("enable_uicc in %s is NULL", __func__);
+		ofono_error("%s: SIM driver's 'enable_uicc' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (dbus_message_iter_get_arg_type(iter) != DBUS_TYPE_VARIANT) {
-		ofono_error("iter type is not variant in %s", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_recurse(iter, &var);
 
 	if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_INT32) {
-		ofono_error("var type is not int32 in %s", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_INT32 ('i'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_get_basic(&var, &enabled);
 
 	if (sim->pending != NULL) {
-		ofono_error("sim->pending in %s is not null", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (sim->uicc_enabled == enabled) {
-		ofono_error("uicc_enabled in %s is already set", __func__);
+		ofono_debug("%s: 'UICCEnabled' is already set to '%d'. No changes needed.",
+			__func__, enabled);
 		return dbus_message_new_method_return(msg);
 	}
 
@@ -865,12 +877,13 @@ static DBusMessage *sim_set_property(DBusConnection *conn, DBusMessage *msg,
 	const char *name, *value;
 
 	if (!dbus_message_iter_init(msg, &iter)) {
-		ofono_error("iter in %s is invalid", __func__);
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING) {
-		ofono_error("iter type in %s is not string", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -882,15 +895,16 @@ static DBusMessage *sim_set_property(DBusConnection *conn, DBusMessage *msg,
 		GSList *own_numbers = NULL;
 
 		if (sim->efmsisdn_length == 0) {
-			ofono_error("efmsisdn_length in %s is 0", __func__);
+			ofono_error("%s: EFMSISDN length is 0, cannot set subscriber numbers",
+				__func__);
 			return __ofono_error_busy(msg);
 		}
 
 		dbus_message_iter_next(&iter);
 
 		if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
-			ofono_error("iter type of subscriberNumbers in %s is not variant",
-				__func__);
+			ofono_error("%s: [SubscriberNumbers] Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 			return __ofono_error_invalid_args(msg);
 		}
 
@@ -899,8 +913,7 @@ static DBusMessage *sim_set_property(DBusConnection *conn, DBusMessage *msg,
 		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_ARRAY ||
 				dbus_message_iter_get_element_type(&var) !=
 				DBUS_TYPE_STRING) {
-			ofono_error("var type of subscriberNumbers in %s is not array or string",
-				__func__);
+			ofono_error("%s: SubscriberNumbers variant is not an array of strings", __func__);
 			return __ofono_error_invalid_args(msg);
 		}
 
@@ -911,16 +924,15 @@ static DBusMessage *sim_set_property(DBusConnection *conn, DBusMessage *msg,
 				DBUS_TYPE_INVALID) {
 			if (dbus_message_iter_get_arg_type(&var_elem) !=
 					DBUS_TYPE_STRING) {
-				ofono_error("var_elem type of subscriberNumbers in %s is not string",
-					__func__);
+				ofono_error("%s: [SubscriberNumbers] Invalid argument type. Expected DBUS_TYPE_STRING ('s'), "
+					"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var_elem));
 				goto error;
 			}
 
 			dbus_message_iter_get_basic(&var_elem, &value);
 
 			if (!valid_phone_number_format(value)) {
-				ofono_error("phone number of subscriberNumbers in %s is in",
-					__func__);
+				ofono_error("%s: Invalid phone number format.", __func__);
 				goto error;
 			}
 
@@ -946,31 +958,34 @@ error:
 		dbus_message_iter_next(&iter);
 
 		if (sim->driver->set_active_card_slot == NULL){
-			ofono_error("set_active_card_slot in %s is NULL", __func__);
+			ofono_error("%s: SIM driver's 'set_active_card_slot' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
 		}
 
 		if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT) {
-			ofono_error("iter type of ActiveCardSlot in %s is not variant", __func__);
+			ofono_error("%s: [ActiveCardSlot] Invalid argument type. Expected DBUS_TYPE_VARIANT ('v'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 			return __ofono_error_invalid_args(msg);
 		}
 
 		dbus_message_iter_recurse(&iter, &var);
 
 		if (dbus_message_iter_get_arg_type(&var) != DBUS_TYPE_UINT32) {
-			ofono_error("var type of ActiveCardSlot in %s is not uint32", __func__);
+			ofono_error("%s: [ActiveCardSlot] Invalid argument type. Expected DBUS_TYPE_UINT32 ('u'), "
+				"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&var));
 			return __ofono_error_invalid_args(msg);
 		}
 
 		dbus_message_iter_get_basic(&var, &slot);
 
 		if (slot <= 0 || slot > sim->card_slot_count) {
-			ofono_error("slot of ActiveCardSlot in %s is invalid", __func__);
+			ofono_error("%s: Invalid slot number: %ld", __func__, (long)slot);
 			return __ofono_error_invalid_args(msg);
 		}
 
 		if (sim->active_card_slot == slot) {
-			ofono_debug("slot of ActiveCardSlot in %s is already set", __func__);
+			ofono_debug("%s: Active card slot is already set to %ld", __func__, (long)slot);
 			return dbus_message_new_method_return(msg);
 		}
 
@@ -985,6 +1000,7 @@ error:
 		return set_property_uicc_enabled(sim, msg, &iter);
 	}
 
+	ofono_error("%s: Unknown property '%s'.", __func__, name);
 	return __ofono_error_invalid_args(msg);
 }
 
@@ -1030,6 +1046,7 @@ static void sim_unlock_cb(const struct ofono_error *error, void *data)
 	struct ofono_sim *sim = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: SIM unlock failed with error type: %d", __func__, error->type);
 		DBusMessage *reply = __ofono_error_failed(sim->pending);
 
 		__ofono_dbus_pending_reply(&sim->pending, reply);
@@ -1046,6 +1063,7 @@ static void sim_lock_cb(const struct ofono_error *error, void *data)
 	struct ofono_sim *sim = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: SIM lock failed with error type: %d", __func__, error->type);
 		DBusMessage *reply = __ofono_error_failed(sim->pending);
 
 		__ofono_dbus_pending_reply(&sim->pending, reply);
@@ -1064,16 +1082,23 @@ static DBusMessage *sim_lock_or_unlock(struct ofono_sim *sim, int lock,
 	const char *typestr;
 	const char *pin;
 
-	if (sim->driver->lock == NULL)
+	if (sim->driver->lock == NULL) {
+		ofono_error("%s: SIM driver's 'lock' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (sim->pending)
+	if (sim->pending) {
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
 					DBUS_TYPE_STRING, &pin,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	type = sim_string_to_passwd(typestr);
 
@@ -1082,11 +1107,15 @@ static DBusMessage *sim_lock_or_unlock(struct ofono_sim *sim, int lock,
 	 * however the PIN combination can be changed
 	 */
 	if (password_is_pin(type) == FALSE ||
-			type == OFONO_SIM_PASSWORD_SIM_PIN2)
+			type == OFONO_SIM_PASSWORD_SIM_PIN2) {
+		ofono_error("%s: Invalid password type (%d) for locking/unlocking", __func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (!__ofono_is_valid_sim_pin(pin, type))
+	if (!__ofono_is_valid_sim_pin(pin, type)) {
+		ofono_error("%s: Invalid PIN format for type %d", __func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	sim->pending = dbus_message_ref(msg);
 
@@ -1125,6 +1154,7 @@ static void sim_change_pin_cb(const struct ofono_error *error, void *data)
 					DBUS_TYPE_INVALID);
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: PIN change failed with error type: %d", __func__, error->type);
 		__ofono_dbus_pending_reply(&sim->pending,
 				__ofono_error_failed(sim->pending));
 
@@ -1152,32 +1182,46 @@ static DBusMessage *sim_change_pin(DBusConnection *conn, DBusMessage *msg,
 	const char *old;
 	const char *new;
 
-	if (sim->driver->change_passwd == NULL)
+	if (sim->driver->change_passwd == NULL) {
+		ofono_error("%s: SIM driver's 'change_passwd' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
-	if (sim->pending)
+	if (sim->pending) {
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
 					DBUS_TYPE_STRING, &old,
 					DBUS_TYPE_STRING, &new,
 					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	type = sim_string_to_passwd(typestr);
 
-	if (password_is_pin(type) == FALSE)
+	if (password_is_pin(type) == FALSE) {
+		ofono_error("%s: Password type is not for PIN", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (!__ofono_is_valid_sim_pin(old, type))
+	if (!__ofono_is_valid_sim_pin(old, type)) {
+		ofono_error("%s: Invalid old PIN format for type %d", __func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (!__ofono_is_valid_sim_pin(new, type))
+	if (!__ofono_is_valid_sim_pin(new, type)) {
+		ofono_error("%s: Invalid new PIN format for type %d", __func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (!strcmp(new, old))
+	if (!strcmp(new, old)) {
+		ofono_debug("%s: Old and new PINs are identical, no change needed", __func__);
 		return dbus_message_new_method_return(msg);
+	}
 
 	sim->pending = dbus_message_ref(msg);
 	sim->driver->change_passwd(sim, type, old, new,
@@ -1197,9 +1241,10 @@ static void sim_enter_pin_cb(const struct ofono_error *error, void *data)
 					DBUS_TYPE_STRING, &pin,
 					DBUS_TYPE_INVALID);
 
-	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: PIN entry failed with error type: %d", __func__, error->type);
 		reply = __ofono_error_failed(sim->pending);
-	else
+	} else
 		reply = dbus_message_new_method_return(sim->pending);
 
 	__ofono_dbus_pending_reply(&sim->pending, reply);
@@ -1215,7 +1260,7 @@ static void sim_enter_pin_cb(const struct ofono_error *error, void *data)
 	if (sim->pin_type == OFONO_SIM_PASSWORD_SIM_PIN ||
 			sim->pin_type == OFONO_SIM_PASSWORD_SIM_PUK) {
 		sim->wait_initialized = true;
-		DBG("Waiting for ofono_sim_initialized_notify");
+		ofono_debug("Waiting for ofono_sim_initialized_notify");
 		return;
 	}
 
@@ -1229,6 +1274,7 @@ static void sim_enter_pin2_cb(const struct ofono_error *error, void *data)
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s: PIN2 entry failed with error type: %d", __func__, error->type);
 		reply = __ofono_error_failed(sim->pending);
 		__ofono_dbus_pending_reply(&sim->pending, reply);
 		return;
@@ -1247,32 +1293,48 @@ static DBusMessage *sim_enter_pin(DBusConnection *conn, DBusMessage *msg,
 	enum ofono_sim_password_type type;
 	const char *pin;
 
-	if (sim->pending)
+	if (sim->pending) {
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
 					DBUS_TYPE_STRING, &pin,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	type = sim_string_to_passwd(typestr);
 
 	if (type == OFONO_SIM_PASSWORD_SIM_PIN2) {
-		if (sim->driver->send_pin2 == NULL) 
+		if (sim->driver->send_pin2 == NULL) {
+			ofono_error("%s: SIM driver's 'send_pin2' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 	} else {
-		if (sim->driver->send_passwd == NULL)
+		if (sim->driver->send_passwd == NULL) {
+			ofono_error("%s: SIM driver's 'send_passwd' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type)
+		if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type) {
+			ofono_error("%s: Invalid PIN type (%d) for current SIM state", __func__, type);
 			return __ofono_error_invalid_format(msg);
+		}
 	}
 
-	if (password_is_pin(type) == FALSE)
+	if (password_is_pin(type) == FALSE) {
+		ofono_error("%s: Password type is not for PIN", __func__);
 		return __ofono_error_invalid_format(msg);
+	}
 
-	if (!__ofono_is_valid_sim_pin(pin, type))
+	if (!__ofono_is_valid_sim_pin(pin, type)) {
+		ofono_error("%s: Invalid PIN format for type %d", __func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	sim->pending = dbus_message_ref(msg);
 
@@ -1491,35 +1553,49 @@ static DBusMessage *sim_reset_pin(DBusConnection *conn, DBusMessage *msg,
 	const char *puk;
 	const char *pin;
 
-	if (sim->pending)
+	if (sim->pending) {
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &typestr,
 					DBUS_TYPE_STRING, &puk,
 					DBUS_TYPE_STRING, &pin,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
 	type = sim_string_to_passwd(typestr);
 
 	if (type == OFONO_SIM_PASSWORD_SIM_PUK2) {
-		if (sim->driver->reset_pin2 == NULL)
+		if (sim->driver->reset_pin2 == NULL) {
+			ofono_error("%s: SIM driver's 'reset_pin2' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 	} else {
-		if (sim->driver->reset_passwd == NULL)
+		if (sim->driver->reset_passwd == NULL) {
+			ofono_error("%s: SIM driver's 'reset_passwd' function is not implemented.",
+				__func__);
 			return __ofono_error_not_implemented(msg);
+		}
 
-		if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type)
+		if (type == OFONO_SIM_PASSWORD_NONE || type != sim->pin_type) {
+			ofono_error("%s: Invalid PIN type for current SIM state", __func__);
 			return __ofono_error_invalid_format(msg);
+		}
 	}
 
-	if (!__ofono_is_valid_sim_pin(puk, type))
+	if (!__ofono_is_valid_sim_pin(puk, type)) {
+		ofono_error("%s: Invalid PUK format for type %d", __func__, type);
 		return __ofono_error_invalid_format(msg);
+	}
 
 	type = puk2pin(type);
 
 	if (!__ofono_is_valid_sim_pin(pin, type)) {
-		ofono_error("invalid pin type %s in %s", pin, __func__);
+		ofono_error("%s: Invalid new PIN format for type %d", __func__, type);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -1556,23 +1632,24 @@ static DBusMessage *sim_enable_or_disable_fdn(struct ofono_sim *sim, int enable,
 	const char *passwd;
 
 	if (sim->driver->lock_fdn == NULL) {
-		ofono_error("lock_fdn is NULL in %s", __func__);
+		ofono_error("%s: SIM driver's 'lock_fdn' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (sim->pending) {
-		ofono_error("sim pending is busy in %s", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &passwd,
 					DBUS_TYPE_INVALID) == FALSE) {
-		ofono_error("invalid msg args in %s", __func__);
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (!__ofono_is_valid_sim_pin(passwd, OFONO_SIM_PASSWORD_SIM_PIN2)) {
-		ofono_error("invalid passwd type %s in %s", passwd, __func__);
+		ofono_error("%s: Invalid PIN2 format", __func__);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -1630,17 +1707,18 @@ static DBusMessage *sim_query_fdn(DBusConnection *conn, DBusMessage *msg,
 	struct ofono_sim *sim = data;
 
 	if (sim->state == OFONO_SIM_STATE_NOT_PRESENT) {
-		ofono_error("sim state is not present in %s", __func__);
+		ofono_error("%s: SIM is not present", __func__);
 		return __ofono_error_failed(msg);
 	}
 
 	if (sim->driver->query_fdn_lock == NULL) {
-		ofono_error("query_fdn_lock is NULL in %s", __func__);
+		ofono_error("%s: SIM driver's 'query_fdn_lock' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (sim->pending) {
-		ofono_error("sim pending is busy in %s", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1681,36 +1759,39 @@ static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
 	int length;
 
 	if (sim->pending) {
-		ofono_error("sim pending is busy in %s", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (sim->driver->open_channel == NULL) {
-		ofono_error("open_channel is NULL in %s", __func__);
+		ofono_error("%s: SIM driver's 'open_channel' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (dbus_message_iter_init(msg, &iter) == FALSE) {
-		ofono_error("invalid msg args in %s", __func__);
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
-		ofono_error("iter ytpe in %s is not array", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_ARRAY ('a'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_recurse(&iter, &array);
 
 	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE) {
-		ofono_error("array type in %s is not byte", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_BYTE ('y'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&array));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_get_fixed_array(&array, &aid, &length);
 
 	if (length == 0 || length > 16) {
-		ofono_error("aid length in %s is invalid", __func__);
+		ofono_error("%s: Invalid AID length: %d", __func__, length);
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -1745,18 +1826,19 @@ static DBusMessage *sim_close_logical_channel(DBusConnection *conn,
 	int session_id;
 
 	if (sim->pending) {
-		ofono_error("sim pending is busy in %s", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (sim->driver->close_channel == NULL) {
-		ofono_error("close_channel is NULL in %s", __func__);
+		ofono_error("%s: SIM driver's 'close_channel' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &session_id,
 					DBUS_TYPE_INVALID) == FALSE) {
-		ofono_error("invalid msg args in %s", __func__);
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -1806,17 +1888,18 @@ static DBusMessage *sim_logical_access(DBusConnection *conn,
 	int pdu_len;
 
 	if (sim->pending) {
-		ofono_error("sim pending is busy in %s", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (sim->driver->logical_access == NULL) {
-		ofono_error("logical_access is NULL in %s", __func__);
+		ofono_error("%s: SIM driver's 'logical_access' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (dbus_message_iter_init(msg, &iter) == FALSE) {
-		ofono_error("invalid msg args in %s", __func__);
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -1824,21 +1907,23 @@ static DBusMessage *sim_logical_access(DBusConnection *conn,
 	dbus_message_iter_next(&iter);
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
-		ofono_error("iter type in %s is not array", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_ARRAY ('a'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_recurse(&iter, &array);
 
 	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE) {
-		ofono_error("array type in %s is not byte", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_BYTE ('y'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&array));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_get_fixed_array(&array, &pdu, &pdu_len);
 
 	if (pdu_len <= 0) {
-		ofono_error("pdu len in %s is 0", __func__);
+		ofono_error("%s: Invalid PDU length: %d", __func__, pdu_len);
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -1888,36 +1973,39 @@ static DBusMessage *sim_basic_access(DBusConnection *conn,
 	int pdu_len;
 
 	if (sim->pending) {
-		ofono_error("sim pending is busy in %s", __func__);
+		ofono_error("%s: SIM is currently busy.", __func__);
 		return __ofono_error_busy(msg);
 	}
 
 	if (sim->driver->basic_access == NULL) {
-		ofono_error("basic_access is NULL in %s", __func__);
+		ofono_error("%s: SIM driver's 'basic_access' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
 	}
 
 	if (dbus_message_iter_init(msg, &iter) == FALSE) {
-		ofono_error("invalid msg args in %s", __func__);
+		ofono_error("%s: Invalid D-Bus message - no arguments provided.", __func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
-		ofono_error("iter type in %s is not array", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_ARRAY ('a'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&iter));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_recurse(&iter, &array);
 
 	if (dbus_message_iter_get_arg_type(&array) != DBUS_TYPE_BYTE) {
-		ofono_error("array type in %s is not byte", __func__);
+		ofono_error("%s: Invalid argument type. Expected DBUS_TYPE_BYTE ('y'), "
+			"but received type '%c'.", __func__, dbus_message_iter_get_arg_type(&array));
 		return __ofono_error_invalid_args(msg);
 	}
 
 	dbus_message_iter_get_fixed_array(&array, &pdu, &pdu_len);
 
 	if (pdu_len <= 0) {
-		ofono_error("pdu len in %s is 0", __func__);
+		ofono_error("%s: Invalid PDU length: %d", __func__, pdu_len);
 		return __ofono_error_invalid_args(msg);
 	}
 
@@ -2307,7 +2395,8 @@ static void sim_ready(enum ofono_sim_state new_state, void *user)
 static void sim_set_ready(struct ofono_sim *sim)
 {
 	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+		ofono_error("%s: SIM instance is NULL. Initialization failed.",
+			__func__);
 		return;
 	}
 
@@ -2471,25 +2560,25 @@ static void sim_efimsi_cb(const struct ofono_error *error,
 	unsigned char parity;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("read efimsi error in %s", __func__);
+		ofono_error("%s: Error reading EF_IMSI", __func__);
 		goto error;
 	}
 
 	if (len != 9) {
-		ofono_error("read efimsi error in %s, len is %d",__func__, len);
+		ofono_error("%s: Unexpected length of EF_IMSI data: %d", __func__, len);
 		goto error;
 	}
 
 	imsi_len = data[0];
 
 	if (imsi_len == 0 || imsi_len > 8) {
-		ofono_error("read efimsi error in %s, imsi len is %d", __func__, imsi_len);
+		ofono_error("%s: Invalid IMSI length: %d", __func__, imsi_len);
 		goto error;
 	}
 
 	/* The low 3 bits of the first byte should be set to binary 001 */
 	if ((data[1] & 0x7) != 0x1) {
-		ofono_error("data is error in %s", __func__);
+		ofono_error("%s: Incorrect format in first byte of IMSI data", __func__);
 		goto error;
 	}
 
@@ -2500,8 +2589,7 @@ static void sim_efimsi_cb(const struct ofono_error *error,
 	imsi[16] = '\0';
 
 	if ((strlen(imsi + 1) % 2) != parity) {
-		ofono_error("read efimsi error in %s, imsi is %s, parity is %u",
-			__func__, imsi, parity);
+		ofono_error("%s: Parity check failed for IMSI: %s, parity: %u", __func__, imsi, parity);
 		goto error;
 	}
 
@@ -2520,6 +2608,8 @@ static void sim_imsi_cb(const struct ofono_error *error, const char *imsi,
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
 		sim_imsi_obtained(sim, imsi);
+	} else {
+		ofono_error("Error occurs during read imsi from sim.");
 	}
 }
 
@@ -2817,7 +2907,7 @@ static void sim_ad_read_cb(int ok, int length, int record,
 
 	/* sanity check for potential invalid values */
 	if (new_mnc_length < 2 || new_mnc_length > 3) {
-		ofono_error("Invalid MNC length");
+		ofono_error("Invalid MNC length: %d", new_mnc_length);
 		return;
 	}
 
@@ -3258,7 +3348,7 @@ int ofono_sim_read_bytes(struct ofono_sim_context *context, int id,
 			ofono_sim_file_read_cb_t cb, void *data)
 {
 	if (num_bytes == 0) {
-		ofono_error("num_bytes is 0 in %s", __func__);
+		ofono_error("%s: Attempt to read 0 bytes", __func__);
 		return -1;
 	}
 
@@ -3327,50 +3417,40 @@ void ofono_sim_remove_file_watch(struct ofono_sim_context *context,
 
 const char *ofono_sim_get_imsi(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return NULL;
-	}
 
 	return sim->imsi;
 }
 
 const char *ofono_sim_get_mcc(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return NULL;
-	}
 
 	return sim->mcc;
 }
 
 const char *ofono_sim_get_mnc(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return NULL;
-	}
 
 	return sim->mnc;
 }
 
 const char *ofono_sim_get_spn(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return NULL;
-	}
 
 	return sim->spn;
 }
 
 enum ofono_sim_phase ofono_sim_get_phase(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return OFONO_SIM_PHASE_UNKNOWN;
-	}
 
 	return sim->phase;
 }
@@ -3378,7 +3458,6 @@ enum ofono_sim_phase ofono_sim_get_phase(struct ofono_sim *sim)
 enum ofono_sim_cphs_phase ofono_sim_get_cphs_phase(struct ofono_sim *sim)
 {
 	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
 		return OFONO_SIM_CPHS_PHASE_NONE;
 	}
 
@@ -3387,20 +3466,16 @@ enum ofono_sim_cphs_phase ofono_sim_get_cphs_phase(struct ofono_sim *sim)
 
 enum ofono_sim_password_type ofono_sim_get_password_type(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return OFONO_SIM_PASSWORD_NONE;
-	}
 
 	return sim->pin_type;
 }
 
 const unsigned char *ofono_sim_get_cphs_service_table(struct ofono_sim *sim)
 {
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return NULL;
-	}
 
 	return sim->cphs_service_table;
 }
@@ -3632,12 +3707,12 @@ static void sim_query_fac_pinlock_cb(const struct ofono_error *error,
 	struct ofono_sim *sim = data;
 
 	if (sim->state == OFONO_SIM_STATE_NOT_PRESENT) {
-		ofono_debug("sim state is not present in %s", __func__);
+		ofono_debug("%s: SIM is not present, skipping further actions", __func__);
 		return;
 	}
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("query pinlock in %s is error", __func__);
+		ofono_error("%s: Error querying facility PIN lock status", __func__);
 		goto done;
 	}
 
@@ -3653,12 +3728,12 @@ static void sim_query_fac_networklock_cb(const struct ofono_error *error,
 	struct ofono_sim *sim = data;
 
 	if (sim->state == OFONO_SIM_STATE_NOT_PRESENT) {
-		ofono_debug("sim state is not present, ignoring in %s", __func__);
+		ofono_debug("%s: SIM is not present, ignoring further actions", __func__);
 		return;
 	}
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("query networklock in %s is error", __func__);
+		ofono_error("%s: Error querying network lock status", __func__);
 		goto done;
 	}
 
@@ -3676,12 +3751,12 @@ static void sim_query_fac_imsilock_cb(const struct ofono_error *error,
 	struct ofono_sim *sim = data;
 
 	if (sim->state == OFONO_SIM_STATE_NOT_PRESENT) {
-		ofono_debug("sim state is not present, ignoring in %s", __func__);
+		ofono_debug("%s: SIM is not present, ignoring further actions", __func__);
 		return;
 	}
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("query imsilock in %s is error", __func__);
+		ofono_error("%s: Error querying IMSI lock status", __func__);
 		goto done;
 	}
 
@@ -3700,21 +3775,25 @@ void ofono_sim_inserted_notify(struct ofono_sim *sim, ofono_bool_t inserted)
 		 * Start initialization procedure from after EFiccid,
 		 * EFli and EFpl are retrieved.
 		 */
-		ofono_debug("sim is resetting in %s", __func__);
+		ofono_debug("%s: SIM was resetting, now transitioning to INSERTED state", __func__);
 		sim->state = OFONO_SIM_STATE_INSERTED;
 		__ofono_sim_recheck_pin(sim);
 		return;
 	}
 
-	if (inserted == TRUE && sim->state == OFONO_SIM_STATE_NOT_PRESENT)
+	if (inserted == TRUE && sim->state == OFONO_SIM_STATE_NOT_PRESENT) {
+		ofono_debug("%s: SIM state changing to INSERTED from NOT_PRESENT", __func__);
 		sim->state = OFONO_SIM_STATE_INSERTED;
-	else if (inserted == FALSE && sim->state != OFONO_SIM_STATE_NOT_PRESENT)
+	} else if (inserted == FALSE && sim->state != OFONO_SIM_STATE_NOT_PRESENT) {
+		ofono_debug("%s: SIM state changing to NOT_PRESENT", __func__);
 		sim->state = OFONO_SIM_STATE_NOT_PRESENT;
-	else
+	} else
 		return;
 
-	if (!__ofono_atom_get_registered(sim->atom))
+	if (!__ofono_atom_get_registered(sim->atom)) {
+		ofono_debug("%s: SIM atom not registered, skipping further actions", __func__);
 		return;
+	}
 
 	sim_inserted_update(sim);
 	call_state_watches(sim);
@@ -3761,7 +3840,7 @@ void ofono_sim_error_notify(struct ofono_sim *sim)
 
 	sim->state = OFONO_SIM_STATE_ERROR;
 	if (!__ofono_atom_get_registered(sim->atom)) {
-		ofono_debug("sim is not registered in %s", __func__);
+		ofono_debug("%s: SIM atom not registered, skipping further actions", __func__);
 		return;
 	}
 
@@ -3796,7 +3875,7 @@ void ofono_sim_initialized_notify(struct ofono_sim *sim)
 {
 	if (sim->state != OFONO_SIM_STATE_INSERTED &&
 				sim->state != OFONO_SIM_STATE_LOCKED_OUT) {
-		ofono_error("sim state in %s is %d not inserted and locked out",
+		ofono_error("%s: Unexpected SIM state: %d, expected INSERTED or LOCKED_OUT",
 			__func__, sim->state);
 		return;
 	}
@@ -3804,7 +3883,7 @@ void ofono_sim_initialized_notify(struct ofono_sim *sim)
 	sim->initialized = true;
 
 	if (!sim->wait_initialized) {
-		ofono_debug("sim is not waiting for initialization in %s", __func__);
+		ofono_debug("%s: SIM was not waiting for initialization", __func__);
 		return;
 	}
 
@@ -3820,15 +3899,11 @@ unsigned int ofono_sim_add_state_watch(struct ofono_sim *sim,
 
 	DBG("%p", sim);
 
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return 0;
-	}
 
-	if (notify == NULL) {
-		ofono_error("notify is NULL in %s", __func__);
+	if (notify == NULL)
 		return 0;
-	}
 
 	item = g_new0(struct ofono_watchlist_item, 1);
 
@@ -3852,15 +3927,11 @@ unsigned int ofono_sim_add_refresh_watch(struct ofono_sim *sim,
 
 	DBG("%p", sim);
 
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return 0;
-	}
 
-	if (notify == NULL) {
-		ofono_error("notify is NULL in %s", __func__);
+	if (notify == NULL)
 		return 0;
-	}
 
 	item = g_new0(struct ofono_watchlist_item, 1);
 
@@ -3916,7 +3987,7 @@ static void sim_spn_set(struct ofono_sim *sim, const void *data, int length,
 	sim->spn_dc = NULL;
 
 	if (data == NULL) {
-		ofono_info("data is NULL in %s", __func__);
+		ofono_info("%s: No SPN data provided", __func__);
 		goto notify;
 	}
 
@@ -3938,12 +4009,12 @@ static void sim_spn_set(struct ofono_sim *sim, const void *data, int length,
 	 */
 	sim->spn = sim_string_to_utf8(data, length);
 	if (sim->spn == NULL) {
-		ofono_error("EFspn read successfully, but couldn't parse");
+		ofono_error("%s: EFspn read successfully, but couldn't parse", __func__);
 		goto notify;
 	}
 
 	if (strlen(sim->spn) == 0) {
-		ofono_info("spn read empty in %s", __func__);
+		ofono_info("%s: SPN read as empty", __func__);
 		l_free(sim->spn);
 		sim->spn = NULL;
 		goto notify;
@@ -4068,8 +4139,6 @@ ofono_bool_t ofono_sim_add_spn_watch(struct ofono_sim *sim, unsigned int *id,
 	struct ofono_watchlist_item *item;
 	unsigned int watch_id;
 
-	ofono_debug("%p", sim);
-
 	if (sim == NULL) {
 		ofono_error("sim is NULL in %s", __func__);
 		return 0;
@@ -4104,8 +4173,6 @@ ofono_bool_t ofono_sim_add_spn_watch(struct ofono_sim *sim, unsigned int *id,
 ofono_bool_t ofono_sim_remove_spn_watch(struct ofono_sim *sim, unsigned int *id)
 {
 	gboolean ret;
-
-	ofono_debug("%p", sim);
 
 	if (sim == NULL)
 		return FALSE;
@@ -4218,7 +4285,7 @@ void __ofono_sim_recheck_pin(struct ofono_sim *sim)
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d)
 {
-	ofono_debug("driver: %p, name: %s", d, d->name);
+	DBG("driver: %p, name: %s", d, d->name);
 
 	if (d->probe == NULL)
 		return -EINVAL;
@@ -4230,7 +4297,7 @@ int ofono_sim_driver_register(const struct ofono_sim_driver *d)
 
 void ofono_sim_driver_unregister(const struct ofono_sim_driver *d)
 {
-	ofono_debug("driver: %p, name: %s", d, d->name);
+	DBG("driver: %p, name: %s", d, d->name);
 
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
@@ -4271,15 +4338,12 @@ static void sim_remove(struct ofono_atom *atom)
 {
 	struct ofono_sim *sim = __ofono_atom_get_data(atom);
 
-	ofono_debug("atom: %p", atom);
+	DBG("atom: %p", atom);
 
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return;
-	}
 
 	if (sim->pending != NULL) {
-		ofono_error("sim pending in %s is not null", __func__);
 		DBusMessage *reply = __ofono_error_failed(sim->pending);
 		__ofono_dbus_pending_reply(&sim->pending, reply);
 	}
@@ -4306,17 +4370,13 @@ struct ofono_sim *ofono_sim_create(struct ofono_modem *modem,
 	GSList *l;
 	int i;
 
-	if (driver == NULL) {
-		ofono_error("driver is NULL in %s", __func__);
+	if (driver == NULL)
 		return NULL;
-	}
 
 	sim = g_try_new0(struct ofono_sim, 1);
 
-	if (sim == NULL) {
-		ofono_error("sim is NULL in %s", __func__);
+	if (sim == NULL)
 		return NULL;
-	}
 
 	sim->phase = OFONO_SIM_PHASE_UNKNOWN;
 	sim->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_SIM,
@@ -4636,7 +4696,7 @@ static void close_channel_cb(const struct ofono_error *error, void *data)
 	struct ofono_sim_aid_session *session = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
-		ofono_error("session %d failed to close", session->session_id);
+		ofono_error("%s: Session %d failed to close", __func__, session->session_id);
 
 	if (g_slist_length(session->watches->items) > 0 &&
 				session->state == SESSION_STATE_OPENING) {
@@ -4702,15 +4762,11 @@ unsigned int __ofono_sim_add_session_watch(
 {
 	struct ofono_watchlist_item *item;
 
-	ofono_debug("%p", session);
-
 	if (session == NULL)
 		return 0;
 
-	if (notify == NULL) {
-		ofono_error("invalid notify in %s", __func__);
+	if (notify == NULL)
 		return 0;
-	}
 
 	item = g_new0(struct ofono_watchlist_item, 1);
 
