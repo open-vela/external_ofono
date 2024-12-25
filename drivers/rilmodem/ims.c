@@ -57,8 +57,10 @@ static void ril_registration_status_cb(struct ril_msg *message, gpointer user_da
 	char* subscriber_uri = NULL;
 	struct parcel rilp;
 
-	if(cb == NULL)
+	if (cb == NULL) {
+		ofono_debug("%s: Callback is NULL, exiting.", __func__);
 		return;
+	}
 
 	g_ril_print_response_no_args(rid->ril, message);
 
