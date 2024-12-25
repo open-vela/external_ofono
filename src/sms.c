@@ -694,6 +694,9 @@ static DBusMessage *sms_set_property(DBusConnection *conn, DBusMessage *msg,
 						OFONO_MESSAGE_MANAGER_INTERFACE,
 						"UseDeliveryReports",
 						DBUS_TYPE_BOOLEAN, &value);
+		} else {
+			ofono_debug("%s: SMS's 'UseDeliveryReports' is already set to '%s'. No changes needed.",
+				__func__, value ? "TRUE" : "FALSE");
 		}
 
 		return NULL;
@@ -1718,7 +1721,7 @@ static const GDBusSignalTable sms_manager_signals[] = {
 	{ GDBUS_SIGNAL("ImmediateMessage",
 			GDBUS_ARGS({ "message", "s" }, { "info", "a{sv}" })) },
 	{ GDBUS_SIGNAL("StatusReportMessage",
-			GDBUS_ARGS({ "message", "s" }, { "info", "a{sv}" })) },
+			GDBUS_ARGS({ "name", "s" })) },
 	{ GDBUS_SIGNAL("MessageAdded",
 			GDBUS_ARGS({ "path", "o" },
 						{ "properties", "a{sv}" })) },
@@ -2107,6 +2110,8 @@ static void handle_sms_status_report(struct ofono_sms *sms,
 {
 	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
 	gboolean delivered;
+	const char *is_delivered = "1";
+	const char *not_delivered = "0";
 	struct ofono_uuid uuid;
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(sms->atom);
@@ -2115,18 +2120,23 @@ static void handle_sms_status_report(struct ofono_sms *sms,
 	const char *signal_name = "StatusReportMessage";
 
 	if (status_report_assembly_report(sms->sr_assembly, incoming, uuid.uuid,
-						&delivered) == FALSE)
+						&delivered) == FALSE) {
+		ofono_debug("%s: Failed to assemble status report", __func__);
 		return;
+	}
 
 	signal = dbus_message_new_signal(path, OFONO_MESSAGE_MANAGER_INTERFACE,
 						signal_name);
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create DBus 'StatusReportMessage' signal for path '%s'.",
+			__func__, path);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
-
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, delivered ? "0" : "1");
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+		delivered ? &is_delivered : &not_delivered);
 
 	g_dbus_send_message(conn, signal);
 

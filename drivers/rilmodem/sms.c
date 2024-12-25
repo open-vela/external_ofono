@@ -559,6 +559,9 @@ static void ril_sms_delete_on_sim(struct ofono_sms *sms,
 
 static void ril_ack_delivery_cb(struct ril_msg *message, gpointer user_data)
 {
+	struct sms_data *sd = user_data;
+
+	g_ril_print_response_no_args(sd->ril, message);
 	if (message->error != RIL_E_SUCCESS)
 		ofono_error("SMS acknowledgement failed: "
 				"Further SMS reception is not guaranteed");
@@ -580,7 +583,7 @@ static void ril_ack_delivery(struct ofono_sms *sms)
 
 	/* ACK the incoming NEW_SMS */
 	g_ril_send(sd->ril, RIL_REQUEST_SMS_ACKNOWLEDGE, &rilp,
-			ril_ack_delivery_cb, NULL, NULL);
+			ril_ack_delivery_cb, sd, NULL);
 }
 
 static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
