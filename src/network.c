@@ -186,8 +186,11 @@ static void init_register(const struct ofono_error *error, void *data)
 {
 	struct ofono_netreg *netreg = data;
 
-	if (netreg->driver->registration_status == NULL)
+	if (netreg->driver->registration_status == NULL) {
+		ofono_debug("%s: registration_status function is not available, exiting.",
+			__func__);
 		return;
+	}
 
 	netreg->driver->registration_status(netreg,
 					registration_status_callback, netreg);
@@ -195,11 +198,16 @@ static void init_register(const struct ofono_error *error, void *data)
 
 static void enforce_auto_only(struct ofono_netreg *netreg)
 {
-	if (netreg->mode != NETWORK_REGISTRATION_MODE_MANUAL)
+	if (netreg->mode != NETWORK_REGISTRATION_MODE_MANUAL) {
+		ofono_debug("%s: Mode is not manual, exiting.", __func__);
 		return;
+	}
 
-	if (netreg->driver->register_auto == NULL)
+	if (netreg->driver->register_auto == NULL) {
+		ofono_debug("%s: register_auto function is not available, exiting.",
+			__func__);
 		return;
+	}
 
 	netreg->driver->register_auto(netreg, init_register, netreg);
 }
@@ -210,8 +218,10 @@ static void set_registration_mode(struct ofono_netreg *netreg, int mode)
 	const char *strmode;
 	const char *path;
 
-	if (netreg->mode == mode)
+	if (netreg->mode == mode) {
+		ofono_debug("%s: Mode is unchanged, exiting", __func__);
 		return;
+	}
 
 	if (mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY)
 		enforce_auto_only(netreg);
@@ -248,13 +258,19 @@ static void register_callback(const struct ofono_error *error, void *data)
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(netreg->pending);
-	else
+	else {
+		ofono_debug("%s: Network registration failed (Error type: %d), sending error message",
+			__func__, error->type);
 		reply = __ofono_error_from_error(error, netreg->pending);
+	}
 
 	__ofono_dbus_pending_reply(&netreg->pending, reply);
 
-	if (netreg->driver->registration_status == NULL)
+	if (netreg->driver->registration_status == NULL) {
+		ofono_debug("%s: registration_status function is not available, exiting.",
+			__func__);
 		return;
+	}
 
 	netreg->driver->registration_status(netreg,
 						registration_status_callback,
@@ -601,8 +617,11 @@ static DBusMessage *network_operator_get_properties(DBusConnection *conn,
 	DBusMessageIter iter;
 	DBusMessageIter dict;
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -623,14 +642,21 @@ static DBusMessage *network_operator_register(DBusConnection *conn,
 	struct network_operator_data *opd = data;
 	struct ofono_netreg *netreg = opd->netreg;
 
-	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY)
+	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY) {
+		ofono_debug("%s: Manual registration denied due to auto-only mode", __func__);
 		return __ofono_error_access_denied(msg);
+	}
 
-	if (netreg->pending)
+	if (netreg->pending) {
+		ofono_error("%s: NetReg is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (netreg->driver->register_manual == NULL)
+	if (netreg->driver->register_manual == NULL) {
+		ofono_error("%s: NetReg driver's 'register_manual' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	netreg->pending = dbus_message_ref(msg);
 
@@ -897,8 +923,11 @@ static void netreg_emit_signal_strength_changed(struct ofono_netreg *netreg)
 	signal = dbus_message_new_signal(path, OFONO_NETWORK_REGISTRATION_INTERFACE,
 						"PropertyChanged");
 
-	if (signal == NULL)
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create DBus 'PropertyChanged' signal for path '%s'.",
+			__func__, path);
 		return;
+	}
 
 	dbus_message_iter_init_append(signal, &iter);
 	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &key);
@@ -921,8 +950,11 @@ static DBusMessage *network_get_properties(DBusConnection *conn,
 	const char *mode = registration_mode_to_string(netreg->mode);
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to allocate D-Bus reply message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
@@ -1001,14 +1033,21 @@ static DBusMessage *network_register(DBusConnection *conn,
 {
 	struct ofono_netreg *netreg = data;
 
-	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY)
+	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY) {
+		ofono_debug("%s: Registration denied due to auto-only mode", __func__);
 		return __ofono_error_access_denied(msg);
+	}
 
-	if (netreg->pending)
+	if (netreg->pending) {
+		ofono_error("%s: NetReg is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (netreg->driver->register_auto == NULL)
+	if (netreg->driver->register_auto == NULL) {
+		ofono_error("%s: NetReg driver's 'register_auto' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	netreg->pending = dbus_message_ref(msg);
 
@@ -1123,14 +1162,21 @@ static DBusMessage *network_scan(DBusConnection *conn,
 {
 	struct ofono_netreg *netreg = data;
 
-	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY)
+	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY) {
+		ofono_debug("%s: Scan denied due to auto-only mode", __func__);
 		return __ofono_error_access_denied(msg);
+	}
 
-	if (netreg->pending)
+	if (netreg->pending) {
+		ofono_error("%s: NetReg is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
-	if (netreg->driver->list_operators == NULL)
+	if (netreg->driver->list_operators == NULL) {
+		ofono_error("%s: NetReg driver's 'list_operators' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	netreg->pending = dbus_message_ref(msg);
 
@@ -1145,20 +1191,29 @@ static DBusMessage *network_register_manual(DBusConnection *conn,
 	struct ofono_netreg *netreg = data;
 	const char *mcc, *mnc, *tech;
 
-	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY)
+	if (netreg->mode == NETWORK_REGISTRATION_MODE_AUTO_ONLY) {
+		ofono_debug("%s: Manual registration denied due to auto-only mode", __func__);
 		return __ofono_error_access_denied(msg);
+	}
 
-	if (netreg->pending)
+	if (netreg->pending) {
+		ofono_error("%s: NetReg is currently busy.", __func__);
 		return __ofono_error_busy(msg);
+	}
 
 	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &mcc,
 					DBUS_TYPE_STRING, &mnc,
 					DBUS_TYPE_STRING, &tech,
-					DBUS_TYPE_INVALID) == FALSE)
+					DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
 		return __ofono_error_invalid_args(msg);
+	}
 
-	if (netreg->driver->register_manual == NULL)
+	if (netreg->driver->register_manual == NULL) {
+		ofono_error("%s: NetReg driver's 'register_manual' function is not implemented.",
+			__func__);
 		return __ofono_error_not_implemented(msg);
+	}
 
 	netreg->pending = dbus_message_ref(msg);
 
@@ -1179,8 +1234,11 @@ static DBusMessage *network_get_operators(DBusConnection *conn,
 	DBusMessageIter array;
 
 	reply = dbus_message_new_method_return(msg);
-	if (reply == NULL)
+	if (reply == NULL) {
+		ofono_error("%s: Failed to create DBus method return message.",
+			__func__);
 		return NULL;
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 
