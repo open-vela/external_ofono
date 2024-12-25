@@ -121,8 +121,8 @@ static gboolean parse_sim_io(GRil *ril, struct ril_msg *message,
 	 * simResponse (string)
 	 */
 	if (message->buf_len < 12) {
-		ofono_error("Invalid SIM IO reply: size too small (< 12): %u",
-				message->buf_len);
+		ofono_error("%s, Invalid SIM IO reply: size too small (< 12): %u",
+				__func__, message->buf_len);
 		return FALSE;
 	}
 
@@ -307,7 +307,7 @@ static void ril_sim_read_info(struct ofono_sim *sim, int fileid,
 	hex_path = get_path(g_ril_vendor(sd->ril),
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
-		ofono_error("Couldn't build SIM read info request - NULL path");
+		ofono_error("%s, Couldn't build SIM read info request - NULL path", __func__);
 		goto error;
 	}
 
@@ -451,7 +451,7 @@ static void ril_sim_read_binary(struct ofono_sim *sim, int fileid,
 	hex_path = get_path(g_ril_vendor(sd->ril),
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
-		ofono_error("Couldn't build SIM read info request - NULL path");
+		ofono_error("%s: Couldn't build SIM read info request - NULL path", __func__);
 		goto error;
 	}
 
@@ -614,7 +614,7 @@ static void update_record(struct ofono_sim *sim, int fileid,
 	hex_path = get_path(g_ril_vendor(sd->ril),
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
-		ofono_error("Couldn't build SIM read info request - NULL path");
+		ofono_error("%s: Couldn't build SIM read info request - NULL path", __func__);
 		goto error;
 	}
 

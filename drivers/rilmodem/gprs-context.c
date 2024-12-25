@@ -110,8 +110,10 @@ static void ril_gprs_context_call_list_changed(struct ril_msg *message,
 	int i;
 	int used_cid = gcd->active_rild_cid;
 
-	if (gcd->state == STATE_IDLE)
+	if (gcd->state == STATE_IDLE) {
+		ofono_debug("%s: Context is IDLE, ignoring update", __func__);
 		return;
+	}
 
 	g_ril_print_unsol_no_args(gcd->ril, message);
 
