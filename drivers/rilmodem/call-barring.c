@@ -90,7 +90,7 @@ static void ril_call_barring_query(struct ofono_call_barring *cb,
 	struct parcel rilp;
 	char svcs_str[4];
 
-	DBG("lock: %s, services to query: %d", lock, cls);
+	ofono_debug("%s, lock: %s, services to query: %d", __func__, lock, cls);
 
 	FIXUP_CLS();
 
@@ -160,7 +160,7 @@ static void ril_call_barring_set(struct ofono_call_barring *cb,
 	struct parcel rilp;
 	char svcs_str[4];
 
-	DBG("lock: %s, enable: %d, bearer class: %d", lock, enable, cls);
+	ofono_debug("%s, lock: %s, enable: %d, bearer class: %d", __func__, lock, enable, cls);
 
 	FIXUP_CLS();
 
@@ -217,7 +217,7 @@ static void ril_call_barring_set_passwd(struct ofono_call_barring *barr,
 	struct cb_data *cbd = cb_data_new(cb, data, bd);
 	struct parcel rilp;
 
-	DBG("lock %s old %s new %s", lock, old_passwd, new_passwd);
+	ofono_debug("%s, lock %s old %s new %s", __func__, lock, old_passwd, new_passwd);
 
 	parcel_init(&rilp);
 

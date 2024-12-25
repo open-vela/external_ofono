@@ -73,7 +73,7 @@ static void ril_lte_set_default_attach_info(const struct ofono_lte *lte,
 	char buf[OFONO_GPRS_MAX_APN_LENGTH + 1];
 	const char *proto = ril_util_gprs_proto_to_ril_string(info->proto);
 
-	DBG("%s", info->apn);
+	ofono_debug("%s: %s", __func__, info->apn);
 
 	parcel_init(&rilp);
 	parcel_w_int32(&rilp, 5);

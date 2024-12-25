@@ -124,7 +124,7 @@ static void ril_cbs_received(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_unsol_no_args(cd->ril, message);
 
-	DBG("req: %d; data_len: %d", message->req, (int) message->buf_len);
+	ofono_debug("%s, req: %d; data_len: %d", __func__, message->req, (int) message->buf_len);
 
 	g_ril_init_parcel(message, &rilp);
 	pdu = parcel_r_raw(&rilp, &pdulen);

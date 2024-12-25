@@ -333,6 +333,7 @@ static void ril_gprs_set_data_profile(struct ofono_gprs *gprs,
 	int i;
 
 	if (contexts == NULL) {
+		ofono_error("%s: No contexts provided", __func__);
 		g_free(cbd);
 		return;
 	}
