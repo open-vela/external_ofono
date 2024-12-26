@@ -473,7 +473,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		if (!ehplmn_list) {
 			ofono_error("malloc fail in %s", __func__);
 		} else {
-			ehplmn_list[0] = '\0';
+			memset(ehplmn_list, 0, sizeof(char) * 6 * ue_sim_data->ehplmn_num + 1);
 			for (int i = 0; i < ue_sim_data->ehplmn_num; i++) {
 				char temp[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = {
 					'\0'
