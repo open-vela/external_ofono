@@ -4284,12 +4284,10 @@ static void voicecall_load_cust_ecc(struct ofono_voicecall *vc)
 
 	ofono_debug("current_ecc_list len:%d",
 		    g_slist_length(current_ecc_list));
-	if (g_slist_length(current_ecc_list) > 0) {
-		vc->cust_ecc_list = current_ecc_list;
 
-		if (vc->driver->set_cust_ecc != NULL) {
-			vc->driver->set_cust_ecc(vc, current_ecc_list, set_cust_ecc_callback, vc);
-		}
+	vc->cust_ecc_list = current_ecc_list;
+	if (vc->driver->set_cust_ecc != NULL) {
+		vc->driver->set_cust_ecc(vc, current_ecc_list, set_cust_ecc_callback, vc);
 	}
 }
 
