@@ -526,7 +526,11 @@ static DBusMessage *ofono_ims_unregister(DBusConnection *conn,
 
 static void ims_config_cb(const struct ofono_error *error, void *data)
 {
+	struct ofono_ims *ims = data;
 	ofono_debug("%s, error type = %d", __func__, error->type);
+
+	if (ims->driver->registration_status != NULL)
+		ims->driver->registration_status(ims, registration_status_cb, ims);
 }
 
 static void send_ims_config(struct ofono_ims *ims)
