@@ -1583,15 +1583,27 @@ static void reset_available(struct network_operator_data *old,
 		set_network_operator_status(old, OPERATOR_STATUS_AVAILABLE);
 }
 
-
-void report_roaming_country_info(char* mcc)
+static void report_roaming_country_info(char *mcc, char *mnc)
 {
-	if(!strcmp(mcc, "454")) {
-		OFONO_DFX_ROAMING_INFO(OFONO_HONGKONG);
+	int count = 0;
+	char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+	if (mcc[0] == '\0' || mnc[0] == '\0') {
+		strcpy(covered_plmn, "unknow");
+	}
+	for (int i = 0; mcc[i] != '\0' && i <= OFONO_MAX_MCC_LENGTH; i++) {
+		covered_plmn[count++] = mcc[i] - '0' + 'a';
+	}
+	for (int i = 0; mnc[i] != '\0' && i <= OFONO_MAX_MNC_LENGTH; i++) {
+		covered_plmn[count++] = mnc[i] - '0' + 'a';
+	}
+
+	if (!strcmp(mcc, "454")) {
+		OFONO_DFX_ROAMING_INFO(OFONO_HONGKONG, covered_plmn);
 	} else if (!strcmp(mcc, "455")) {
-		OFONO_DFX_ROAMING_INFO(OFONO_MACAU);
+		OFONO_DFX_ROAMING_INFO(OFONO_MACAU, covered_plmn);
 	} else {
-		OFONO_DFX_ROAMING_INFO(OFONO_COUNTRY_UNKNOW);
+		OFONO_DFX_ROAMING_INFO(OFONO_COUNTRY_UNKNOW, covered_plmn);
 	}
 }
 
@@ -1681,9 +1693,6 @@ emit:
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
 					"MobileCountryCode",
 					DBUS_TYPE_STRING, &mcc);
-			if (netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) {
-				report_roaming_country_info(netreg->current_operator->mcc);
-			}
 		}
 
 		if (netreg->current_operator->mnc[0] != '\0') {
@@ -1693,6 +1702,10 @@ emit:
 					"MobileNetworkCode",
 					DBUS_TYPE_STRING, &mnc);
 		}
+		if (netreg->status == NETWORK_REGISTRATION_STATUS_ROAMING) {
+			report_roaming_country_info(netreg->current_operator->mcc,
+						    netreg->current_operator->mnc);
+			}
 	}
 
 	notify_status_watches(netreg);

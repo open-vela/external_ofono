@@ -162,11 +162,11 @@ struct ofono_plmn_op_code {
 		sendEventMisightF(915300005, "%s:%d", "oos_time", oos_duration);                   \
 	} while (0)
 
-#define OFONO_DFX_ROAMING_INFO(roaming_country_code)                                               \
+#define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_ROAMING:%d", roaming_country_code);                   \
-		sendEventMisightF(915300006, "%s:%d", "roaming_country_code",                      \
-				  roaming_country_code);                                           \
+		syslog(LOG_DEBUG, "OFONO_DFX_ROAMING:%d,%s", roaming_country_code, covered_plmn);  \
+		sendEventMisightF(915300006, "%s:%d,%s:%s", "roaming_country_code",                \
+				  roaming_country_code, "plmn", covered_plmn);                     \
 	} while (0)
 
 #define OFONO_DFX_BAND_INFO(band)                                                                  \
@@ -270,8 +270,8 @@ struct ofono_plmn_op_code {
 #define OFONO_DFX_OOS_DURATION_INFO(oos_duration)                                                  \
 	REPORT_DATA_LOG("%s,%d", "OOS_DURATION_INFO", oos_duration)
 
-#define OFONO_DFX_ROAMING_INFO(roaming_country_code)                                               \
-	REPORT_DATA_LOG("%s,%d", "ROAMING_INFO", roaming_country_code)
+#define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
+	REPORT_DATA_LOG("%s,%d,%s", "ROAMING_INFO", roaming_country_code, covered_plmn)
 
 #define OFONO_DFX_BAND_INFO(band) REPORT_DATA_LOG("%s,%d", "BAND_INFO", band)
 
@@ -331,8 +331,8 @@ struct ofono_plmn_op_code {
 #define OFONO_DFX_OOS_DURATION_INFO(oos_duration)                                                  \
 	syslog(LOG_DEBUG, "OFONO_DFX:OOS_DURATION_INFO:%d", oos_duration)
 
-#define OFONO_DFX_ROAMING_INFO(roaming_country_code)                                               \
-	syslog(LOG_DEBUG, "OFONO_DFX_ROAMING:%d", roaming_country_code)
+#define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
+	syslog(LOG_DEBUG, "OFONO_DFX_ROAMING:%d,%s", roaming_country_code, covered_plmn)
 
 #define OFONO_DFX_BAND_INFO(band) syslog(LOG_DEBUG, "OFONO_DFX_BAND:%d", band)
 
