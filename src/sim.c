@@ -2123,12 +2123,16 @@ static void sim_msisdn_read_cb(int ok, int length, int record,
 
 	if (!ok) {
 		ofono_error("Failed to read EFmsidn");
+		struct ofono_phone_number *own = g_new0(struct ofono_phone_number, 1);
+		sim->new_numbers = g_slist_prepend(sim->new_numbers, own);
 		goto check;
 	}
 
 	if (record_length < 14 || length < record_length) {
 		ofono_error("EFmsidn shall at least contain 14 bytes");
-		return;
+		struct ofono_phone_number *own = g_new0(struct ofono_phone_number, 1);
+		sim->new_numbers = g_slist_prepend(sim->new_numbers, own);
+		goto check;
 	}
 
 	total = length / record_length;
