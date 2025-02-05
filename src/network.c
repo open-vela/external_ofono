@@ -1698,12 +1698,12 @@ void stop_record_oos_time(struct ofono_netreg *netreg)
 			stop_time.tv_sec - netreg->oos_start_time.tv_sec;
 		if (netreg->oos_by_radio_on_flag &&
 		    temp_value < NORMAL_REGISTER_DURATION) {
-			netreg->oos_by_radio_on_flag = FALSE;
 			ofono_debug("%s ignore oos duration", __func__);
 		} else {
 			netreg->oos_duration =
 				netreg->oos_duration + temp_value;
 		}
+		netreg->oos_by_radio_on_flag = FALSE;
 		memset(&netreg->oos_start_time, 0,
 		       sizeof(netreg->oos_start_time));
 	}
