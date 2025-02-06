@@ -4720,6 +4720,24 @@ static void sim_state_watch(enum ofono_sim_state new_state, void *user)
 			ofono_sim_remove_spn_watch(gprs->sim, &gprs->spn_watch);
 			gprs->spn_watch = 0;
 		}
+		if (gprs->settings) {
+			storage_close(gprs->imsi, SETTINGS_STORE,
+				gprs->settings, TRUE);
+
+			g_free(gprs->imsi);
+			gprs->imsi = NULL;
+
+			g_free(gprs->preferred_apn);
+			gprs->preferred_apn = NULL;
+
+			gprs->settings = NULL;
+		}
+		for (GSList *l = gprs->contexts; l;) {
+			struct pri_context *ctx = l->data;
+			l = l->next;
+			gprs->contexts = g_slist_remove(gprs->contexts, ctx);
+			context_dbus_unregister(ctx);
+		}
 		break;
 	case OFONO_SIM_STATE_READY:
 		gprs_load_settings(gprs, ofono_sim_get_imsi(gprs->sim));
