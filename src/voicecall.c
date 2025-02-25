@@ -3292,6 +3292,10 @@ static DBusMessage *manager_answer(DBusConnection *conn,
 		vc->pending = dbus_message_ref(msg);
 
 		vc->driver->hold_all_active(vc, generic_callback, vc);
+	} else {
+		ofono_error("%s: Cannot answer! call state(%d) is not incoming or waiting state",
+			__func__, call->call->status);
+		return __ofono_error_failed(msg);
 	}
 
 	return NULL;
