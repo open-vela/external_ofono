@@ -65,12 +65,6 @@ enum type_name {
 	TYPE_CHAR,
 };
 
-enum type_name {
-	TYPE_INT,
-	TYPE_UNSIGNED_INT,
-	TYPE_CHAR,
-};
-
 #pragma pack(1)
 
 struct ofono_cell_quality {
