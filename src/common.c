@@ -364,6 +364,9 @@ const char *abnormal_event_type_to_string(int type)
 		return normal_event[type - 200];
 	}
 
+	if (type == 1000) {
+		return "modem_common_event";
+	}
 	return "unexepected";
 }
 
