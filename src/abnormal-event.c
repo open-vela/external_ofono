@@ -32,10 +32,20 @@
 
 #define INT_STR_MAX 15
 #define MAX_PARAM_SIZE 6
-#define MAX_STR_PARAM_LEN 30
+#define MAX_STR_PARAM_LEN 50
 #define KEY_NAME "abnormal_event"
 
-static void report_abnormal_info(int param_count, ...)
+static struct ofono_ue_camp_cell_info g_camped_cell_info = {
+	.sub = 0,
+	.plmn = 0,
+	.tac = 0,
+	.cell_id = 0,
+	.band = 0,
+	.earfcn = 0,
+	.pci = 0,
+};
+
+static void report_abnormal_info(const struct ofono_ue_camp_cell_info *info, int param_count, ...)
 {
 	va_list args;
 	char abnormal_info[MAX_PARAM_SIZE][MAX_STR_PARAM_LEN];
@@ -50,7 +60,15 @@ static void report_abnormal_info(int param_count, ...)
 		int type = va_arg(args, int);
 		switch (type) {
 		case TYPE_INT: {
-			snprintf(abnormal_info[i], MAX_STR_PARAM_LEN, "%d", va_arg(args, int));
+			if (i == 0) { // first is type_id
+				int type_id = va_arg(args, int);
+
+				snprintf(abnormal_info[i], MAX_STR_PARAM_LEN, "%d_%u_%u_%u",
+					type_id, info->tac, info->plmn, info->cell_id);
+			} else {
+				snprintf(abnormal_info[i], MAX_STR_PARAM_LEN, "%d",
+					va_arg(args, int));
+			}
 			break;
 		}
 		case TYPE_UNSIGNED_INT: {
@@ -70,7 +88,7 @@ static void report_abnormal_info(int param_count, ...)
 			break;
 		}
 		default: {
-			ofono_error("unexpected parm type");
+			ofono_error("unexpected parm type,type=%d", type);
 			break;
 		}
 		}
@@ -104,9 +122,9 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,ef_id=%u,sw1=%u,sw2=%u", KEY_NAME, ef_file_data->sub,
 			    ef_file_data->ef_id, ef_file_data->sw1, ef_file_data->sw2);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT, ef_file_data->ef_id,
-				     TYPE_UNSIGNED_INT, ef_file_data->sw1, TYPE_UNSIGNED_INT,
-				     ef_file_data->sw2);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				ef_file_data->ef_id, TYPE_UNSIGNED_INT, ef_file_data->sw1,
+				TYPE_UNSIGNED_INT, ef_file_data->sw2);
 		break;
 	}
 	case OFONO_ABNORMAL_PROFILE: {
@@ -114,7 +132,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			(struct ofono_abnormal_profile *) covert_data;
 
 		ofono_debug("%s,sub=%u", KEY_NAME, profile_data->sub);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_INT, 1);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_INT, 1);
 		break;
 	}
 	case OFONO_ABNORMAL_RLF: {
@@ -123,16 +141,15 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		const char *cause_str = reest_cause_to_string(reest_data->reest_cause);
 
 		ofono_debug("%s,sub=%u,earfcn=%u,pci=%u,band=%u,rsrp=%d,rsrq=%"
-			    "d,sinr=%d,rssi=%d,reest_cause=%s",
-			    KEY_NAME, reest_data->sub, reest_data->earfcn, reest_data->pci,
-			    reest_data->band, reest_data->cell_quality.rsrp,
-			    reest_data->cell_quality.rsrq, reest_data->cell_quality.sinr,
-			    reest_data->cell_quality.rssi, cause_str);
-		report_abnormal_info(6, TYPE_INT, type_id, TYPE_UNSIGNED_INT, reest_data->earfcn,
-				     TYPE_UNSIGNED_INT, reest_data->pci, TYPE_INT,
-				     reest_data->cell_quality.rsrp, TYPE_INT,
-				     reest_data->cell_quality.sinr, TYPE_UNSIGNED_INT,
-				     reest_data->reest_cause);
+				"d,sinr=%d,rssi=%d,reest_cause=%s",
+				KEY_NAME, reest_data->sub, reest_data->earfcn, reest_data->pci,
+				reest_data->band, reest_data->cell_quality.rsrp,
+				reest_data->cell_quality.rsrq, reest_data->cell_quality.sinr,
+				reest_data->cell_quality.rssi, cause_str);
+		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				reest_data->earfcn, TYPE_UNSIGNED_INT, reest_data->pci, TYPE_INT,
+				reest_data->cell_quality.sinr, TYPE_UNSIGNED_INT,
+				reest_data->reest_cause);
 		break;
 	}
 	case OFONO_ABNORMAL_RACH_ACCESS: {
@@ -143,10 +160,10 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		ofono_debug("%s,sub=%u,earfcn=%u,pci=%u,fail_reason=%s", KEY_NAME,
 			    rach_access_data->sub, rach_access_data->earfcn, rach_access_data->pci,
 			    cause_str);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     rach_access_data->earfcn, TYPE_UNSIGNED_INT,
-				     rach_access_data->pci, TYPE_UNSIGNED_INT,
-				     rach_access_data->fail_reason);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				rach_access_data->earfcn, TYPE_UNSIGNED_INT,
+				rach_access_data->pci, TYPE_UNSIGNED_INT,
+				rach_access_data->fail_reason);
 		break;
 	}
 	case OFONO_ABNORMAL_OOS: {
@@ -155,9 +172,9 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,earfcn=%u,pci=%u,oos_type=%s", KEY_NAME, oos_data->sub,
 			    oos_data->earfcn, oos_data->pci, oos_type_str);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT, oos_data->earfcn,
-				     TYPE_UNSIGNED_INT, oos_data->pci, TYPE_UNSIGNED_INT,
-				     oos_data->oos_type);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				oos_data->earfcn, TYPE_UNSIGNED_INT, oos_data->pci,
+				TYPE_UNSIGNED_INT, oos_data->oos_type);
 		break;
 	}
 	case OFONO_ABNORMAL_NAS_TIMEOUT: {
@@ -173,12 +190,12 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 				    timer_exp_data->cell_quality.sinr,
 				    timer_exp_data->cell_quality.rssi);
 		}
-		report_abnormal_info(6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     timer_exp_data->timer_id, TYPE_INT,
-				     timer_exp_data->cell_quality.rsrp, TYPE_INT,
-				     timer_exp_data->cell_quality.rsrq, TYPE_INT,
-				     timer_exp_data->cell_quality.sinr, TYPE_INT,
-				     timer_exp_data->cell_quality.rssi);
+		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				timer_exp_data->timer_id, TYPE_INT,
+				timer_exp_data->cell_quality.rsrp, TYPE_INT,
+				timer_exp_data->cell_quality.rsrq, TYPE_INT,
+				timer_exp_data->cell_quality.sinr, TYPE_INT,
+				timer_exp_data->cell_quality.rssi);
 		break;
 	}
 	case OFONO_ABNORMAL_SIP_TIMEOUT: {
@@ -189,9 +206,9 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,srv_type=%s,sip_method=%s", KEY_NAME, sip_timeout_data->sub,
 			    srv_type_str, sip_method_str);
-		report_abnormal_info(3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     sip_timeout_data->srv_type, TYPE_UNSIGNED_INT,
-				     sip_timeout_data->sip_method);
+		report_abnormal_info(&g_camped_cell_info, 3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				sip_timeout_data->srv_type, TYPE_UNSIGNED_INT,
+				sip_timeout_data->sip_method);
 		break;
 	}
 	case OFONO_ABNORMAL_TIMEOUT_IN_RRC: {
@@ -202,10 +219,10 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		ofono_debug("%s,sub=%u,earfcn=%u,pci=%u,timer=%s", KEY_NAME,
 			    timeout_in_rrc_data->sub, timeout_in_rrc_data->earfcn,
 			    timeout_in_rrc_data->pci, timer_id_str);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     timeout_in_rrc_data->earfcn, TYPE_UNSIGNED_INT,
-				     timeout_in_rrc_data->pci, TYPE_UNSIGNED_INT,
-				     timeout_in_rrc_data->timer);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				timeout_in_rrc_data->earfcn, TYPE_UNSIGNED_INT,
+				timeout_in_rrc_data->pci, TYPE_UNSIGNED_INT,
+				timeout_in_rrc_data->timer);
 		break;
 	}
 	case OFONO_ABNORMAL_ECC_CALL_FAIL: {
@@ -215,8 +232,8 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,cause=%s", KEY_NAME, ecc_call_fail_data->sub,
 			    ecall_fail_str);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     ecc_call_fail_data->cause);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				ecc_call_fail_data->cause);
 		break;
 	}
 	case OFONO_ABNORMAL_RTP_RTCP: {
@@ -225,8 +242,8 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		const char *rtp_error_str = rtp_rtcp_error_to_string(rtp_rtcp_data->error_type);
 
 		ofono_debug("%s,sub=%u,error_type=%s", KEY_NAME, rtp_rtcp_data->sub, rtp_error_str);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     rtp_rtcp_data->error_type);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				rtp_rtcp_data->error_type);
 		break;
 	}
 	case OFONO_ABNORMAL_PAGING_DECODE: {
@@ -240,12 +257,12 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			    paging_decode_data->cell_quality.rsrq,
 			    paging_decode_data->cell_quality.sinr,
 			    paging_decode_data->cell_quality.rssi);
-		report_abnormal_info(6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     paging_decode_data->earfcn, TYPE_UNSIGNED_INT,
-				     paging_decode_data->pci, TYPE_INT,
-				     paging_decode_data->cell_quality.rsrp, TYPE_INT,
-				     paging_decode_data->cell_quality.sinr, TYPE_INT,
-				     paging_decode_data->cell_quality.rssi);
+		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				paging_decode_data->earfcn, TYPE_UNSIGNED_INT,
+				paging_decode_data->pci, TYPE_INT,
+				paging_decode_data->cell_quality.rsrp, TYPE_INT,
+				paging_decode_data->cell_quality.sinr, TYPE_INT,
+				paging_decode_data->cell_quality.rssi);
 		break;
 	}
 	case OFONO_ABNORMAL_CALL_QUALITY: {
@@ -257,10 +274,10 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			    KEY_NAME, call_quality_data->sub, call_quality_data->pkt_lost,
 			    call_quality_data->fraction_lost,
 			    call_quality_data->jitter_buffer_size);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     call_quality_data->pkt_lost, TYPE_UNSIGNED_INT,
-				     call_quality_data->fraction_lost, TYPE_UNSIGNED_INT,
-				     call_quality_data->jitter_buffer_size);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				call_quality_data->pkt_lost, TYPE_UNSIGNED_INT,
+				call_quality_data->fraction_lost, TYPE_UNSIGNED_INT,
+				call_quality_data->jitter_buffer_size);
 		break;
 	}
 	case OFONO_ABNORMAL_PDCP: {
@@ -272,11 +289,11 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			    pdcp_data->ul_loss_rate, pdcp_data->cell_quality.rsrp,
 			    pdcp_data->cell_quality.rsrq, pdcp_data->cell_quality.sinr,
 			    pdcp_data->cell_quality.rssi);
-		report_abnormal_info(
-			6, TYPE_INT, type_id, TYPE_UNSIGNED_INT, pdcp_data->dl_loss_rate,
-			TYPE_UNSIGNED_INT, pdcp_data->ul_loss_rate, TYPE_INT,
-			pdcp_data->cell_quality.rsrp, TYPE_INT, pdcp_data->cell_quality.rsrq,
-			TYPE_INT, pdcp_data->cell_quality.sinr);
+		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				pdcp_data->dl_loss_rate, TYPE_UNSIGNED_INT, pdcp_data->ul_loss_rate,
+				TYPE_INT, pdcp_data->cell_quality.rsrp, TYPE_INT,
+				pdcp_data->cell_quality.rsrq,
+				TYPE_INT, pdcp_data->cell_quality.sinr);
 		break;
 	}
 	case OFONO_ABNORMAL_NAS_REJECT: {
@@ -295,12 +312,12 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 				    nas_reject_data->cell_quality.sinr,
 				    nas_reject_data->cell_quality.rssi);
 		}
-		report_abnormal_info(6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     nas_reject_data->procedure_type, TYPE_UNSIGNED_INT,
-				     nas_reject_data->reject_cause, TYPE_INT,
-				     nas_reject_data->cell_quality.rsrp, TYPE_INT,
-				     nas_reject_data->cell_quality.rsrq, TYPE_INT,
-				     nas_reject_data->cell_quality.sinr);
+		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				nas_reject_data->procedure_type, TYPE_UNSIGNED_INT,
+				nas_reject_data->reject_cause, TYPE_INT,
+				nas_reject_data->cell_quality.rsrp, TYPE_INT,
+				nas_reject_data->cell_quality.rsrq, TYPE_INT,
+				nas_reject_data->cell_quality.sinr);
 		break;
 	}
 	case OFONO_ABNORMAL_SIP_REJECT: {
@@ -312,10 +329,10 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		ofono_debug("%s,sub=%u,srv_type=%s,sip_method=%s,resp_code=%u", KEY_NAME,
 			    sip_reject_data->sub, srv_type_str, sip_method_str,
 			    sip_reject_data->resp_code);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     sip_reject_data->srv_type, TYPE_UNSIGNED_INT,
-				     sip_reject_data->sip_method, TYPE_UNSIGNED_INT,
-				     sip_reject_data->resp_code);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				sip_reject_data->srv_type, TYPE_UNSIGNED_INT,
+				sip_reject_data->sip_method, TYPE_UNSIGNED_INT,
+				sip_reject_data->resp_code);
 		break;
 	}
 	case OFONO_ABNORMAL_RRC_REJECT: {
@@ -325,10 +342,10 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		ofono_debug("%s,sub=%u,earfcn=%u,pci=%u,error_scenario_id=%u", KEY_NAME,
 			    rrc_reject_data->sub, rrc_reject_data->earfcn, rrc_reject_data->pci,
 			    rrc_reject_data->error_scenario_id);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     rrc_reject_data->earfcn, TYPE_UNSIGNED_INT,
-				     rrc_reject_data->pci, TYPE_UNSIGNED_INT,
-				     rrc_reject_data->error_scenario_id);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				rrc_reject_data->earfcn, TYPE_UNSIGNED_INT,
+				rrc_reject_data->pci, TYPE_UNSIGNED_INT,
+				rrc_reject_data->error_scenario_id);
 		break;
 	}
 	case OFONO_ABNORMAL_PING_PONG: {
@@ -348,8 +365,9 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,cause=%u,error_scenario_id=%u", KEY_NAME, cc_fail_data->sub,
 			    cc_fail_data->cause, cc_fail_data->error_scenario_id);
-		report_abnormal_info(3, TYPE_INT, type_id, TYPE_UNSIGNED_INT, cc_fail_data->cause,
-				     TYPE_UNSIGNED_INT, cc_fail_data->error_scenario_id);
+		report_abnormal_info(&g_camped_cell_info, 3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				cc_fail_data->cause, TYPE_UNSIGNED_INT,
+				cc_fail_data->error_scenario_id);
 		break;
 	}
 	case OFONO_ABNORMAL_XCAP: {
@@ -360,9 +378,9 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,mode=%s,reason=%s,error_type=%s", KEY_NAME, xcap_data->sub,
 			    xcap_mode_str, xcap_reason_str, xcap_error_str);
-		report_abnormal_info(4, TYPE_INT, type_id, TYPE_UNSIGNED_INT, xcap_data->mode,
-				     TYPE_UNSIGNED_INT, xcap_data->reason, TYPE_UNSIGNED_INT,
-				     xcap_data->error_type);
+		report_abnormal_info(&g_camped_cell_info, 4, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				xcap_data->mode, TYPE_UNSIGNED_INT, xcap_data->reason,
+				TYPE_UNSIGNED_INT, xcap_data->error_type);
 		break;
 	}
 	case OFONO_ABNORMAL_DATA: {
@@ -372,11 +390,11 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			    data_data->sub, data_data->event, data_data->cell_quality.rsrp,
 			    data_data->cell_quality.rsrq, data_data->cell_quality.sinr,
 			    data_data->cell_quality.rssi);
-		report_abnormal_info(6, TYPE_INT, type_id, TYPE_UNSIGNED_INT, data_data->event,
-				     TYPE_INT, data_data->cell_quality.rsrp, TYPE_INT,
-				     data_data->cell_quality.rsrq, TYPE_INT,
-				     data_data->cell_quality.sinr, TYPE_INT,
-				     data_data->cell_quality.rssi);
+		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				data_data->event, TYPE_INT, data_data->cell_quality.rsrp, TYPE_INT,
+				data_data->cell_quality.rsrq, TYPE_INT,
+				data_data->cell_quality.sinr,
+				TYPE_INT, data_data->cell_quality.rssi);
 		break;
 	}
 	case OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP: {
@@ -387,8 +405,8 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,reason_type=%s", KEY_NAME, sip_end_reason_data->sub,
 			    call_end_reason_str);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     sip_end_reason_data->reason_type);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				sip_end_reason_data->reason_type);
 		break;
 	}
 	case OFONO_LIMITED_SERVICE_CAMP_EVENT: // 200
@@ -399,9 +417,9 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 
 		ofono_debug("%s,sub=%u,type=%u,cause=%s", KEY_NAME, limited_service_data->sub,
 			    limited_service_data->type, limted_cause_str);
-		report_abnormal_info(3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-				     limited_service_data->type, TYPE_UNSIGNED_INT,
-				     limited_service_data->cause);
+		report_abnormal_info(&g_camped_cell_info, 3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				limited_service_data->type, TYPE_UNSIGNED_INT,
+				limited_service_data->cause);
 		break;
 	}
 	case OFONO_REDIRECT_EVENT: {
@@ -409,7 +427,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			(struct ofono_redirect_event *) covert_data;
 
 		ofono_debug("%s,sub=%u", KEY_NAME, redirect_data->sub);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_INT, 1);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_INT, 1);
 		break;
 	}
 	case OFONO_HANDOVER_EVENT: {
@@ -417,7 +435,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			(struct ofono_abnormal_handover_event *) covert_data;
 
 		ofono_debug("%s,sub=%u", KEY_NAME, handover_data->sub);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_INT, 1);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_INT, 1);
 		break;
 	}
 	case OFONO_RESELECT_EVENT: {
@@ -425,7 +443,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			(struct ofono_abnormal_reselect_event *) covert_data;
 
 		ofono_debug("%s,sub=%u", KEY_NAME, reselect_data->sub);
-		report_abnormal_info(2, TYPE_INT, type_id, TYPE_INT, 1);
+		report_abnormal_info(&g_camped_cell_info, 2, TYPE_INT, type_id, TYPE_INT, 1);
 		break;
 	}
 	case OFONO_CSFB_EVENT: {
@@ -455,12 +473,14 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 		struct ofono_ue_camp_cell_info *ue_camp_cell_data =
 			(struct ofono_ue_camp_cell_info *) covert_data;
 
+		memcpy(&g_camped_cell_info, ue_camp_cell_data,
+			sizeof(struct ofono_ue_camp_cell_info));
 		ofono_debug("%s,sub=%u,plmn=%u,tac=%u,cell_id=%u,band=%u,"
-			    "earfcn=%u,pci=%u",
-			    KEY_NAME, ue_camp_cell_data->sub, ue_camp_cell_data->plmn,
-			    ue_camp_cell_data->tac, ue_camp_cell_data->cell_id,
-			    ue_camp_cell_data->band, ue_camp_cell_data->earfcn,
-			    ue_camp_cell_data->pci);
+			"earfcn=%u,pci=%u",
+			KEY_NAME, ue_camp_cell_data->sub, ue_camp_cell_data->plmn,
+			ue_camp_cell_data->tac, ue_camp_cell_data->cell_id,
+			ue_camp_cell_data->band, ue_camp_cell_data->earfcn,
+			ue_camp_cell_data->pci);
 		if (!ofono_modem_check_and_save_band(modem, ue_camp_cell_data->band)) {
 			OFONO_DFX_BAND_INFO(ue_camp_cell_data->band);
 		}
@@ -483,10 +503,24 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			}
 			ofono_debug("%s,sub=%u,hplmn=%u,ehplmn_list=%s", KEY_NAME, ue_sim_data->sub,
 				    ue_sim_data->hplmn, ehplmn_list);
-			report_abnormal_info(3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
-					     ue_sim_data->hplmn, TYPE_CHAR, ehplmn_list);
+			report_abnormal_info(&g_camped_cell_info, 3, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
+				ue_sim_data->hplmn, TYPE_CHAR, ehplmn_list);
 			free(ehplmn_list);
 		}
+		break;
+	}
+	case OFONO_MODEM_COMMON_EVENT: {
+		struct ofono_modem_common_info *modem_common_data =
+			(struct ofono_modem_common_info *)covert_data;
+		char common_info[MAX_STR_PARAM_LEN] = {'\0'};
+
+		snprintf(common_info, MAX_STR_PARAM_LEN, "%u_%u_%u_%u",
+			modem_common_data->id, g_camped_cell_info.tac, g_camped_cell_info.plmn,
+			g_camped_cell_info.cell_id);
+		ofono_debug("%s,modem common event id=%u", KEY_NAME, modem_common_data->id);
+		OFONO_DFX_MODEM_COMMON_EVENT_INFO(common_info, modem_common_data->parm1,
+			modem_common_data->parm2, modem_common_data->parm3,
+			modem_common_data->parm4, modem_common_data->parm5);
 		break;
 	}
 	default:
