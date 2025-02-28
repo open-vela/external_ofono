@@ -55,6 +55,8 @@ enum ofono_abnormal_event {
 	OFONO_UE_CAP_INFO,
 	OFONO_UE_CAMP_CELL_INFO,
 	OFONO_UE_SIM_INFO,
+
+	OFONO_MODEM_COMMON_EVENT = 1000,
 };
 
 enum type_name {
@@ -488,6 +490,17 @@ struct ofono_ue_sim_info {
 	unsigned int hplmn;
 	unsigned int ehplmn_num;
 	unsigned int ehplmn[16];
+};
+
+// OFONO_MODEM_COMMON_EVENT = 1000
+struct ofono_modem_common_info {
+	unsigned int sub;
+	unsigned int id;
+	unsigned int parm1;
+	unsigned int parm2;
+	unsigned int parm3;
+	unsigned int parm4;
+	unsigned int parm5;
 };
 
 #pragma pack()

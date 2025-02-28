@@ -220,6 +220,15 @@ struct ofono_plmn_op_code {
 				  "parm5", parm5, "parm6", parm6);                                 \
 	} while (0)
 
+#define OFONO_DFX_MODEM_COMMON_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                \
+	do {                                                                                       \
+		sendEventMisightF(915200013,                                                       \
+				  "%s:%s,%s:%u,%s:%u,%s:%u,%s:%u,"                                 \
+				  "%s:%u",                                                         \
+				  "parm1", parm1, "parm2", parm2, "parm3", parm3, "parm4", parm4,  \
+				  "parm5", parm5, "parm6", parm6);                                 \
+	} while (0)
+
 #elif defined(CONFIG_OFONO_DATA_LOG_OVER_MIWEAR)
 
 #define REPORT_DATA_LOG(format, ...)                                                               \
@@ -287,6 +296,10 @@ struct ofono_plmn_op_code {
 	REPORT_DATA_LOG("%s,%s,%s,%s,%s,%s,%s", "ABNORMAL_EVENT", parm1, parm2, parm3, parm4,      \
 			parm5, parm6)
 
+#define OFONO_DFX_MODEM_COMMON_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                \
+	REPORT_DATA_LOG("%s,%s,%u,%u,%u,%u,%u", "MODEM_COMMON_EVENT", parm1, parm2, parm3, parm4,  \
+			parm5, parm6)
+
 #else
 
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
@@ -342,6 +355,9 @@ struct ofono_plmn_op_code {
 	syslog(LOG_DEBUG, "OFONO_DFX_ABNORMAL_EVENT:%s,%s,%s,%s,%s,%s", parm1, parm2, parm3,       \
 	       parm4, parm5, parm6);
 
+#define OFONO_DFX_MODEM_COMMON_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                \
+	syslog(LOG_DEBUG, "OFONO_DFX_ABNORMAL_EVENT:%s,%u,%u,%u,%u,%u", parm1, parm2, parm3,       \
+	       parm4, parm5, parm6);
 #endif
 
 #define OFONO_DFX_CALL_INFO_IF(flag, type, direction, media, fail_scenario, fail_reason)           \
