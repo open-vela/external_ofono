@@ -291,13 +291,17 @@ static void periodic_updates_enabled_cb(const struct ofono_error *error,
 					void *data)
 {
 	struct ofono_netmon *netmon = data;
+	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Error enabling periodic updates");
-
 		netmon_agent_free(netmon->agent);
+		__ofono_dbus_pending_reply(&netmon->pending, __ofono_error_failed(netmon->pending));
 		return;
 	}
+
+	reply = dbus_message_new_method_return(netmon->pending);
+	__ofono_dbus_pending_reply(&netmon->pending, reply);
 }
 
 static void periodic_updates_disabled_cb(const struct ofono_error *error,
