@@ -2514,7 +2514,7 @@ static void private_chat_callback(const struct ofono_error *error, void *data)
 				DBUS_TYPE_INVALID);
 
 	c = strrchr(callpath, '/');
-	sscanf(c, "/voicecall%2u", &id);
+	sscanf(c, "/voicecall%u", &id);
 
 	old = g_slist_copy(vc->multiparty_list);
 
@@ -2585,7 +2585,7 @@ static DBusMessage *multiparty_private_chat(DBusConnection *conn,
 		return __ofono_error_not_found(msg);
 	}
 
-	if (!sscanf(c, "/voicecall%2u", &id)) {
+	if (!sscanf(c, "/voicecall%u", &id)) {
 		ofono_error("%s: Failed to extract call ID from path: %s", __func__, callpath);
 		return __ofono_error_not_found(msg);
 	}
