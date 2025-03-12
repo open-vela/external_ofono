@@ -93,7 +93,11 @@ static int process_cellinfo_list(struct ril_msg *message,
 	int i;
 	int position = 0;
 
-	if (message->error != RIL_E_SUCCESS) {
+	/* When the process_cellinfo_list function is triggered by the unsolicited
+	 * message RIL_UNSOL_CELL_INFO_LIST, the user_data parameter is NULL, and
+	 * the message does not contain an error field at this time.
+	 * */
+	if (user_data && message->error != RIL_E_SUCCESS) {
 		if (cbd) {
 			cb = cbd->cb;
 			CALLBACK_WITH_FAILURE(cb, 0, NULL, cbd->data);
