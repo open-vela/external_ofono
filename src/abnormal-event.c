@@ -148,6 +148,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 				reest_data->cell_quality.rssi, cause_str);
 		report_abnormal_info(&g_camped_cell_info, 6, TYPE_INT, type_id, TYPE_UNSIGNED_INT,
 				reest_data->earfcn, TYPE_UNSIGNED_INT, reest_data->pci, TYPE_INT,
+				reest_data->cell_quality.rsrp, TYPE_INT,
 				reest_data->cell_quality.sinr, TYPE_UNSIGNED_INT,
 				reest_data->reest_cause);
 		break;
