@@ -443,7 +443,7 @@ static char *get_operator_display_name(struct ofono_netreg *netreg)
 	if (home_or_spdi)
 		if (netreg->flags & NETWORK_REGISTRATION_FLAG_HOME_SHOW_PLMN)
 			/* Case 1 */
-			snprintf(name, len, "%s (%s)", spn, plmn);
+			snprintf(name, len, "%s", plmn);
 		else
 			/* Case 2 */
 			snprintf(name, len, "%s", spn);
@@ -2247,13 +2247,15 @@ static void sim_spn_display_condition_parse(struct ofono_netreg *netreg,
 static void spn_read_cb(const char *spn, const char *dc, void *data)
 {
 	struct ofono_netreg *netreg = data;
+	char display_condition = SIM_EFSPN_DC_HOME_PLMN_BIT;
 
 	netreg->flags &= ~(NETWORK_REGISTRATION_FLAG_HOME_SHOW_PLMN |
 				NETWORK_REGISTRATION_FLAG_ROAMING_SHOW_SPN);
 
-	if (dc)
-		sim_spn_display_condition_parse(netreg, *dc);
+	if (!dc)
+		dc = &display_condition;
 
+	sim_spn_display_condition_parse(netreg, *dc);
 	if (netreg->current_operator)
 		netreg_emit_operator_display_name(netreg);
 }
