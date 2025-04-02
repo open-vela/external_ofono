@@ -123,18 +123,6 @@ static DBusMessage *cs_pop_message_from_queue(DBusConnection *connection,
 static DBusMessage *cs_push_message_to_queue(DBusConnection *connection,
 					     DBusMessage *msg, void *data);
 
-static int clir_status_from_string(const char *status)
-{
-	if (!strcmp(status, "default"))
-		return CLIR_STATUS_NOT_PROVISIONED;
-	else if (!strcmp(status, "enabled"))
-		return CLIR_STATUS_PROVISIONED_PERMANENT;
-	else if (!strcmp(status, "disabled"))
-		return CLIR_STATUS_UNKNOWN;
-
-	return -1;
-}
-
 static const char *clip_status_to_string(int status)
 {
 	switch (status) {
@@ -1630,7 +1618,6 @@ static DBusMessage *cs_set_clir(DBusConnection *conn,
 				DBusMessage *msg, void *data)
 {
 	struct ofono_call_settings *cs = data;
-	char *status;
 	int clir = -1;
 
 	if (cs->driver == NULL) {
@@ -1651,16 +1638,15 @@ static DBusMessage *cs_set_clir(DBusConnection *conn,
 	}
 
 	if (dbus_message_get_args(msg, NULL,
-				DBUS_TYPE_STRING, &status,
+				DBUS_TYPE_INT32, &clir,
 				DBUS_TYPE_INVALID) == FALSE) {
 		ofono_error("%s: Failed to retrieve string argument from D-Bus message.",
 			__func__);
 		return __ofono_error_invalid_args(msg);
 	}
 
-	clir = clir_status_from_string(status);
-	if (clir == -1) {
-		ofono_error("%s: Invalid CLIR status '%s'.", __func__, status);
+	if (clir < 0 || clir > 2) {
+		ofono_error("%s: Invalid CLIR value '%d'.", __func__, clir);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -1714,7 +1700,7 @@ static const GDBusMethodTable cs_methods[] = {
 			GDBUS_ARGS({ "status", "i" }),
 			cs_get_call_waiting) },
 	{ GDBUS_ASYNC_METHOD("SetClir",
-			GDBUS_ARGS({ "status", "s" }), NULL,
+			GDBUS_ARGS({ "status", "i" }), NULL,
 			cs_set_clir) },
 	{ GDBUS_ASYNC_METHOD("GetClir", NULL,
 			GDBUS_ARGS({ "status", "i" }),
