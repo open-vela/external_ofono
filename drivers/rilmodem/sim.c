@@ -934,6 +934,16 @@ static void ril_sim_status_changed(struct ril_msg *message, gpointer user_data)
 	send_get_sim_status(sim);
 }
 
+static void ril_sim_invalid_changed(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_sim *sim = (struct ofono_sim *) user_data;
+	struct sim_data *sd = ofono_sim_get_data(sim);
+
+	g_ril_print_unsol_no_args(sd->ril, message);
+
+	ofono_sim_invalid_notify(sim);
+}
+
 static void ril_uicc_enablement_changed(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_sim *sim = (struct ofono_sim *) user_data;
@@ -1553,6 +1563,9 @@ static gboolean listen_and_get_sim_status(gpointer user)
 	/* TODO: should we also register for RIL_UNSOL_SIM_REFRESH? */
 	g_ril_register(sd->ril, RIL_UNSOL_SIM_REFRESH,
 			(GRilNotifyFunc) ril_sim_refresh, sim);
+
+	g_ril_register(sd->ril, RIL_UNSOL_SIM_INVALID, (GRilNotifyFunc) ril_sim_invalid_changed,
+		       sim);
 
 	return FALSE;
 }

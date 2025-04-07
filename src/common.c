@@ -1301,3 +1301,11 @@ gboolean is_gprs_context_type_support(const char *gc_type) {
 	}
 }
 
+const int *get_signal_level_thresholds_info(int type)
+{
+	if (type == 0) {
+		return default_rsrp_thresholds;
+	} else {
+		return default_rssi_thresholds;
+	}
+}

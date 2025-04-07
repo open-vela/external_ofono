@@ -149,6 +149,7 @@ struct ofono_sim {
 	bool sdn_ready : 1;
 	bool initialized : 1;
 	bool wait_initialized : 1;
+	unsigned int sim_invalid;
 };
 
 struct cached_pin {
@@ -382,6 +383,16 @@ static void sim_state_update(struct ofono_sim *sim)
 					DBUS_TYPE_UINT32, &state);
 }
 
+void ofono_sim_invalid_notify(struct ofono_sim *sim)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	const char *path = __ofono_atom_get_path(sim->atom);
+
+	sim->sim_invalid = 1;
+	ofono_dbus_signal_property_changed(conn, path, OFONO_SIM_MANAGER_INTERFACE, "SimInvalid",
+					   DBUS_TYPE_UINT32, &sim->sim_invalid);
+}
+
 static void call_state_watches(struct ofono_sim *sim)
 {
 	GSList *l;
@@ -453,6 +464,8 @@ static DBusMessage *sim_get_properties(DBusConnection *conn,
 	ofono_dbus_dict_append(&dict, "Present", DBUS_TYPE_BOOLEAN, &present);
 
 	ofono_dbus_dict_append(&dict, "SimState", DBUS_TYPE_UINT32, &state);
+
+	ofono_dbus_dict_append(&dict, "SimInvalid", DBUS_TYPE_UINT32, &sim->sim_invalid);
 
 	if (!present)
 		goto done;

@@ -65,6 +65,18 @@ typedef void (*ofono_modem_oem_req_str_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_modem_enable_abnormal_event_cb_t)(
 		const struct ofono_error *error, int status, void *data);
 
+typedef void (*ofono_modem_suppress_message_report_cb_t)(const struct ofono_error *error,
+							void *data);
+
+typedef void (*ofono_modem_set_signal_report_Threshold_cb_t)(const struct ofono_error *error,
+							     void *data);
+
+typedef void (*ofono_modem_enable_modem_stationary_cb_t)(const struct ofono_error *error,
+							 void *data);
+
+typedef void (*ofono_modem_set_modem_stationary_threshold_cb_t)(const struct ofono_error *error,
+								void *data);
+
 struct ofono_modem_driver {
 	const char *name;
 	enum ofono_modem_type modem_type;
@@ -123,6 +135,21 @@ struct ofono_modem_driver {
 	void (*enable_modem_abnormal_event)(struct ofono_modem *modem, ofono_bool_t enable,
 			int module_mask, int from_event_id, int to_event_id,
 			ofono_modem_enable_abnormal_event_cb_t cb, void *data);
+
+	void (*suppress_message_report)(struct ofono_modem *modem, ofono_bool_t enable,
+				       ofono_modem_suppress_message_report_cb_t cb, void *data);
+
+	void (*set_signal_report_Threshold)(struct ofono_modem *modem, int type,
+					    const int *thresholds,
+					    ofono_modem_set_signal_report_Threshold_cb_t cb,
+					    void *data);
+
+	void (*enable_modem_stationary)(struct ofono_modem *modem, ofono_bool_t enable,
+					ofono_modem_enable_modem_stationary_cb_t cb, void *data);
+
+	void (*set_modem_stationary_threshold)(struct ofono_modem *modem, int value,
+					       ofono_modem_set_modem_stationary_threshold_cb_t cb,
+					       void *data);
 };
 
 void ofono_modem_add_interface(struct ofono_modem *modem,
