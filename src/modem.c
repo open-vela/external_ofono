@@ -148,7 +148,12 @@ struct modem_property {
 
 static const char *modem_support_pending_list[] = { "SetProperty",
 						    "EnableModem",
-						    "DisableModem", NULL };
+						    "DisableModem",
+						    "SuppressMessageReport",
+						    "SetSignalReportThreshold",
+						    "SetModemStationary",
+						    "SetModemStationaryThreshold",
+						    NULL };
 static DBusMessage *modem_pop_message_from_queue(DBusConnection *connection,
 						 DBusMessage *msg, void *data);
 static DBusMessage *modem_push_message_to_queue(DBusConnection *connection,
@@ -1795,6 +1800,211 @@ static DBusMessage *modem_disable(DBusConnection *conn, DBusMessage *msg,
 	return modem_enable_or_disable(modem, FALSE, conn, msg);
 }
 
+static void set_signal_report_Threshold_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when setting signal report threshold.");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static DBusMessage *modem_set_signal_report_Threshold(DBusConnection *conn, DBusMessage *msg,
+						      void *data)
+{
+	struct ofono_modem *modem = data;
+	int type;
+	const int *thresholds;
+
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__,
+			    ofono_modem_get_path(modem));
+		return __ofono_error_busy(msg);
+	}
+
+	if (modem->driver->set_signal_report_Threshold == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'set_signal_report_Threshold' function is not "
+			    "implemented.",
+			    __func__, ofono_modem_get_path(modem));
+		return __ofono_error_not_implemented(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &type, DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
+	thresholds = get_signal_level_thresholds_info(type);
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->set_signal_report_Threshold(modem, type, thresholds,
+						   set_signal_report_Threshold_cb, modem);
+
+	return NULL;
+}
+
+static void suppress_message_report_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when setting signal report threshold.");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static DBusMessage *modem_suppress_message_report(DBusConnection *conn, DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	int enable;
+
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__,
+			    ofono_modem_get_path(modem));
+		return __ofono_error_busy(msg);
+	}
+
+	if (modem->driver->suppress_message_report == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'suppress_message_report' function is not "
+			    "implemented.",
+			    __func__, ofono_modem_get_path(modem));
+		return __ofono_error_not_implemented(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &enable, DBUS_TYPE_INVALID) ==
+	    FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->suppress_message_report(modem, enable ? TRUE : FALSE,
+					      suppress_message_report_cb, modem);
+
+	return NULL;
+}
+
+static void modem_enable_modem_stationary_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when enable modem stationary.");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static DBusMessage *modem_enable_modem_stationary(DBusConnection *conn, DBusMessage *msg,
+						  void *data)
+{
+	struct ofono_modem *modem = data;
+	int enable;
+
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__,
+			    ofono_modem_get_path(modem));
+		return __ofono_error_busy(msg);
+	}
+
+	if (modem->driver->enable_modem_stationary == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'enable_modem_stationary' function is not "
+			    "implemented.",
+			    __func__, ofono_modem_get_path(modem));
+		return __ofono_error_not_implemented(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &enable, DBUS_TYPE_INVALID) ==
+	    FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->enable_modem_stationary(modem, enable ? TRUE : FALSE,
+					       modem_enable_modem_stationary_cb, modem);
+
+	return NULL;
+}
+
+static void modem_set_modem_stationary_threshold_cb(const struct ofono_error *error, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when set modem stationary threshold.");
+
+		reply = __ofono_error_failed(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+
+		return;
+	}
+
+	reply = dbus_message_new_method_return(modem->pending);
+
+	__ofono_dbus_pending_reply(&modem->pending, reply);
+}
+
+static DBusMessage *modem_set_modem_stationary_threshold(DBusConnection *conn, DBusMessage *msg,
+							 void *data)
+{
+	struct ofono_modem *modem = data;
+	int value;
+
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__,
+			    ofono_modem_get_path(modem));
+		return __ofono_error_busy(msg);
+	}
+
+	if (modem->driver->set_modem_stationary_threshold == NULL) {
+		ofono_error(
+			"%s: Modem [%s] driver's 'set_modem_stationary_threshold' function is not "
+			"implemented.",
+			__func__, ofono_modem_get_path(modem));
+		return __ofono_error_not_implemented(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &value, DBUS_TYPE_INVALID) == FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->set_modem_stationary_threshold(
+		modem, value, modem_set_modem_stationary_threshold_cb, modem);
+
+	return NULL;
+}
+
 static DBusMessage *enable_modem_abnormal_event(DBusConnection *conn,
 						DBusMessage *msg, void *data)
 {
@@ -2107,12 +2317,27 @@ static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_METHOD("HandleCommand",
 			GDBUS_ARGS({ "atom", "i" }, { "command", "i" }),
 			NULL, modem_handle_command) },
-	{ GDBUS_ASYNC_METHOD("LoadModemEccList", NULL, NULL,
-			     modem_load_ecc_list) },
-	{ GDBUS_METHOD("PopMessage", NULL, NULL,
-			     modem_pop_message_from_queue) },
-	{ GDBUS_METHOD("PushMessage", NULL, NULL,
-			     modem_push_message_to_queue) },
+	{ GDBUS_ASYNC_METHOD("LoadModemEccList",
+			NULL, NULL,
+			modem_load_ecc_list) },
+	{ GDBUS_METHOD("PopMessage",
+			NULL, NULL,
+			modem_pop_message_from_queue) },
+	{ GDBUS_METHOD("PushMessage",
+			NULL, NULL,
+			modem_push_message_to_queue) },
+	{ GDBUS_ASYNC_METHOD("SetSignalReportThreshold",
+			GDBUS_ARGS({ "enable", "i" }), NULL,
+			modem_set_signal_report_Threshold) },
+	{ GDBUS_ASYNC_METHOD("SuppressMessageReport",
+			GDBUS_ARGS({ "enable", "i" }), NULL,
+			modem_suppress_message_report) },
+	{ GDBUS_ASYNC_METHOD("SetModemStationary",
+			GDBUS_ARGS({ "enable", "i" }), NULL,
+			modem_enable_modem_stationary) },
+	{ GDBUS_ASYNC_METHOD("SetModemStationaryThreshold",
+			GDBUS_ARGS({ "value", "i" }), NULL,
+			modem_set_modem_stationary_threshold) },
 	{ }
 };
 

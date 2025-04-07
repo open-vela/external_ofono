@@ -678,6 +678,163 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 	CALLBACK_WITH_FAILURE(cb, data);
 }
 
+static void ril_suppress_message_report_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_suppress_message_report_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("set unsol message suppress fail");
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+	} else {
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+	}
+}
+
+static void ril_suppress_message_report(struct ofono_modem *modem, ofono_bool_t enable,
+				       ofono_modem_suppress_message_report_cb_t cb, void *data)
+{
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 2);
+
+	g_ril_append_print_buf(rd->ril, "(%d)", enable);
+
+	if (enable) {
+		/*
+		RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED-bit1
+		RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED-bit2
+		RIL_UNSOL_CELL_INFO_LIST-bit3
+		RIL_UNSOL_SIGNAL_STRENGTH-bit4
+		*/
+		parcel_w_int32(&rilp, 0x0F);
+		/* 0-enable,1-disable for every bit*/
+		parcel_w_int32(&rilp, 0x0F);
+	} else {
+		parcel_w_int32(&rilp, 0x0F);
+		parcel_w_int32(&rilp, 0x00);
+	}
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_SUPPRESS_MESSAGE_REPORT, &rilp,
+		       ril_suppress_message_report_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_set_signal_report_Threshold_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_set_signal_report_Threshold_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("set signal report threshold fail");
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+	} else {
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+	}
+}
+
+static void ril_set_signal_report_Threshold(struct ofono_modem *modem, int type,
+					    const int *thresholds,
+					    ofono_modem_set_signal_report_Threshold_cb_t cb,
+					    void *data)
+{
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 5);
+	parcel_w_int32(&rilp, type); /*0-rsrp,1-rssi*/
+	parcel_w_int32(&rilp, thresholds[0]);
+	parcel_w_int32(&rilp, thresholds[1]);
+	parcel_w_int32(&rilp, thresholds[2]);
+	parcel_w_int32(&rilp, thresholds[3]);
+
+	g_ril_append_print_buf(rd->ril, "(%d)", type);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_SET_SIGNAL_THRESHOLD, &rilp,
+		       ril_set_signal_report_Threshold_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_enable_modem_stationarys_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_enable_modem_stationary_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("set modem stationary fail");
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+	} else {
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+	}
+}
+
+static void ril_enable_modem_stationary(struct ofono_modem *modem, ofono_bool_t enable,
+					ofono_modem_enable_modem_stationary_cb_t cb, void *data)
+{
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 1);
+	parcel_w_int32(&rilp, enable);
+
+	g_ril_append_print_buf(rd->ril, "(%d)", enable);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_SET_DEVICE_STATIONARY, &rilp,
+		       ril_enable_modem_stationarys_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
+static void ril_set_modem_stationary_threshold_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	ofono_modem_set_modem_stationary_threshold_cb_t cb = cbd->cb;
+
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("set modem stationary threshold fail");
+		CALLBACK_WITH_FAILURE(cb, cbd->data);
+	} else {
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+	}
+}
+
+static void ril_set_modem_stationary_threshold(struct ofono_modem *modem, int value,
+					       ofono_modem_set_modem_stationary_threshold_cb_t cb,
+					       void *data)
+{
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 1);
+	parcel_w_int32(&rilp, value);
+
+	g_ril_append_print_buf(rd->ril, "(%d)", value);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_SET_DEVICE_STATIONARY_JUDGE_SCOPE, &rilp,
+		       ril_set_modem_stationary_threshold_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, data);
+}
+
 static void ril_enable_modem_abnormal_event(struct ofono_modem *modem, ofono_bool_t enable,
 		int module_mask, int from_event_id, int to_event_id, ofono_modem_enable_abnormal_event_cb_t cb, void *data)
 {
@@ -869,6 +1026,10 @@ static struct ofono_modem_driver ril_driver = {
 	.request_oem_raw = ril_request_oem_hook_raw,
 	.request_oem_strings = ril_request_oem_hook_strings,
 	.enable_modem_abnormal_event = ril_enable_modem_abnormal_event,
+	.suppress_message_report = ril_suppress_message_report,
+	.set_signal_report_Threshold = ril_set_signal_report_Threshold,
+	.enable_modem_stationary = ril_enable_modem_stationary,
+	.set_modem_stationary_threshold = ril_set_modem_stationary_threshold,
 };
 
 /*
