@@ -313,6 +313,8 @@ ofono_bool_t ofono_sim_remove_spn_watch(struct ofono_sim *sim, unsigned int *id)
  */
 void ofono_sim_inserted_notify(struct ofono_sim *sim, ofono_bool_t inserted);
 
+void ofono_sim_invalid_notify(struct ofono_sim *sim);
+
 /*
  * When the SIM PIN has been entered, many devices require some time to
  * initialize the SIM and calls to CPIN? will return a SIM BUSY error.  Or
