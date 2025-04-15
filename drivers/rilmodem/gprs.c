@@ -570,7 +570,7 @@ static gboolean ril_delayed_register(gpointer user_data)
 
 	get_active_data_calls(gprs);
 
-	g_ril_register(gd->ril, RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED,
+	g_ril_register(gd->ril, RIL_UNSOL_RESPONSE_NETWORK_STATE_CHANGED,
 					ril_gprs_state_change, gprs);
 
 	g_ril_register(gd->ril, RIL_UNSOL_RESTRICTED_STATE_CHANGED,
