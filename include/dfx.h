@@ -211,15 +211,6 @@ struct ofono_plmn_op_code {
 				  modem_active_duration);                                          \
 	} while (0)
 
-#define OFONO_DFX_ABNORMAL_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                    \
-	do {                                                                                       \
-		sendEventMisightF(915200012,                                                       \
-				  "%s:%s,%s:%s,%s:%s,%s:%s,%s:%s,"                                 \
-				  "%s:%s",                                                         \
-				  "parm1", parm1, "parm2", parm2, "parm3", parm3, "parm4", parm4,  \
-				  "parm5", parm5, "parm6", parm6);                                 \
-	} while (0)
-
 #elif defined(CONFIG_OFONO_DATA_LOG_OVER_MIWEAR)
 
 #define REPORT_DATA_LOG(format, ...)                                                               \
@@ -283,10 +274,6 @@ struct ofono_plmn_op_code {
 	REPORT_DATA_LOG("%s,%d,%d", "MODEM_DURATION_INFO", modem_deactive_duration,                \
 			modem_active_duration)
 
-#define OFONO_DFX_ABNORMAL_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                    \
-	REPORT_DATA_LOG("%s,%s,%s,%s,%s,%s,%s", "ABNORMAL_EVENT", parm1, parm2, parm3, parm4,      \
-			parm5, parm6)
-
 #else
 
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
@@ -337,10 +324,6 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_MODEM_DURATION_INFO(modem_deactive_duration, modem_active_duration)              \
 	syslog(LOG_DEBUG, "OFONO_DFX_MODEM:%d,%d", modem_deactive_duration, modem_active_duration)
-
-#define OFONO_DFX_ABNORMAL_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                    \
-	syslog(LOG_DEBUG, "OFONO_DFX_ABNORMAL_EVENT:%s,%s,%s,%s,%s,%s", parm1, parm2, parm3,       \
-	       parm4, parm5, parm6);
 
 #endif
 
