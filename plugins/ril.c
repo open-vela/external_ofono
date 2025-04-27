@@ -647,6 +647,10 @@ static void ril_enable_abnormal_event_cb(struct ril_msg *message, gpointer user_
 {
 	struct cb_data *cbd = user_data;
 	ofono_modem_enable_abnormal_event_cb_t cb = cbd->cb;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+
+	g_ril_print_response_no_args(rd->ril, message);
 
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("enable/disable abnormal event fail");
