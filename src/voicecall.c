@@ -97,6 +97,7 @@ struct ofono_voicecall {
 	unsigned int netreg_watch;
 	unsigned int netreg_status_watch;
 	GQueue *voicecall_queue;
+	gboolean unsol_clcc_with_data;
 };
 
 struct voicecall {
@@ -5409,6 +5410,16 @@ void ofono_voicecall_set_data(struct ofono_voicecall *vc, void *data)
 void *ofono_voicecall_get_data(struct ofono_voicecall *vc)
 {
 	return vc->driver_data;
+}
+
+void ofono_voicecall_set_clcc(struct ofono_voicecall *vc, gboolean clcc)
+{
+	vc->unsol_clcc_with_data = clcc;
+}
+
+gboolean ofono_voicecall_get_clcc(struct ofono_voicecall *vc)
+{
+	return vc->unsol_clcc_with_data;
 }
 
 struct ofono_modem *ofono_voicecall_get_modem(struct ofono_voicecall *vc)
