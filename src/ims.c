@@ -396,7 +396,7 @@ static gboolean report_ims_register_duration(gpointer user_data)
 void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 				int ext_info, char *subscriber_uri)
 {
-	const char *path = __ofono_atom_get_path(ims->atom);
+	const char *path = NULL;
 	DBusConnection *conn = ofono_dbus_get_connection();
 	dbus_bool_t new_reg_info;
 	dbus_bool_t new_voice_capable, new_sms_capable;
@@ -407,7 +407,8 @@ void ofono_ims_status_notify(struct ofono_ims *ims, int reg_info,
 			__func__);
 		return;
 	}
-	
+
+	path = __ofono_atom_get_path(ims->atom);
 	ofono_debug("%s: Called with path='%s', reg_info=%d, ext_info=%d, subscriber_uri='%s'",
             __func__, __ofono_atom_get_path(ims->atom), reg_info, ext_info,
 				subscriber_uri ? subscriber_uri : "NULL");
