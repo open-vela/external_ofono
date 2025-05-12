@@ -2644,8 +2644,8 @@ static struct pri_context *add_context(struct ofono_gprs *gprs,
 	ofono_info("%s: Registering new context '%s' with ID %u.", __func__, context->name, id);
 
 	if (!context_dbus_register(context)) {
-		ofono_error("%s: Failed to register PRI context '%s' with ID %u to D-Bus.",
-                __func__, context->name, id);
+		ofono_error("%s: Failed to register PRI context with ID %u to D-Bus.",
+                __func__, id);
 		return NULL;
 	}
 
@@ -2684,8 +2684,7 @@ void ofono_gprs_cid_activated(struct ofono_gprs *gprs, unsigned int cid,
 
 	if (strlen(apn) > OFONO_GPRS_MAX_APN_LENGTH
 				|| is_valid_apn(apn) == FALSE) {
-		ofono_error("%s: Activation failed for CID %u due to invalid APN '%s'.",
-			__func__, cid, apn ? apn : "(NULL)");
+		ofono_error("%s: Activation failed for CID %u due to invalid APN.", __func__, cid);
 		return;
 	}
 
@@ -3056,8 +3055,8 @@ static DBusMessage *gprs_edit_context(DBusConnection *conn,
 	}
 
 	if (name == NULL) {
-		ofono_debug("%s: Name was NULL. Defaulted to '%s'.", __func__, name ? name : "(NULL)");
 		name = gprs_context_default_name(type);
+		ofono_debug("%s: Name was NULL. Defaulted to '%s'.", __func__, name ? name : "(NULL)");
 	}
 
 	if (name == NULL) {
@@ -3375,8 +3374,7 @@ static void provision_context(const struct ofono_gprs_provision_data *ap,
 	context->context.type = ap->type;
 
 	if (context_dbus_register(context) == FALSE) {
-		ofono_error("%s: Failed to register context '%s' to D-Bus.",
-			__func__, context->name);
+		ofono_error("%s: Failed to register context to D-Bus.", __func__);
 		return;
 	}
 
@@ -3512,7 +3510,7 @@ static DBusMessage *gprs_request_network(DBusConnection *conn,
 {
 	struct ofono_gprs *gprs = data;
 	struct pri_context *ctx;
-	const char *typestr;
+	const char *typestr = NULL;
 	enum ofono_gprs_context_type type;
 
 	if (gprs->pending) {
@@ -3528,9 +3526,14 @@ static DBusMessage *gprs_request_network(DBusConnection *conn,
 		return __ofono_error_invalid_args(msg);
 	}
 
+	if (typestr == NULL) {
+		ofono_error("%s: context type is NULL.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
 	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
 		ofono_error("%s: Invalid context type string '%s'.",
-			__func__, typestr ? typestr : "(NULL)");
+			__func__, typestr);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -3549,7 +3552,7 @@ static DBusMessage *gprs_release_network(DBusConnection *conn,
 {
 	struct ofono_gprs *gprs = data;
 	struct pri_context *ctx;
-	const char *typestr;
+	const char *typestr = NULL;
 	enum ofono_gprs_context_type type;
 
 	if (gprs->pending) {
@@ -3565,9 +3568,13 @@ static DBusMessage *gprs_release_network(DBusConnection *conn,
 		return __ofono_error_invalid_args(msg);
 	}
 
+	if (typestr == NULL) {
+		ofono_error("%s: context type is NULL.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
 	if (gprs_context_string_to_type(typestr, &type) == FALSE) {
-		ofono_error("%s: Invalid context type string '%s'.",
-			__func__, typestr ? typestr : "(NULL)");
+		ofono_error("%s: Invalid context type string '%s'.", __func__, typestr);
 		return __ofono_error_invalid_format(msg);
 	}
 
@@ -4507,8 +4514,7 @@ static gboolean load_context(struct ofono_gprs *gprs, const char *group)
 		strcpy(context->message_center, msgcenter);
 
 	if (context_dbus_register(context) == FALSE) {
-		ofono_error("%s: Failed to register context '%s' to D-Bus.",
-			__func__, context->name);
+		ofono_error("%s: Failed to register context to D-Bus.", __func__);
 		goto error;
 	}
 
