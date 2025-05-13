@@ -2514,6 +2514,12 @@ static void private_chat_callback(const struct ofono_error *error, void *data)
 				DBUS_TYPE_INVALID);
 
 	c = strrchr(callpath, '/');
+	if (c == NULL) {
+		ofono_error("%s: Invalid call path: %s", __func__, callpath == NULL ? "*" : callpath);
+		__ofono_dbus_pending_reply(&vc->pending, __ofono_error_failed(vc->pending));
+		return;
+	}
+
 	sscanf(c, "/voicecall%u", &id);
 
 	old = g_slist_copy(vc->multiparty_list);
