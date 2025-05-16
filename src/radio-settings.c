@@ -440,6 +440,8 @@ static void radio_set_rat_mode(struct ofono_radio_settings *rs,
 	path = __ofono_atom_get_path(rs->atom);
 	str_mode = radio_access_mode_to_string(rs->mode);
 
+	ofono_debug("%s:%s", __func__, str_mode);
+
 	ofono_dbus_signal_property_changed(conn, path,
 						OFONO_RADIO_SETTINGS_INTERFACE,
 						"TechnologyPreference",
