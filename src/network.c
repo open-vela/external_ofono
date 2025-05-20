@@ -1589,7 +1589,7 @@ static void report_roaming_country_info(char *mcc, char *mnc)
 	char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
 
 	if (mcc[0] == '\0' || mnc[0] == '\0') {
-		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH);
+		strncpy(covered_plmn, "unknow", sizeof(covered_plmn));
 	}
 	for (int i = 0; mcc[i] != '\0' && i <= OFONO_MAX_MCC_LENGTH; i++) {
 		covered_plmn[count++] = mcc[i] - '0' + 'a';
