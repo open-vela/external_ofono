@@ -2515,7 +2515,7 @@ static void private_chat_callback(const struct ofono_error *error, void *data)
 
 	c = strrchr(callpath, '/');
 	if (c == NULL) {
-		ofono_error("%s: Invalid call path: %s", __func__, callpath == NULL ? "*" : callpath);
+		ofono_error("%s: Invalid call path", __func__);
 		__ofono_dbus_pending_reply(&vc->pending, __ofono_error_failed(vc->pending));
 		return;
 	}
