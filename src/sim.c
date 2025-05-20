@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <ell/ell.h>
 
@@ -993,12 +994,12 @@ error:
 		dbus_message_iter_get_basic(&var, &slot);
 
 		if (slot <= 0 || slot > sim->card_slot_count) {
-			ofono_error("%s: Invalid slot number: %ld", __func__, (long)slot);
+			ofono_error("%s: Invalid slot number: %" PRIu32, __func__, slot);
 			return __ofono_error_invalid_args(msg);
 		}
 
 		if (sim->active_card_slot == slot) {
-			ofono_debug("%s: Active card slot is already set to %ld", __func__, (long)slot);
+			ofono_debug("%s: Active card slot is already set to %" PRIu32, __func__, slot);
 			return dbus_message_new_method_return(msg);
 		}
 
