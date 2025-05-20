@@ -394,6 +394,26 @@ void ofono_sim_invalid_notify(struct ofono_sim *sim)
 					   DBUS_TYPE_UINT32, &sim->sim_invalid);
 }
 
+void ofono_sim_invalid_clear(struct ofono_sim *sim)
+{
+	DBusConnection *conn;
+	const char *path;
+
+	if (sim == NULL) {
+		return;
+	}
+
+	if (sim->sim_invalid == 1) {
+		ofono_debug("%s,sim valid", __func__);
+		sim->sim_invalid = 0;
+		conn = ofono_dbus_get_connection();
+		path = __ofono_atom_get_path(sim->atom);
+		ofono_dbus_signal_property_changed(conn, path, OFONO_SIM_MANAGER_INTERFACE,
+						   "SimInvalid", DBUS_TYPE_UINT32,
+						   &sim->sim_invalid);
+	}
+}
+
 static void call_state_watches(struct ofono_sim *sim)
 {
 	GSList *l;

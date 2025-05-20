@@ -387,6 +387,8 @@ int ofono_sim_logical_access(struct ofono_sim *sim, int session_id,
 
 void ofono_sim_uicc_enablement_changed(struct ofono_sim *sim, int enabled);
 
+void ofono_sim_invalid_clear(struct ofono_sim *sim);
+
 #ifdef __cplusplus
 }
 #endif
