@@ -139,6 +139,8 @@ void ofono_netmon_neighbouring_cell_notify(struct ofono_netmon *netmon,
 					const struct ofono_cell_info* cell,
 					void *data);
 
+void ofono_netmon_cellinfo_changed_count_update(struct ofono_netmon *netmon);
+
 #ifdef __cplusplus
 }
 #endif

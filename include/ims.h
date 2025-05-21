@@ -68,6 +68,7 @@ void *ofono_ims_get_data(const struct ofono_ims *ims);
 int ofono_ims_get_reg_info(struct ofono_ims *ims);
 int ofono_ims_get_ext_info(struct ofono_ims *ims);
 int ofono_ims_has_sms_capable(int reg_info, int ext_info);
+void ofono_ims_state_changed_count_update(struct ofono_ims *ims);
 
 #ifdef __cplusplus
 }

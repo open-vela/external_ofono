@@ -32,7 +32,7 @@
 
 #include <glib.h>
 #include <gdbus.h>
-
+#include <ofono/dfx.h>
 #include "ofono.h"
 #include "netmonagent.h"
 
@@ -55,6 +55,8 @@ struct ofono_netmon {
 	void *driver_data;
 	struct ofono_atom *atom;
 	struct netmon_agent *agent;
+	int cellinfo_changed_count_timer_id;
+	int cellinfo_changed_count;
 };
 
 static const char *cell_type_to_tech_name(enum ofono_netmon_cell_type type)
@@ -172,6 +174,11 @@ static void append_cell_struct(const struct ofono_cell_info *cell,
 	netmon_cell_info_dict_append(&dict, cell);
 	dbus_message_iter_close_container(&entry, &dict);
 	dbus_message_iter_close_container(iter, &entry);
+}
+
+void ofono_netmon_cellinfo_changed_count_update(struct ofono_netmon *netmon)
+{
+	netmon->cellinfo_changed_count += 1;
 }
 
 void ofono_netmon_serving_cell_notify(struct ofono_netmon *netmon,
@@ -585,12 +592,25 @@ static void netmon_unregister(struct ofono_atom *atom)
 	g_dbus_unregister_interface(conn, path, OFONO_NETMON_INTERFACE);
 }
 
+static gboolean report_cell_info_changed_count(gpointer user_data)
+{
+	struct ofono_netmon *netmon = user_data;
+
+	ofono_debug("%s:cellinfo_changed_count=%d", __func__, netmon->cellinfo_changed_count);
+	OFONO_DFX_CELL_INFO_CHANGED_COUNT(netmon->cellinfo_changed_count);
+	netmon->cellinfo_changed_count = 0;
+	return TRUE;
+}
+
 static void netmon_remove(struct ofono_atom *atom)
 {
 	struct ofono_netmon *netmon = __ofono_atom_get_data(atom);
 
 	if (netmon == NULL)
 		return;
+
+	report_cell_info_changed_count(netmon);
+	g_source_remove(netmon->cellinfo_changed_count_timer_id);
 
 	if (netmon->pending != NULL) {
 		DBusMessage *reply = __ofono_error_failed(netmon->pending);
@@ -655,6 +675,10 @@ void ofono_netmon_register(struct ofono_netmon *netmon)
 	ofono_modem_add_interface(modem, OFONO_NETMON_INTERFACE);
 
 	__ofono_atom_register(netmon->atom, netmon_unregister);
+
+	netmon->cellinfo_changed_count = 0;
+	netmon->cellinfo_changed_count_timer_id =
+		g_timeout_add(REPORTING_PERIOD, report_cell_info_changed_count, netmon);
 }
 
 void ofono_netmon_remove(struct ofono_netmon *netmon)

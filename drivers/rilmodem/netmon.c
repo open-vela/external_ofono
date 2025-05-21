@@ -268,6 +268,7 @@ static void ril_cellinfo_notify(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_netmon *netmon = user_data;
 
+	ofono_netmon_cellinfo_changed_count_update(netmon);
 	process_cellinfo_list(message, netmon, NULL);
 }
 

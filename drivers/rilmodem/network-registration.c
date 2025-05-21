@@ -402,6 +402,7 @@ static void ril_network_state_change(struct ril_msg *message,
 	g_ril_print_unsol_no_args(nd->ril, message);
 
 	ril_registration_status(netreg, NULL, NULL);
+	ofono_netreg_network_state_changed_count_update(netreg);
 }
 
 static void ril_registration_status(struct ofono_netreg *netreg,
@@ -728,6 +729,7 @@ static void ril_strength_notify(struct ril_msg *message, gpointer user_data)
 	struct netreg_data *nd = ofono_netreg_get_data(netreg);
 	int strength = parse_signal_strength(nd->ril, message, nd->tech, netreg);
 
+	ofono_netreg_signal_changed_count_update(netreg);
 	ofono_netreg_strength_notify(netreg, strength);
 }
 

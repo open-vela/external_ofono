@@ -226,6 +226,25 @@ struct ofono_plmn_op_code {
 				  "parm5", parm5, "parm6", parm6);                                 \
 	} while (0)
 
+#define OFONO_DFX_NETWORK_SIGNAL_CHANGED_COUNT(signal_changed_count, network_state_changed_count)  \
+	do {                                                                                       \
+		sendEventMisightF(915200014, "%s:%d,%s:%d", "signal_changed_count",                \
+				  signal_changed_count, "network_state_changed_count",             \
+				  network_state_changed_count);                                    \
+	} while (0)
+
+#define OFONO_DFX_IMS_STATE_CHANGED_COUNT(ims_state_changed_count)                                 \
+	do {                                                                                       \
+		sendEventMisightF(915200015, "%s:%d", "ims_state_changed_count",                   \
+				  ims_state_changed_count);                                        \
+	} while (0)
+
+#define OFONO_DFX_CELL_INFO_CHANGED_COUNT(cellinfo_changed_count)                                  \
+	do {                                                                                       \
+		sendEventMisightF(915200016, "%s:%d", "cellinfo_changed_count",                    \
+				  cellinfo_changed_count);                                         \
+	} while (0)
+
 #elif defined(CONFIG_OFONO_DATA_LOG_OVER_MIWEAR)
 
 #define REPORT_DATA_LOG(format, ...)                                                               \
@@ -297,6 +316,15 @@ struct ofono_plmn_op_code {
 	REPORT_DATA_LOG("%s,%s,%u,%u,%u,%u,%u", "MODEM_COMMON_EVENT", parm1, parm2, parm3, parm4,  \
 			parm5, parm6)
 
+#define OFONO_DFX_NETWORK_SIGNAL_CHANGED_COUNT(signal_changed_count, network_state_changed_count)  \
+	REPORT_DATA_LOG("%s,%d,%d", "NETWORK_SIGNAL_CHANGED_COUNT", signal_changed_count,          \
+			network_state_changed_count)
+
+#define OFONO_DFX_IMS_STATE_CHANGED_COUNT(ims_state_changed_count)                                 \
+	REPORT_DATA_LOG("%s,%d", "IMS_STATE_CHANGED_COUNT", ims_state_changed_count)
+
+#define OFONO_DFX_CELL_INFO_CHANGED_COUNT(cellinfo_changed_count)                                  \
+	REPORT_DATA_LOG("%s,%d", "CELLINFO_CHANGED_COUNT", cellinfo_changed_count)
 #else
 
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
@@ -353,8 +381,19 @@ struct ofono_plmn_op_code {
 	       parm4, parm5, parm6);
 
 #define OFONO_DFX_MODEM_COMMON_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                \
-	syslog(LOG_DEBUG, "OFONO_DFX_ABNORMAL_EVENT:%s,%u,%u,%u,%u,%u", parm1, parm2, parm3,       \
-	       parm4, parm5, parm6);
+	syslog(LOG_DEBUG, "OFONO_DFX_COMMON_EVENT:%s,%u,%u,%u,%u,%u", parm1, parm2, parm3, parm4,  \
+	       parm5, parm6);
+
+#define OFONO_DFX_NETWORK_SIGNAL_CHANGED_COUNT(signal_changed_count, network_state_changed_count)  \
+	syslog(LOG_DEBUG, "NETWORK_SIGNAL_CHANGED_COUNT:%d,%d", signal_changed_count,              \
+	       network_state_changed_count)
+
+#define OFONO_DFX_IMS_STATE_CHANGED_COUNT(ims_state_changed_count)                                 \
+	syslog(LOG_DEBUG, "IMS_STATE_CHANGED_COUNT:%d", ims_state_changed_count)
+
+#define OFONO_DFX_CELL_INFO_CHANGED_COUNT(cellinfo_changed_count)                                  \
+	syslog(LOG_DEBUG, "CELLINFO_CHANGED_COUNT:%d", cellinfo_changed_count)
+
 #endif
 
 #define OFONO_DFX_CALL_INFO_IF(flag, type, direction, media, fail_scenario, fail_reason)           \

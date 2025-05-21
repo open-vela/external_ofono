@@ -63,6 +63,7 @@ struct ofono_ims {
 	struct timespec ims_register_start_time;
 	int ims_register_duration;
 	int ims_reigster_report_time_id;
+	int ims_state_changed_count;
 };
 
 static GSList *g_drivers = NULL;
@@ -367,6 +368,15 @@ void update_ims_register_duration(struct ofono_ims *ims, int reg_info)
 	}
 }
 
+static gboolean report_ims_state_changed_count(struct ofono_ims *ims)
+{
+	ofono_debug("%s:ims_state_changed_count=%d", __func__, ims->ims_state_changed_count);
+	OFONO_DFX_IMS_STATE_CHANGED_COUNT(ims->ims_state_changed_count);
+
+	ims->ims_state_changed_count = 0;
+	return TRUE;
+}
+
 static gboolean report_ims_register_duration(gpointer user_data)
 {
 	struct ofono_ims *ims = user_data;
@@ -390,6 +400,7 @@ static gboolean report_ims_register_duration(gpointer user_data)
 	}
 	ims->ims_register_duration = 0;
 
+	report_ims_state_changed_count(ims);
 	return TRUE;
 }
 
@@ -876,8 +887,14 @@ static void ofono_ims_finish_register(struct ofono_ims *ims)
 	ofono_modem_add_interface(modem, OFONO_IMS_INTERFACE);
 	__ofono_atom_register(ims->atom, ims_atom_unregister);
 
+	ims->ims_state_changed_count = 0;
 	ims->ims_reigster_report_time_id = g_timeout_add(REPORTING_PERIOD,
 			report_ims_register_duration, ims);
+}
+
+void ofono_ims_state_changed_count_update(struct ofono_ims *ims)
+{
+	ims->ims_state_changed_count += 1;
 }
 
 static void registration_init_cb(const struct ofono_error *error,
