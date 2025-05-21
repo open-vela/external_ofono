@@ -102,6 +102,8 @@ struct ofono_netreg {
 	int current_rat;
 	int  rat_report_time_id;
 	int radio_status;
+	int signal_changed_count;
+	int network_state_changed_count;
 };
 
 struct network_operator_data {
@@ -1800,6 +1802,20 @@ static gboolean report_oos_duration(gpointer user_data)
 	return TRUE;
 }
 
+static gboolean report_network_signal_change_unsol_count(gpointer user_data)
+{
+	struct ofono_netreg *netreg = user_data;
+
+	ofono_debug("%s:signal_changed_count=%d,network_state_changed_count=%d", __func__,
+		    netreg->signal_changed_count, netreg->network_state_changed_count);
+	OFONO_DFX_NETWORK_SIGNAL_CHANGED_COUNT(netreg->signal_changed_count,
+					       netreg->network_state_changed_count);
+	netreg->signal_changed_count = 0;
+	netreg->network_state_changed_count = 0;
+
+	return TRUE;
+}
+
 void update_signal_level_duration(struct ofono_netreg *netreg)
 {
 	int current_signal_level;
@@ -2074,6 +2090,8 @@ static gboolean report_rat_info(gpointer user_data)
 			netreg->rat_duration[2], netreg->rat_duration[3]);
 	}
 	memset(netreg->rat_duration, 0, sizeof(netreg->rat_duration));
+
+	report_network_signal_change_unsol_count(netreg);
 	return TRUE;
 }
 
@@ -2099,6 +2117,16 @@ static void netreg_radio_state_change(int state, void *data)
 	if (state == RADIO_STATUS_OFF && old_state != RADIO_STATUS_UNKNOWN) {
 		stop_record_oos_time(netreg);
 	}
+}
+
+void ofono_netreg_network_state_changed_count_update(struct ofono_netreg *netreg)
+{
+	netreg->network_state_changed_count += 1;
+}
+
+void ofono_netreg_signal_changed_count_update(struct ofono_netreg *netreg)
+{
+	netreg->signal_changed_count += 1;
 }
 
 void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
@@ -3006,6 +3034,9 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 	netreg->radio_status = RADIO_STATUS_UNKNOWN;
 	netreg->report_oos_time_id = g_timeout_add(REPORTING_PERIOD,
 				report_oos_duration, netreg);
+
+	netreg->signal_changed_count = 0;
+	netreg->network_state_changed_count = 0;
 
 	memset(&netreg->signal_level_start_time, 0,
 	       sizeof(netreg->signal_level_start_time));

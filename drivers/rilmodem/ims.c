@@ -162,6 +162,7 @@ static void ims_registration_notify(struct ril_msg *message, gpointer user_data)
 	struct ofono_ims *ims = user_data;
 	struct ril_ims_data *rid = ofono_ims_get_data(ims);
 
+	ofono_ims_state_changed_count_update(ims);
 	g_ril_print_unsol_no_args(rid->ril, message);
 
 	get_ims_registration_state(ims);
