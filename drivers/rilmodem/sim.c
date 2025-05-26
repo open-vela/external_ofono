@@ -60,6 +60,7 @@
 #define CMD_UPDATE_BINARY 214 /* 0xD6   */
 #define CMD_UPDATE_RECORD 220 /* 0xDC   */
 
+#define NO_ERROR_CODE -1
 /*
  * Based on ../drivers/atmodem/sim.c.
  *
@@ -1725,18 +1726,26 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	struct sim_data *sd = cbd->user;
 	struct parcel rilp;
 	int session_id = -1;
+	int error_code = NO_ERROR_CODE;
 	int select_response;
 	int numparams;
 
+	g_ril_init_parcel(message, &rilp);
+
 	if (message->error != RIL_E_SUCCESS) {
-		ofono_error("Reply failure: %s",
-				ril_error_to_string(message->error));
+		ofono_error("RILD reply failure: %s, message buf %s, message buf len: %d",
+				ril_error_to_string(message->error), message->buf ? "is not NULL" : "is NULL", message->buf_len);
+
+		if (message->buf != NULL && message->buf_len > sizeof(int32_t)) {
+			numparams = parcel_r_int32(&rilp);
+			if (numparams == 2)
+				error_code = parcel_r_int32(&rilp);
+		}
+		ofono_error("%s : Reply failure, error code is %d", __func__, error_code);
 		goto error;
 	}
 
-	g_ril_init_parcel(message, &rilp);
 	numparams = parcel_r_int32(&rilp);
-
 	if (numparams != 2) {
 		ofono_error("%s: invalid OPEN CHANNEL reply: "
 				"number of params is %d; should be 2.",
@@ -1763,7 +1772,7 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, session_id, cbd->data);
+	CALLBACK_WITH_FAILURE(cb, error_code, cbd->data);
 }
 
 static void ril_sim_open_channel(struct ofono_sim *sim, const unsigned char *aid,
@@ -1784,7 +1793,7 @@ static void ril_sim_open_channel(struct ofono_sim *sim, const unsigned char *aid
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_OPEN_CHANNEL, &rilp,
 			ril_sim_open_channel_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, -1 /*invalid session id*/, data);
+		CALLBACK_WITH_FAILURE(cb, NO_ERROR_CODE /*invalid session id*/, data);
 	}
 }
 
@@ -1793,14 +1802,24 @@ static void ril_sim_close_channel_cb(struct ril_msg *message, gpointer user_data
 	struct cb_data *cbd = user_data;
 	ofono_sim_close_channel_cb_t cb = cbd->cb;
 	struct sim_data *sd = cbd->user;
+	struct parcel rilp;
+	int numparams = 0;
+	int error_code = NO_ERROR_CODE;
 
 	if (message->error != RIL_E_SUCCESS) {
-		ofono_error("Reply failure: %s",
-				ril_error_to_string(message->error));
-		CALLBACK_WITH_FAILURE(cb, cbd->data);
+		ofono_error("RILD reply failure: %s, message buf %s, message buf len: %d",
+			ril_error_to_string(message->error), message->buf ? "is not NULL" : "is NULL", message->buf_len);
+		if (message->buf != NULL && message->buf_len > sizeof(int32_t)) {
+			g_ril_init_parcel(message, &rilp);
+
+			numparams = parcel_r_int32(&rilp);
+			if (numparams == 1)
+				error_code = parcel_r_int32(&rilp);
+		}
+		CALLBACK_WITH_FAILURE(cb, error_code, cbd->data);
 	} else {
 		g_ril_print_response_no_args(sd->ril, message);
-		CALLBACK_WITH_SUCCESS(cb, cbd->data);
+		CALLBACK_WITH_SUCCESS(cb, error_code, cbd->data);
 	}
 }
 
@@ -1820,7 +1839,7 @@ static void ril_sim_close_channel(struct ofono_sim *sim, int session_id,
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_CLOSE_CHANNEL, &rilp,
 			ril_sim_close_channel_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, data);
+		CALLBACK_WITH_FAILURE(cb, NO_ERROR_CODE, data);
 	}
 }
 
@@ -1833,11 +1852,19 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 	char *hex_response;
 	unsigned char *response = NULL;
 	unsigned char *response_append = NULL;
+	struct parcel rilp;
+	int error_code = NO_ERROR_CODE;
 	size_t len;
 
 	if (message->error != RIL_E_SUCCESS) {
-		ofono_error("RILD reply failure: %s",
-				ril_error_to_string(message->error));
+		ofono_error("RILD reply failure: %s, message buf %s, message buf len: %d",
+				ril_error_to_string(message->error), message->buf ? "is not NULL" : "is NULL", message->buf_len);
+
+		if (message->buf != NULL && message->buf_len > sizeof(int32_t)) {
+			g_ril_init_parcel(message, &rilp);
+			error_code = parcel_r_int32(&rilp);
+		}
+		ofono_error("%s : Reply failure, error code is %d", __func__, error_code);
 		goto error;
 	}
 
@@ -1865,14 +1892,14 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 	response_append[len + 1] = (unsigned char) sw2;
 
 
-	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, cbd->data);
+	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, error_code, cbd->data);
 	l_free(response);
 	l_free(response_append);
 	return;
 
 error:
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, error_code, cbd->data);
 	l_free(response);
-	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
 }
 
 static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
@@ -1886,7 +1913,7 @@ static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
 	if (len < 5) {
 		ofono_error("logical access parameter err.");
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
 		return;
 	}
 
@@ -1914,7 +1941,7 @@ static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL, &rilp,
 			ril_sim_logical_access_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
 	}
 	l_free(encoded_pdu_data);
 }
@@ -1928,11 +1955,18 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 	char *hex_response;
 	unsigned char *response = NULL;
 	unsigned char *response_append = NULL;
+	struct parcel rilp;
+	int error_code = NO_ERROR_CODE;
 	size_t len;
 
 	if (message->error != RIL_E_SUCCESS) {
-		ofono_error("RILD reply failure: %s",
-				ril_error_to_string(message->error));
+		ofono_error("RILD reply failure: %s, message buf %s, message buf len: %d",
+				ril_error_to_string(message->error), message->buf ? "is not NULL" : "is NULL", message->buf_len);
+
+		if (message->buf != NULL && message->buf_len > sizeof(int32_t)) {
+			g_ril_init_parcel(message, &rilp);
+			error_code = parcel_r_int32(&rilp);
+		}
 		goto error;
 	}
 
@@ -1960,15 +1994,15 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 	response_append[len + 1] = (unsigned char) sw2;
 
 
-	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, cbd->data);
+	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, error_code, cbd->data);
 	l_free(response);
 	l_free(response_append);
 
 	return;
 
 error:
+	CALLBACK_WITH_FAILURE(cb, NULL, 0, error_code, cbd->data);
 	l_free(response);
-	CALLBACK_WITH_FAILURE(cb, NULL, 0, cbd->data);
 }
 
 static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu,
@@ -1981,7 +2015,7 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	if (len < 5) {
 		ofono_error("basic access parameter err.");
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
 		return;
 	}
 
@@ -2010,7 +2044,7 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC, &rilp,
 			ril_sim_basic_access_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
+		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
 	}
 	l_free(encoded_pdu_data);
 }

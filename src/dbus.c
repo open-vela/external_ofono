@@ -286,6 +286,12 @@ int ofono_dbus_signal_dict_property_changed(DBusConnection *conn,
 	return g_dbus_send_message(conn, signal);
 }
 
+DBusMessage *__ofono_error_code_args(DBusMessage *msg, int error_code)
+{
+	return g_dbus_create_error(msg, OFONO_ERROR_INTERFACE
+					".ErrorCodeArguments", "%d", error_code);
+}
+
 DBusMessage *__ofono_error_invalid_args(DBusMessage *msg)
 {
 	return g_dbus_create_error(msg, OFONO_ERROR_INTERFACE
