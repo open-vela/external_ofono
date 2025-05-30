@@ -1784,6 +1784,13 @@ handled:
 	return v;
 }
 
+int get_register_status(struct ofono_modem *modem)
+{
+	struct ofono_netreg *netreg = __ofono_atom_find(OFONO_ATOM_TYPE_NETREG, modem);
+
+	return ofono_netreg_get_status(netreg);
+}
+
 static void manager_dial_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_voicecall *vc = data;
@@ -1814,15 +1821,18 @@ static void manager_dial_callback(const struct ofono_error *error, void *data)
 						DBUS_TYPE_INVALID);
 	} else {
 		struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
+		char info[40];
 
+		snprintf(info, sizeof(info), "modem fail:status:%s",
+			 registration_status_to_string(get_register_status(modem)));
 		if (query_dialing_ecc_info(vc, number) == TRUE) {
 			__ofono_modem_dec_emergency_mode(modem);
 			remove_dialing_ecc_info(vc, number);
-			OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE,
-					OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
+			OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE, OFONO_VOICE,
+					    OFONO_DIAL_FAIL, info);
 		} else {
-			OFONO_DFX_CALL_INFO(OFONO_NORMAL_CALL, OFONO_ORIGINATE,
-					OFONO_VOICE, OFONO_DIAL_FAIL, "modem fail");
+			OFONO_DFX_CALL_INFO(OFONO_NORMAL_CALL, OFONO_ORIGINATE, OFONO_VOICE,
+					    OFONO_DIAL_FAIL, info);
 		}
 
 		tone_request_finish(vc, g_queue_peek_head(vc->toneq), ENOENT, FALSE);
@@ -1904,10 +1914,15 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 	}
 
 	if (is_emergency_number(vc, number) == TRUE) {
+		char info[40];
+
 		__ofono_modem_inc_emergency_mode(modem);
 		save_dialing_ecc_info(vc, number);
-		OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE,
-				OFONO_VOICE, OFONO_NORMAL, "NA");
+		snprintf(info, sizeof(info), "NA:status:%s",
+			 registration_status_to_string(get_register_status(modem)));
+
+		OFONO_DFX_CALL_INFO(OFONO_EMERGENCY_CALL, OFONO_ORIGINATE, OFONO_VOICE,
+				    OFONO_NORMAL, info);
 	}
 
 	if (strlen(post_dial) > 0) {
