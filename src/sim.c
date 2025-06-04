@@ -2540,7 +2540,12 @@ static void sim_mccmnc_obtained(struct ofono_sim *sim, const char *imsi)
 			sim_mccmnc_update(sim->mcc, sim->mnc, imsi, sim->mnc_length)) {
 		DBusConnection *conn = ofono_dbus_get_connection();
 		const char *path = __ofono_atom_get_path(sim->atom);
+		struct ofono_modem *modem = __ofono_atom_get_modem(sim->atom);
+		struct ofono_gprs *gprs = __ofono_atom_find(OFONO_ATOM_TYPE_GPRS, modem);
 		const char *str;
+
+		if (sim->mcc[0] && sim->mnc[0])
+			ofono_gprs_reset_provisioned(gprs);
 
 		strncpy(sim->mcc, sim->imsi, OFONO_MAX_MCC_LENGTH);
 		sim->mcc[OFONO_MAX_MCC_LENGTH] = '\0';

@@ -4791,6 +4791,20 @@ static void gprs_sim_ready(struct ofono_gprs *gprs)
 			"Provisioned",
 			gprs->provisioned);
 
+		while (gprs->contexts != NULL) {
+			struct pri_context *ctx = gprs->contexts->data;
+
+			if (gprs->settings) {
+				ofono_info("%s: Removing settings for context '%s'.",
+					__func__, ctx->name);
+				g_key_file_remove_group(gprs->settings, ctx->key, NULL);
+				storage_sync(gprs->imsi, SETTINGS_STORE, gprs->settings);
+			}
+
+			context_dbus_unregister(ctx);
+			gprs->contexts = g_slist_remove(gprs->contexts, ctx);
+		}
+
 		provision_contexts(gprs, ofono_sim_get_mcc(sim),
 					ofono_sim_get_mnc(sim), NULL);
 	}
@@ -4908,6 +4922,13 @@ int ofono_gprs_get_context_status(struct ofono_gprs_context *gc)
 		return ctx->status;
 
 	return CONTEXT_STATUS_DEACTIVATED;
+}
+
+void ofono_gprs_reset_provisioned(struct ofono_gprs *gprs)
+{
+	gprs->provisioned = FALSE;
+	g_key_file_set_boolean(gprs->settings, SETTINGS_GROUP,
+			"Provisioned", gprs->provisioned);
 }
 
 struct ofono_gprs_primary_context *ofono_gprs_get_pri_context_by_name(
