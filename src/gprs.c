@@ -2530,7 +2530,6 @@ static DBusMessage *gprs_set_property(DBusConnection *conn,
 						property, DBUS_TYPE_BOOLEAN, &value);
 	}
 
-	ofono_error("%s: Unknown property '%s'.", __func__, property);
 	return dbus_message_new_method_return(msg);
 }
 
