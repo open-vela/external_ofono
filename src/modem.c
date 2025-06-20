@@ -110,6 +110,8 @@ struct ofono_modem {
 	GHashTable		*camp_band_info;
 	GHashTable		*en_list; /* emergency number list */
 	GQueue			*modem_queue;
+	int suppress_message_report_flag;
+	int signal_report_type;
 };
 
 struct ofono_devinfo {
@@ -1819,12 +1821,18 @@ static void set_signal_report_Threshold_cb(const struct ofono_error *error, void
 	__ofono_dbus_pending_reply(&modem->pending, reply);
 }
 
+static void set_signal_report_Threshold_default_cb(const struct ofono_error *error, void *data)
+{
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when set signal report threshold.");
+	}
+}
+
 static DBusMessage *modem_set_signal_report_Threshold(DBusConnection *conn, DBusMessage *msg,
 						      void *data)
 {
 	struct ofono_modem *modem = data;
 	int type;
-	const int *thresholds;
 
 	if (modem->pending) {
 		ofono_error("%s: Modem [%s] is currently busy.", __func__,
@@ -1844,13 +1852,35 @@ static DBusMessage *modem_set_signal_report_Threshold(DBusConnection *conn, DBus
 		return __ofono_error_invalid_args(msg);
 	}
 
-	thresholds = get_signal_level_thresholds_info(type);
+	if (type != 0 && type != 1) {
+		ofono_error("%s: Invalid signal report threshold type.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
 
+	modem->signal_report_type = type;
 	modem->pending = dbus_message_ref(msg);
-	modem->driver->set_signal_report_Threshold(modem, type, thresholds,
-						   set_signal_report_Threshold_cb, modem);
+	if (modem->radio_status == RADIO_STATUS_ON) {
+		const int *thresholds;
+
+		thresholds = get_signal_level_thresholds_info(type);
+
+		modem->driver->set_signal_report_Threshold(modem, type, thresholds,
+							   set_signal_report_Threshold_cb, modem);
+	} else {
+		DBusMessage *reply;
+
+		reply = dbus_message_new_method_return(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
 
 	return NULL;
+}
+
+static void suppress_message_report_default_cb(const struct ofono_error *error, void *data)
+{
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occus when suppress message report.");
+	}
 }
 
 static void suppress_message_report_cb(const struct ofono_error *error, void *data)
@@ -1896,9 +1926,21 @@ static DBusMessage *modem_suppress_message_report(DBusConnection *conn, DBusMess
 		return __ofono_error_invalid_args(msg);
 	}
 
+	if (enable != 0 && enable != 1) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+	modem->suppress_message_report_flag = enable;
 	modem->pending = dbus_message_ref(msg);
-	modem->driver->suppress_message_report(modem, enable ? TRUE : FALSE,
-					      suppress_message_report_cb, modem);
+	if (modem->radio_status == RADIO_STATUS_ON) {
+		modem->driver->suppress_message_report(modem, enable ? TRUE : FALSE,
+						       suppress_message_report_cb, modem);
+	} else {
+		DBusMessage *reply;
+
+		reply = dbus_message_new_method_return(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
 
 	return NULL;
 }
@@ -3487,6 +3529,9 @@ int ofono_modem_register(struct ofono_modem *modem)
 
 	modem->modem_queue = g_queue_new();
 
+	modem->suppress_message_report_flag = -1;
+	modem->signal_report_type = -1;
+
 	return 0;
 }
 
@@ -3771,6 +3816,27 @@ void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 			modem->driver->enable_modem_abnormal_event(modem, modem->enable, modem->module_mask,
 								modem->from_event_id, modem->to_event_id,
 								enable_modem_abnormal_event_default_cb, modem);
+		}
+
+		if (modem->driver->suppress_message_report != NULL) {
+			if (modem->suppress_message_report_flag == 0 ||
+			    modem->suppress_message_report_flag == 1) {
+				modem->driver->suppress_message_report(
+					modem, modem->suppress_message_report_flag ? TRUE : FALSE,
+					suppress_message_report_default_cb, modem);
+			}
+		}
+
+		if (modem->driver->set_signal_report_Threshold != NULL) {
+			if (modem->signal_report_type == 0 || modem->signal_report_type == 1) {
+				const int *thresholds;
+
+				thresholds =
+					get_signal_level_thresholds_info(modem->signal_report_type);
+				modem->driver->set_signal_report_Threshold(
+					modem, modem->signal_report_type, thresholds,
+					set_signal_report_Threshold_default_cb, modem);
+			}
 		}
 
 		/* if radio state doesn't match user setting, sync it again */
