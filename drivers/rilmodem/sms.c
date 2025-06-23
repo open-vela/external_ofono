@@ -567,17 +567,17 @@ static void ril_ack_delivery_cb(struct ril_msg *message, gpointer user_data)
 				"Further SMS reception is not guaranteed");
 }
 
-static void ril_ack_delivery(struct ofono_sms *sms)
+static void ril_ack_delivery(struct ofono_sms *sms, int result, int error_code)
 {
 	struct sms_data *sd = ofono_sms_get_data(sms);
 	struct parcel rilp;
 
 	parcel_init(&rilp);
 	parcel_w_int32(&rilp, 2); /* Number of int32 values in array */
-	parcel_w_int32(&rilp, 1); /* Successful receipt */
-	parcel_w_int32(&rilp, 0); /* error code */
+	parcel_w_int32(&rilp, result); /* Successful receipt */
+	parcel_w_int32(&rilp, error_code); /* error code */
 
-	g_ril_append_print_buf(sd->ril, "(1,0)");
+	g_ril_append_print_buf(sd->ril, "(%d,%d)", result, error_code);
 
 	/* TODO: should ACK be sent for either of the error cases? */
 
@@ -596,8 +596,9 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	char *ril_pdu;
 	size_t ril_pdu_len;
 	unsigned char pdu[176];
-	gboolean fail_flag = FALSE;
 	char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+	int result = SMS_ACK_SUCCESS;
+	int error_code = SMS_ACK_NO_ERROR_CODE;
 
 	ofono_debug("req: %d; data_len: %d", message->req, (int) message->buf_len);
 	ril_get_covered_plmn(sd, covered_plmn);
@@ -607,8 +608,11 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	g_ril_init_parcel(message, &rilp);
 
 	ril_pdu = parcel_r_string(&rilp);
-	if (ril_pdu == NULL)
-		return;
+	if (ril_pdu == NULL) {
+		result = SMS_ACK_FAILURE;
+		error_code = SMS_ACK_PDU_DECODE_FAILED_ERROR_CODE;
+		goto fail;
+	}
 
 	g_ril_append_print_buf(sd->ril, "{%s}", ril_pdu);
 	g_ril_print_unsol(sd->ril, message);
@@ -617,14 +621,16 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 
 	if (ril_pdu_len > sizeof(pdu) * 2) {
 		ofono_error("invalid pdu, return !");
-		fail_flag = TRUE;
+		result = SMS_ACK_FAILURE;
+		error_code = SMS_ACK_PDU_DECODE_FAILED_ERROR_CODE;
 		goto fail;
 	}
 
 	if (decode_hex_own_buf(ril_pdu, ril_pdu_len,
 					&ril_buf_len, -1, pdu) == NULL) {
 		ofono_error("decoded pdu failed !");
-		fail_flag = TRUE;
+		result = SMS_ACK_FAILURE;
+		error_code = SMS_ACK_PDU_DECODE_FAILED_ERROR_CODE;
 		goto fail;
 	}
 
@@ -645,14 +651,14 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 		ofono_sms_status_notify(sms, pdu, ril_buf_len,
 						ril_buf_len - smsc_len);
 
-	/* ACK the incoming NEW_SMS */
-	ril_ack_delivery(sms);
-
 fail:
-	if (fail_flag) {
+	if (!result) {
 		OFONO_DFX_SMS_INFO(ril_get_op_code(sd), OFONO_SMS_TYPE_UNKNOW, OFONO_SMS_RECEIVE,
 				   OFONO_SMS_FAIL, covered_plmn);
 	}
+
+	/* ACK the incoming NEW_SMS */
+	ril_ack_delivery(sms, result, error_code);
 	g_free(ril_pdu);
 }
 

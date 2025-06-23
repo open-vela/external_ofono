@@ -196,6 +196,17 @@ enum sms_pid_type {
 	SMS_PID_TYPE_USIM_DOWNLOAD = 0x7f,
 };
 
+enum sms_recv_ack_status {
+	SMS_ACK_FAILURE = 0,
+	SMS_ACK_SUCCESS = 1,
+};
+
+enum sms_recv_ack_error_code {
+	SMS_ACK_NO_ERROR_CODE = 0,
+	SMS_ACK_STORATE_FULL_ERROR_CODE = 1,
+	SMS_ACK_PDU_DECODE_FAILED_ERROR_CODE = 2,
+};
+
 enum cbs_language {
 	CBS_LANGUAGE_GERMAN = 0x0,
 	CBS_LANGUAGE_ENGLISH = 0x1,
