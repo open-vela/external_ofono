@@ -2507,6 +2507,21 @@ static void multiparty_callback_common(struct ofono_voicecall *vc,
 	g_strfreev(objpath_list);
 }
 
+static void remove_call_from_multiparty_list(struct ofono_voicecall *vc, int call_id)
+{
+	GSList *l = g_slist_find_custom(vc->multiparty_list, GINT_TO_POINTER(call_id),
+					call_compare_by_id);
+
+	if (l) {
+		vc->multiparty_list = g_slist_remove(vc->multiparty_list, l->data);
+
+		if (vc->multiparty_list && vc->multiparty_list->next == NULL) {
+			g_slist_free(vc->multiparty_list);
+			vc->multiparty_list = NULL;
+		}
+	}
+}
+
 static void private_chat_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_voicecall *vc = data;
@@ -2514,7 +2529,6 @@ static void private_chat_callback(const struct ofono_error *error, void *data)
 	const char *callpath;
 	const char *c;
 	int id;
-	GSList *l;
 	GSList *old;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
@@ -2540,18 +2554,7 @@ static void private_chat_callback(const struct ofono_error *error, void *data)
 
 	old = g_slist_copy(vc->multiparty_list);
 
-	l = g_slist_find_custom(vc->multiparty_list, GINT_TO_POINTER(id),
-				call_compare_by_id);
-
-	if (l) {
-		vc->multiparty_list =
-			g_slist_remove(vc->multiparty_list, l->data);
-
-		if (vc->multiparty_list->next == NULL) {
-			g_slist_free(vc->multiparty_list);
-			vc->multiparty_list = NULL;
-		}
-	}
+	remove_call_from_multiparty_list(vc, id);
 
 	reply = dbus_message_new_method_return(vc->pending);
 	multiparty_callback_common(vc, reply);
@@ -3774,7 +3777,7 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 				const struct ofono_call *call)
 {
 	struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
-	GSList *l;
+	GSList *l, *old;
 	struct voicecall *v = NULL;
 	struct ofono_call *newcall;
 
@@ -3795,6 +3798,12 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 		voicecall_set_call_name(l->data, call->name,
 						call->cnap_validity);
 
+		if (!call->mpty) {
+			old = g_slist_copy(vc->multiparty_list);
+			remove_call_from_multiparty_list(vc, call->id);
+			voicecalls_multiparty_changed(old, vc->multiparty_list);
+			g_slist_free(old);
+		}
 		voicecalls_emit_call_changed(vc, l->data);
 
 		return;
