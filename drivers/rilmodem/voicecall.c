@@ -479,6 +479,26 @@ gboolean ril_poll_clcc(gpointer user_data)
 	return FALSE;
 }
 
+static void append_local_release_calls(struct ril_voicecall_data *vd, unsigned int affected_types)
+{
+	if (!affected_types)
+		return;
+
+	GSList *l;
+	struct ofono_call *call;
+
+	for (l = vd->calls; l; l = l->next) {
+		call = l->data;
+
+		if (affected_types & (1 << call->status)) {
+			if (!g_slist_find(vd->local_release_call_ids, GUINT_TO_POINTER(call->id))) {
+				vd->local_release_call_ids = g_slist_append(
+					vd->local_release_call_ids, GUINT_TO_POINTER(call->id));
+			}
+		}
+	}
+}
+
 static void generic_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct change_state_req *req = user_data;
@@ -490,26 +510,15 @@ static void generic_cb(struct ril_msg *message, gpointer user_data)
 		decode_ril_error(&error, "OK");
 	} else {
 		decode_ril_error(&error, "FAIL");
+		g_slist_free(vd->local_release_call_ids);
+		vd->local_release_call_ids = NULL;
 		goto out;
 	}
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-	if (req->affected_types) {
-		GSList *l;
-		struct ofono_call *call;
-
-		for (l = vd->calls; l; l = l->next) {
-			call = l->data;
-
-			if (req->affected_types & (1 << call->status)) {
-				if (!g_slist_find(vd->local_release_call_ids, GUINT_TO_POINTER(call->id))) {
-					vd->local_release_call_ids = g_slist_append(vd->local_release_call_ids,
-							GUINT_TO_POINTER(call->id));
-				}
-			}
-		}
-	}
+	if (!clcc_with_data)
+		append_local_release_calls(vd, req->affected_types);
 
 out:
 	if (!clcc_with_data)
@@ -1250,6 +1259,10 @@ void ril_release_all_held(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
 	int ret;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	if (ofono_voicecall_get_clcc(vc))
+		append_local_release_calls(vd, AFFECTED_STATES_WB);
 
 	ret = ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
 			hangup_generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
@@ -1261,6 +1274,10 @@ void ril_release_all_active(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
 	int ret;
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	if (ofono_voicecall_get_clcc(vc))
+		append_local_release_calls(vd, AFFECTED_STATES_FG);
 
 	ret = ril_template(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND, vc,
 			hangup_generic_cb, AFFECTED_STATES_FG, NULL, cb, data);
@@ -1271,6 +1288,11 @@ void ril_release_all_active(struct ofono_voicecall *vc,
 void ril_set_udub(struct ofono_voicecall *vc,
 			ofono_voicecall_cb_t cb, void *data)
 {
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+
+	if (ofono_voicecall_get_clcc(vc))
+		append_local_release_calls(vd, AFFECTED_STATES_WB);
+
 	ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
 			generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
 }
