@@ -1772,7 +1772,7 @@ static void ril_sim_open_channel_cb(struct ril_msg *message, gpointer user_data)
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, error_code, cbd->data);
+	CALLBACK_WITH_FAILURE_CODE(cb, error_code, session_id, cbd->data);
 }
 
 static void ril_sim_open_channel(struct ofono_sim *sim, const unsigned char *aid,
@@ -1793,7 +1793,7 @@ static void ril_sim_open_channel(struct ofono_sim *sim, const unsigned char *aid
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_OPEN_CHANNEL, &rilp,
 			ril_sim_open_channel_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NO_ERROR_CODE /*invalid session id*/, data);
+		CALLBACK_WITH_FAILURE_CODE(cb, NO_ERROR_CODE /*invalid session id*/, -1, data);
 	}
 }
 
@@ -1816,10 +1816,10 @@ static void ril_sim_close_channel_cb(struct ril_msg *message, gpointer user_data
 			if (numparams == 1)
 				error_code = parcel_r_int32(&rilp);
 		}
-		CALLBACK_WITH_FAILURE(cb, error_code, cbd->data);
+		CALLBACK_WITH_FAILURE_CODE(cb, error_code, cbd->data);
 	} else {
 		g_ril_print_response_no_args(sd->ril, message);
-		CALLBACK_WITH_SUCCESS(cb, error_code, cbd->data);
+		CALLBACK_WITH_SUCCESS(cb, cbd->data);
 	}
 }
 
@@ -1839,7 +1839,7 @@ static void ril_sim_close_channel(struct ofono_sim *sim, int session_id,
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_CLOSE_CHANNEL, &rilp,
 			ril_sim_close_channel_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NO_ERROR_CODE, data);
+		CALLBACK_WITH_FAILURE_CODE(cb, NO_ERROR_CODE, data);
 	}
 }
 
@@ -1892,13 +1892,13 @@ static void ril_sim_logical_access_cb(struct ril_msg *message, gpointer user_dat
 	response_append[len + 1] = (unsigned char) sw2;
 
 
-	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, error_code, cbd->data);
+	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, cbd->data);
 	l_free(response);
 	l_free(response_append);
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, NULL, 0, error_code, cbd->data);
+	CALLBACK_WITH_FAILURE_CODE(cb, error_code, NULL, 0, cbd->data);
 	l_free(response);
 }
 
@@ -1913,7 +1913,7 @@ static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
 	if (len < 5) {
 		ofono_error("logical access parameter err.");
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
+		CALLBACK_WITH_FAILURE_CODE(cb, NO_ERROR_CODE, NULL, 0, data);
 		return;
 	}
 
@@ -1941,7 +1941,7 @@ static void ril_sim_logical_access(struct ofono_sim *sim, int session_id,
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_CHANNEL, &rilp,
 			ril_sim_logical_access_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
+		CALLBACK_WITH_FAILURE_CODE(cb, NO_ERROR_CODE, NULL, 0, data);
 	}
 	l_free(encoded_pdu_data);
 }
@@ -1994,14 +1994,14 @@ static void ril_sim_basic_access_cb(struct ril_msg *message, gpointer user_data)
 	response_append[len + 1] = (unsigned char) sw2;
 
 
-	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, error_code, cbd->data);
+	CALLBACK_WITH_SUCCESS(cb, response_append, len + 2, cbd->data);
 	l_free(response);
 	l_free(response_append);
 
 	return;
 
 error:
-	CALLBACK_WITH_FAILURE(cb, NULL, 0, error_code, cbd->data);
+	CALLBACK_WITH_FAILURE_CODE(cb, error_code, NULL, 0, cbd->data);
 	l_free(response);
 }
 
@@ -2015,7 +2015,7 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	if (len < 5) {
 		ofono_error("basic access parameter err.");
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
+		CALLBACK_WITH_FAILURE_CODE(cb, NO_ERROR_CODE, NULL, 0, data);
 		return;
 	}
 
@@ -2044,7 +2044,7 @@ static void ril_sim_basic_access(struct ofono_sim *sim, const unsigned char *pdu
 	if (g_ril_send(sd->ril, RIL_REQUEST_SIM_TRANSMIT_APDU_BASIC, &rilp,
 			ril_sim_basic_access_cb, cbd, g_free) == 0) {
 		g_free(cbd);
-		CALLBACK_WITH_FAILURE(cb, NULL, 0, NO_ERROR_CODE, data);
+		CALLBACK_WITH_FAILURE_CODE(cb, NO_ERROR_CODE, NULL, 0, data);
 	}
 	l_free(encoded_pdu_data);
 }

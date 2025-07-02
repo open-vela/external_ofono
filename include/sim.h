@@ -152,13 +152,13 @@ typedef void (*ofono_sim_list_apps_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_sim_open_channel_cb_t)(const struct ofono_error *error,
 					int value, void *data);
 typedef void (*ofono_sim_close_channel_cb_t)(const struct ofono_error *error,
-					int error_code, void *data);
+					void *data);
 
 typedef void (*ofono_sim_logical_access_cb_t)(const struct ofono_error *error,
-		const unsigned char *resp, unsigned int len, int error_code, void *data);
+		const unsigned char *resp, unsigned int len, void *data);
 
 typedef void (*ofono_sim_basic_access_cb_t)(const struct ofono_error *error,
-		const unsigned char *resp, unsigned int len, int error_code, void *data);
+		const unsigned char *resp, unsigned int len, void *data);
 
 typedef void (*ofono_sim_set_active_card_slot_cb_t)(
 					const struct ofono_error *error,

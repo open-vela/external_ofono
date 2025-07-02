@@ -137,14 +137,17 @@ int ril_util_address_to_gprs_proto(const char *addr);
 	e.type = OFONO_ERROR_TYPE_FAILURE;	\
 	e.error = 0				\
 
-#define CALLBACK_WITH_FAILURE(cb, args...)		\
+#define CALLBACK_WITH_FAILURE_CODE(cb, error_code, args...)		\
 	do {						\
 		struct ofono_error cb_e;		\
 		cb_e.type = OFONO_ERROR_TYPE_FAILURE;	\
-		cb_e.error = 0;				\
+		cb_e.error = error_code;				\
 							\
 		cb(&cb_e, ##args);			\
-	} while (0)					\
+	} while (0)
+
+#define CALLBACK_WITH_FAILURE(cb, ...)		\
+	CALLBACK_WITH_FAILURE_CODE(cb, 0, ##__VA_ARGS__)
 
 #define CALLBACK_WITH_SUCCESS(f, args...)		\
 	do {						\
