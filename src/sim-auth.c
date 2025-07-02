@@ -309,9 +309,8 @@ gsm_end:
 }
 
 static void logical_access_cb(const struct ofono_error *error,
-		const unsigned char *resp, unsigned int len, int error_code, void *data)
+		const unsigned char *resp, unsigned int len, void *data)
 {
-	(void)error_code;
 	struct ofono_sim_auth *sa = data;
 
 	/* error must have occurred in a previous CB */

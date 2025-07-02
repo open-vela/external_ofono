@@ -62,6 +62,8 @@ enum session_state {
 	SESSION_STATE_OPEN
 };
 
+#define NO_ERROR_CODE -1
+
 struct ofono_sim_aid_session {
 	struct sim_app_record *record;
 	int session_id;
@@ -1766,15 +1768,17 @@ static void open_logical_channel_cb(const struct ofono_error *error, int value,
 		void *data)
 {
 	struct ofono_sim *sim = data;
+	int error_code = NO_ERROR_CODE;
 	DBusMessage *reply;
 	DBusMessageIter iter;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Error occurred during open logical channel");
-		if (value == -1) {
+		error_code = error->error;
+		if (error_code == NO_ERROR_CODE) {
 			reply = __ofono_error_failed(sim->pending);
 		} else {
-			reply = __ofono_error_code_args(sim->pending, value);
+			reply = __ofono_error_code_args(sim->pending, error_code);
 		}
 		__ofono_dbus_pending_reply(&sim->pending, reply);
 		return;
@@ -1840,14 +1844,16 @@ static DBusMessage *sim_open_logical_channel(DBusConnection *conn,
 	return NULL;
 }
 
-static void close_logical_channel_cb(const struct ofono_error *error, int error_code, void *data)
+static void close_logical_channel_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_sim *sim = data;
+	int error_code = NO_ERROR_CODE;
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Error occurred during close logical channel");
-		if (error_code != -1) {
+		error_code = error->error;
+		if (error_code != NO_ERROR_CODE) {
 			reply = __ofono_error_code_args(sim->pending, error_code);
 		} else {
 			reply = __ofono_error_failed(sim->pending);
@@ -1892,16 +1898,18 @@ static DBusMessage *sim_close_logical_channel(DBusConnection *conn,
 }
 
 static void logical_access_cb(const struct ofono_error *error,
-		const unsigned char *resp, unsigned int len, int error_code, void *data)
+		const unsigned char *resp, unsigned int len, void *data)
 {
 	struct ofono_sim *sim = data;
+	int error_code = NO_ERROR_CODE;
 	DBusMessage *reply;
 	DBusMessageIter iter, array;
 	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Error occurred during logical access");
-		if (error_code != -1) {
+		error_code = error->error;
+		if (error_code != NO_ERROR_CODE) {
 			reply = __ofono_error_code_args(sim->pending, error_code);
 		} else {
 			reply = __ofono_error_failed(sim->pending);
@@ -1982,16 +1990,18 @@ static DBusMessage *sim_logical_access(DBusConnection *conn,
 }
 
 static void sim_basic_access_cb(const struct ofono_error *error,
-		const unsigned char *resp, unsigned int len, int error_code, void *data)
+		const unsigned char *resp, unsigned int len, void *data)
 {
 	struct ofono_sim *sim = data;
+	int error_code = NO_ERROR_CODE;
 	DBusMessage *reply;
 	DBusMessageIter iter, array;
 	int i;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
 		ofono_error("Error occurred during basic access");
-		if (error_code != -1) {
+		error_code = error->error;
+		if (error_code != NO_ERROR_CODE) {
 			reply = __ofono_error_code_args(sim->pending, error_code);
 		} else {
 			reply = __ofono_error_failed(sim->pending);
@@ -4750,9 +4760,8 @@ const char *__ofono_sim_get_impi(struct ofono_sim *sim)
 static void open_channel_cb(const struct ofono_error *error, int session_id,
 		void *data);
 
-static void close_channel_cb(const struct ofono_error *error, int error_code, void *data)
+static void close_channel_cb(const struct ofono_error *error, void *data)
 {
-	(void)error_code;
 	struct ofono_sim_aid_session *session = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR)
