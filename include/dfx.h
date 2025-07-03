@@ -93,7 +93,7 @@ struct ofono_plmn_op_code {
 #ifdef CONFIG_TELEPHONY_DFX
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
 	do {                                                                                       \
-		sendEventMisightF(961040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
+		sendEventMisightF(923040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
 				  "direction", direction, "media", media, "fail_scenario",         \
 				  fail_scenario, "fail_reason", fail_reason);                      \
 	} while (0)
