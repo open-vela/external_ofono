@@ -76,6 +76,7 @@ struct ofono_stk {
 	char *idle_mode_text;
 	struct stk_icon_id idle_mode_icon;
 	struct timeval get_inkey_start_ts;
+	enum ofono_sim_state sim_state;
 	int dtmf_id;
 
 	__ofono_sms_sim_download_cb_t sms_pp_cb;
@@ -3200,6 +3201,21 @@ static void stk_remove(struct ofono_atom *atom)
 	g_free(stk);
 }
 
+static void stk_sim_state_change(int state, void *data)
+{
+	struct ofono_atom *atom = data;
+	struct ofono_stk *stk = __ofono_atom_get_data(atom);
+
+	ofono_debug("%s, old_state: %d, sim_state: %d", __func__, stk->sim_state, state);
+	if (stk->sim_state == state)
+		return;
+
+	stk->sim_state = state;
+	if (state == OFONO_SIM_STATE_INSERTED) {
+		stk->driver->initialized(stk);
+	}
+}
+
 struct ofono_stk *ofono_stk_create(struct ofono_modem *modem,
 					unsigned int vendor,
 					const char *driver,
@@ -3224,6 +3240,7 @@ struct ofono_stk *ofono_stk_create(struct ofono_modem *modem,
 
 	stk->atom = __ofono_modem_add_atom(modem, OFONO_ATOM_TYPE_STK,
 						stk_remove, stk);
+	__ofono_atom_add_sim_state_watch(stk->atom, stk_sim_state_change);
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_stk_driver *drv = l->data;

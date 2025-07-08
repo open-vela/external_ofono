@@ -41,6 +41,7 @@ struct ofono_stk_driver {
 	const char *name;
 	int (*probe)(struct ofono_stk *stk, unsigned int vendor, void *data);
 	void (*remove)(struct ofono_stk *stk);
+	void (*initialized)(struct ofono_stk *stk);
 	void (*envelope)(struct ofono_stk *stk,
 				int length, const unsigned char *command,
 				ofono_stk_envelope_cb_t cb, void *data);

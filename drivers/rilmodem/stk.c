@@ -228,10 +228,14 @@ static int ril_stk_probe(struct ofono_stk *stk, unsigned int vendor,
 	g_ril_register(data->ril, RIL_UNSOL_STK_EVENT_NOTIFY,
 					ril_stk_event_notify, stk);
 
-	g_ril_send(data->ril, RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING, NULL,
-					ril_stk_initialize_cb, stk, NULL);
-
 	return 0;
+}
+
+static void ril_stk_initialized(struct ofono_stk *stk)
+{
+	struct stk_data *sd = ofono_stk_get_data(stk);
+	g_ril_send(sd->ril, RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING, NULL,
+					ril_stk_initialize_cb, stk, NULL);
 }
 
 static void ril_stk_remove(struct ofono_stk *stk)
@@ -248,6 +252,7 @@ static const struct ofono_stk_driver driver = {
 	.name = RILMODEM,
 	.probe = ril_stk_probe,
 	.remove = ril_stk_remove,
+	.initialized = ril_stk_initialized,
 	.envelope = ril_stk_envelope,
 	.terminal_response = ril_stk_terminal_response,
 };
