@@ -198,8 +198,6 @@ static void ril_stk_initialize_cb(struct ril_msg *message,
 
 		return;
 	}
-
-	ofono_stk_register(stk);
 }
 
 static int ril_stk_probe(struct ofono_stk *stk, unsigned int vendor,
@@ -213,6 +211,7 @@ static int ril_stk_probe(struct ofono_stk *stk, unsigned int vendor,
 	data->vendor = vendor;
 
 	ofono_stk_set_data(stk, data);
+	ofono_stk_register(stk);
 
 	g_ril_register(data->ril, RIL_UNSOL_STK_PROACTIVE_COMMAND,
 					ril_stk_proactive_cmd_notify, stk);
