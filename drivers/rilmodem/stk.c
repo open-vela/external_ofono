@@ -146,6 +146,8 @@ static void ril_stk_proactive_cmd_notify(struct ril_msg *message,
 				gpointer user_data)
 {
 	struct ofono_stk *stk = user_data;
+	struct stk_data *sd = ofono_stk_get_data(stk);
+	const char *pdu_str;
 	struct parcel rilp;
 	size_t pdulen;
 	unsigned char *pdu;
@@ -153,7 +155,11 @@ static void ril_stk_proactive_cmd_notify(struct ril_msg *message,
 	DBG("");
 
 	g_ril_init_parcel(message, &rilp);
-	pdu = l_util_from_hexstring(parcel_r_string(&rilp), &pdulen);
+	pdu_str = parcel_r_string(&rilp);
+	pdu = l_util_from_hexstring(pdu_str, &pdulen);
+
+	g_ril_append_print_buf(sd->ril, "{%s}", pdu_str);
+	g_ril_print_unsol(sd->ril, message);
 
 	ofono_stk_proactive_command_notify(stk, pdulen, pdu);
 	l_free(pdu);
