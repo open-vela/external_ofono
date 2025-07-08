@@ -57,8 +57,8 @@
 
 /* To use with change_state_req::affected_types */
 #define AFFECTED_STATES_ALL 0x3F
-#define AFFECTED_STATES_WB 0x32  //RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND
-#define AFFECTED_STATES_FG 0x0D  //RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND
+#define AFFECTED_STATES_WB 0x32 // RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND
+#define AFFECTED_STATES_FG 0x0D // RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND
 
 /* Auto-answer delay in seconds */
 #define AUTO_ANSWER_DELAY_S 3
@@ -221,27 +221,22 @@ static gint call_compare_by_id(gconstpointer a, gconstpointer b)
 	return 0;
 }
 
-static void handle_call_disconnected(struct ril_voicecall_data *vd,
-                                     struct ofono_voicecall *vc,
-                                     struct ofono_call *call,
-                                     struct ril_msg *message,
-                                     int reqid,
-                                     gpointer user_data)
+static void handle_call_disconnected(struct ril_voicecall_data *vd, struct ofono_voicecall *vc,
+				     struct ofono_call *call, struct ril_msg *message, int reqid,
+				     gpointer user_data)
 {
-	if (g_slist_find_custom(vd->local_release_call_ids,
-				GUINT_TO_POINTER(call->id), call_compare_by_id)) {
-		ofono_voicecall_disconnected(vc, call->id,
-			OFONO_DISCONNECT_REASON_LOCAL_HANGUP, NULL);
+	if (g_slist_find_custom(vd->local_release_call_ids, GUINT_TO_POINTER(call->id),
+				call_compare_by_id)) {
+		ofono_voicecall_disconnected(vc, call->id, OFONO_DISCONNECT_REASON_LOCAL_HANGUP,
+					     NULL);
 
 	} else if (message->error == RIL_E_RADIO_NOT_AVAILABLE) {
-		ofono_voicecall_disconnected(vc, call->id,
-			OFONO_DISCONNECT_REASON_ERROR, NULL);
+		ofono_voicecall_disconnected(vc, call->id, OFONO_DISCONNECT_REASON_ERROR, NULL);
 
 		OFONO_DFX_CALL_INFO(OFONO_CALL_TYPE_UNKNOW,
-			call->direction ? OFONO_TERMINATE : OFONO_ORIGINATE,
-			call->type ? OFONO_VOICE : OFONO_VIDEO,
-			OFONO_ONGOING_FAIL,
-			"modem fail:RIL_E_RADIO_NOT_AVAILABLE");
+				    call->direction ? OFONO_TERMINATE : OFONO_ORIGINATE,
+				    call->type ? OFONO_VOICE : OFONO_VIDEO, OFONO_ONGOING_FAIL,
+				    "modem fail:RIL_E_RADIO_NOT_AVAILABLE");
 	} else {
 		struct lastcause_req *reqdata = g_new0(struct lastcause_req, 1);
 		reqdata->vc = user_data;
@@ -262,8 +257,9 @@ GSList *remove_disconnected_calls(GSList *calls, GSList *n)
 	return calls;
 }
 
-static void process_call_updates(struct ril_msg *message, gpointer user_data,
-			struct parcel *rilp, int num) {
+static void process_call_updates(struct ril_msg *message, gpointer user_data, struct parcel *rilp,
+				 int num)
+{
 	struct ofono_voicecall *vc = user_data;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 	int reqid = RIL_REQUEST_LAST_CALL_FAIL_CAUSE;
@@ -282,23 +278,21 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 		call->status = parcel_r_int32(rilp);
 		call->id = parcel_r_int32(rilp);
 		call->phone_number.type = parcel_r_int32(rilp);
-		call->mpty = parcel_r_int32(rilp); /* isMpty */
+		call->mpty = parcel_r_int32(rilp);	/* isMpty */
 		call->direction = parcel_r_int32(rilp); /* isMT */
-		parcel_r_int32(rilp); /* als */
-		call->type = parcel_r_int32(rilp); /* isVoice */
-		parcel_r_int32(rilp); /* isVoicePrivacy */
+		parcel_r_int32(rilp);			/* als */
+		call->type = parcel_r_int32(rilp);	/* isVoice */
+		parcel_r_int32(rilp);			/* isVoicePrivacy */
 		number = parcel_r_string(rilp);
 		if (number) {
-			strncpy(call->phone_number.number, number,
-				OFONO_MAX_PHONE_NUMBER_LENGTH);
+			strncpy(call->phone_number.number, number, OFONO_MAX_PHONE_NUMBER_LENGTH);
 			g_free(number);
 		}
 
 		parcel_r_int32(rilp); /* numberPresentation */
 		name = parcel_r_string(rilp);
 		if (name) {
-			strncpy(call->name, name,
-				OFONO_MAX_CALLER_NAME_LENGTH);
+			strncpy(call->name, name, OFONO_MAX_CALLER_NAME_LENGTH);
 			g_free(name);
 		}
 
@@ -310,9 +304,8 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 		else
 			call->clip_validity = 2;
 
-		ofono_debug("[id=%d,status=%d,type=%d,number=***,name=%s]",
-			call->id, call->status, call->type,
-			call->name);
+		ofono_debug("[id=%d,status=%d,type=%d,number=***,name=%s]", call->id, call->status,
+			    call->type, call->name);
 
 		calls = g_slist_insert_sorted(calls, call, call_compare);
 	}
@@ -349,10 +342,8 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 				dial_callback_state(vd, "OK");
 			}
 			if (nc->direction) {
-				OFONO_DFX_CALL_INFO(OFONO_CALL_TYPE_UNKNOW,
-						OFONO_TERMINATE,
-						OFONO_MEDIA_UNKNOW,
-						OFONO_LISTEN_NORMAL, "NA");
+				OFONO_DFX_CALL_INFO(OFONO_CALL_TYPE_UNKNOW, OFONO_TERMINATE,
+						    OFONO_MEDIA_UNKNOW, OFONO_LISTEN_NORMAL, "NA");
 			}
 			n = n->next;
 		} else {
@@ -373,16 +364,14 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 			 * CDIP doesn't arrive as part of CLCC, always
 			 * re-use from the old call
 			 */
-			memcpy(&nc->called_number, &oc->called_number,
-					sizeof(oc->called_number));
+			memcpy(&nc->called_number, &oc->called_number, sizeof(oc->called_number));
 
 			/*
 			 * If the CLIP is not provided and the CLIP never
 			 * arrives, or RING is used, then signal the call
 			 * here
 			 */
-			if (nc->status == CALL_STATUS_INCOMING &&
-            				(vd->flags & FLAG_NEED_CLIP)) {
+			if (nc->status == CALL_STATUS_INCOMING && (vd->flags & FLAG_NEED_CLIP)) {
 				if (nc->type) {
 					/*
 					 * The callback function of dial is set, and
@@ -394,7 +383,8 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 					 * subsequent operations will be blocked.
 					 */
 					if (vd->cb) {
-						ofono_debug("CLCC response empty while dial pending, notify error");
+						ofono_debug("CLCC response empty while dial "
+							    "pending, notify error");
 						dial_callback_state(vd, "ERROR");
 					}
 					ofono_voicecall_notify(vc, nc);
@@ -406,7 +396,8 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 
 				if (nc->status == CALL_STATUS_DISCONNECTED) {
 					GSList *next = n->next;
-					handle_call_disconnected(vd, vc, oc, message, reqid, user_data);
+					handle_call_disconnected(vd, vc, oc, message, reqid,
+								 user_data);
 					calls = remove_disconnected_calls(calls, n);
 					n = next;
 					o = o->next;
