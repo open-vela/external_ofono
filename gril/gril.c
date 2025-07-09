@@ -569,7 +569,7 @@ static struct ril_msg *read_fixed_record(struct ril_s *p,
 	if (message_len < plen)
 		return NULL;
 
-	message = g_malloc(sizeof(struct ril_msg));
+	message = g_malloc0(sizeof(struct ril_msg));
 
 	/* allocate ril_msg->buffer */
 	message->buf_len = plen;
