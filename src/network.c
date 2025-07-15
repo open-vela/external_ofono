@@ -333,6 +333,19 @@ static gint network_operator_data_compare(gconstpointer a, gconstpointer b)
 	return comp1 != 0 ? comp1 : comp2;
 }
 
+static const char *network_operator_build_path(struct ofono_netreg *netreg,
+							const char *mcc,
+							const char *mnc)
+{
+	static char path[256];
+
+	snprintf(path, sizeof(path), "%s/operator/%s%s",
+			__ofono_atom_get_path(netreg->atom),
+			mcc, mnc);
+
+	return path;
+}
+
 static void set_network_operator_status(struct network_operator_data *opd,
 					int status)
 {
@@ -351,7 +364,7 @@ static void set_network_operator_status(struct network_operator_data *opd,
 		return;
 
 	status_str = network_operator_status_to_string(status);
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_OPERATOR_INTERFACE,
@@ -372,7 +385,7 @@ static void set_network_operator_techs(struct network_operator_data *opd,
 
 	opd->techs = techs;
 	technologies = network_operator_technologies(opd);
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
 	ofono_dbus_signal_array_property_changed(conn, path,
 					OFONO_NETWORK_REGISTRATION_INTERFACE,
@@ -487,7 +500,7 @@ static void set_network_operator_name(struct network_operator_data *opd,
 	if (opd->mcc[0] == '\0' && opd->mnc[0] == '\0')
 		return;
 
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_OPERATOR_INTERFACE,
@@ -509,7 +522,7 @@ static void set_network_operator_eons_info(struct network_operator_data *opd,
 	if (old_eons_info == NULL && eons_info == NULL)
 		return;
 
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 	opd->eons_info = eons_info;
 
 	if (old_eons_info && old_eons_info->longname)
@@ -679,7 +692,7 @@ static gboolean network_operator_dbus_register(struct ofono_netreg *netreg,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path;
 
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
 	if (!g_dbus_register_interface(conn, path,
 					OFONO_NETWORK_OPERATOR_INTERFACE,
@@ -707,7 +720,7 @@ static gboolean network_operator_dbus_unregister(struct ofono_netreg *netreg,
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path;
 
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
 	return g_dbus_unregister_interface(conn, path,
 					OFONO_NETWORK_OPERATOR_INTERFACE);
@@ -1054,7 +1067,7 @@ static void append_operator_struct(struct ofono_netreg *netreg,
 	DBusMessageIter entry, dict;
 	const char *path;
 
-	path = __ofono_atom_get_path(netreg->atom);
+	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
 	dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &entry);
 	dbus_message_iter_append_basic(&entry, DBUS_TYPE_OBJECT_PATH, &path);
