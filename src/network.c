@@ -104,6 +104,7 @@ struct ofono_netreg {
 	int radio_status;
 	int signal_changed_count;
 	int network_state_changed_count;
+	ofono_bool_t fixed_path_enable;
 };
 
 struct network_operator_data {
@@ -347,7 +348,7 @@ static const char *network_operator_build_path(struct ofono_netreg *netreg,
 }
 
 static void set_network_operator_status(struct network_operator_data *opd,
-					int status)
+					int status, bool fixed_path)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_netreg *netreg = opd->netreg;
@@ -370,6 +371,12 @@ static void set_network_operator_status(struct network_operator_data *opd,
 					OFONO_NETWORK_OPERATOR_INTERFACE,
 					"Status", DBUS_TYPE_STRING,
 					&status_str);
+	if (fixed_path) {
+		path = __ofono_atom_get_path(netreg->atom);
+		ofono_debug("%s: Setting %s operator status to %s", __func__, path, status_str);
+		ofono_dbus_signal_property_changed(conn, path, OFONO_NETWORK_OPERATOR_INTERFACE,
+						   "Status", DBUS_TYPE_STRING, &status_str);
+	}
 }
 
 static void set_network_operator_techs(struct network_operator_data *opd,
@@ -471,7 +478,7 @@ static void netreg_emit_operator_display_name(struct ofono_netreg *netreg)
 }
 
 static void set_network_operator_name(struct network_operator_data *opd,
-					const char *name)
+					const char *name, bool fixed_path)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	struct ofono_netreg *netreg = opd->netreg;
@@ -480,11 +487,10 @@ static void set_network_operator_name(struct network_operator_data *opd,
 	if (name[0] == '\0')
 		return;
 
-	if (!strncmp(opd->name, name, OFONO_MAX_OPERATOR_NAME_LENGTH))
-		return;
-
-	strncpy(opd->name, name, OFONO_MAX_OPERATOR_NAME_LENGTH);
-	opd->name[OFONO_MAX_OPERATOR_NAME_LENGTH] = '\0';
+	if (strncmp(opd->name, name, OFONO_MAX_OPERATOR_NAME_LENGTH)) {
+		strncpy(opd->name, name, OFONO_MAX_OPERATOR_NAME_LENGTH);
+		opd->name[OFONO_MAX_OPERATOR_NAME_LENGTH] = '\0';
+        }
 
 	/*
 	 * If we have Enhanced Operator Name info on the SIM, we always use
@@ -505,6 +511,13 @@ static void set_network_operator_name(struct network_operator_data *opd,
 	ofono_dbus_signal_property_changed(conn, path,
 					OFONO_NETWORK_OPERATOR_INTERFACE,
 					"Name", DBUS_TYPE_STRING, &name);
+
+	if (fixed_path) {
+		path = __ofono_atom_get_path(netreg->atom);
+		ofono_debug("%s: Setting %s operator name to %s", __func__, path, name);
+		ofono_dbus_signal_property_changed(conn, path, OFONO_NETWORK_OPERATOR_INTERFACE,
+						   "Name", DBUS_TYPE_STRING, &name);
+	}
 }
 
 static void set_network_operator_eons_info(struct network_operator_data *opd,
@@ -687,10 +700,11 @@ static const GDBusSignalTable network_operator_signals[] = {
 };
 
 static gboolean network_operator_dbus_register(struct ofono_netreg *netreg,
-					struct network_operator_data *opd)
+					       struct network_operator_data *opd, bool fixed_path)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path;
+	const char *fixed_path_value;
 
 	path = network_operator_build_path(netreg, opd->mcc, opd->mnc);
 
@@ -710,6 +724,21 @@ static gboolean network_operator_dbus_register(struct ofono_netreg *netreg,
 	if (netreg->eons)
 		opd->eons_info = sim_eons_lookup(netreg->eons,
 							opd->mcc, opd->mnc);
+	if (fixed_path) {
+		struct network_operator_data *copy_opd;
+
+		copy_opd = network_operator_create((const struct ofono_network_operator *)opd);
+		fixed_path_value = __ofono_atom_get_path(netreg->atom);
+		if (!g_dbus_register_interface(conn, fixed_path_value,
+					       OFONO_NETWORK_OPERATOR_INTERFACE,
+					       network_operator_methods, network_operator_signals,
+					       NULL, copy_opd, network_operator_destroy)) {
+			ofono_error("Could not register NetworkOperator %s", fixed_path_value);
+		} else {
+			ofono_debug("Registered NetworkOperator %s success", fixed_path_value);
+			netreg->fixed_path_enable = TRUE;
+		}
+	}
 
 	return TRUE;
 }
@@ -778,9 +807,9 @@ static gboolean update_operator_list(struct ofono_netreg *netreg, int total,
 					network_operator_data_compare);
 
 		if (o) { /* Update and move to a new list */
-			set_network_operator_status(o->data, copd->status);
+			set_network_operator_status(o->data, copd->status, FALSE);
 			set_network_operator_techs(o->data, copd->techs);
-			set_network_operator_name(o->data, copd->name);
+			set_network_operator_name(o->data, copd->name, FALSE);
 
 			n = g_slist_prepend(n, o->data);
 			netreg->operator_list =
@@ -792,7 +821,7 @@ static gboolean update_operator_list(struct ofono_netreg *netreg, int total,
 			opd = g_memdup2(copd,
 					sizeof(struct network_operator_data));
 
-			if (!network_operator_dbus_register(netreg, opd)) {
+			if (!network_operator_dbus_register(netreg, opd, FALSE)) {
 				g_free(opd);
 				continue;
 			}
@@ -1581,8 +1610,9 @@ static void reset_available(struct network_operator_data *old,
 	if (old == NULL)
 		return;
 
-	if (new == NULL || network_operator_compare(old, new) != 0)
-		set_network_operator_status(old, OPERATOR_STATUS_AVAILABLE);
+	if (new == NULL || network_operator_compare(old, new) != 0) {
+		set_network_operator_status(old, OPERATOR_STATUS_AVAILABLE, TRUE);
+	}
 }
 
 static void report_roaming_country_info(char *mcc, char *mnc)
@@ -1654,8 +1684,8 @@ static void current_operator_callback(const struct ofono_error *error,
 			set_network_operator_techs(opd, techs);
 		}
 
-		set_network_operator_status(opd, OPERATOR_STATUS_CURRENT);
-		set_network_operator_name(opd, current->name);
+		set_network_operator_status(opd, OPERATOR_STATUS_CURRENT, TRUE);
+		set_network_operator_name(opd, current->name, TRUE);
 
 		if (netreg->current_operator == op->data)
 			return;
@@ -1670,7 +1700,7 @@ static void current_operator_callback(const struct ofono_error *error,
 		opd = network_operator_create(current);
 
 		if (opd->mcc[0] != '\0' && opd->mnc[0] != '\0' &&
-				!network_operator_dbus_register(netreg, opd)) {
+				!network_operator_dbus_register(netreg, opd, TRUE)) {
 			g_free(opd);
 			return;
 		} else
@@ -2522,6 +2552,11 @@ static void netreg_unregister(struct ofono_atom *atom)
 
 		network_operator_dbus_unregister(netreg, l->data);
 	}
+	if (netreg->fixed_path_enable) {
+		ofono_debug("Unregistering Network Operator  with fixed path: %s", path);
+		g_dbus_unregister_interface(conn, path, OFONO_NETWORK_OPERATOR_INTERFACE);
+		netreg->fixed_path_enable = FALSE;
+	}
 
 	g_slist_free(netreg->operator_list);
 	netreg->operator_list = NULL;
@@ -3050,6 +3085,8 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 	memset(netreg->rat_duration, 0, sizeof(netreg->rat_duration));
 	netreg->rat_report_time_id = g_timeout_add(REPORTING_PERIOD,
 			report_rat_info, netreg);
+
+	netreg->fixed_path_enable = TRUE;
 
 }
 
