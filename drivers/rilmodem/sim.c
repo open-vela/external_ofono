@@ -283,11 +283,13 @@ done:
 	 * ETSI TS 102 221, section 8.4.2 (we are accessing the card in mode
 	 * "select by path from MF", see 3gpp 27.007, +CRSM).
 	 */
-	if (vendor == OFONO_RIL_VENDOR_MTK && len >= (int) ROOTMF_SZ &&
+#ifdef CONFIG_OFONO_RIL_STRIP_MF_ID
+	if (len >= (int) ROOTMF_SZ &&
 			memcmp(db_path, ROOTMF, ROOTMF_SZ) == 0) {
 		comm_path = db_path + ROOTMF_SZ;
 		len -= ROOTMF_SZ;
 	}
+#endif
 
 	if (len == 0)
 		return NULL;
