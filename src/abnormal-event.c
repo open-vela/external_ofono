@@ -396,6 +396,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 				     TYPE_INT, data_data->cell_quality.rsrq, TYPE_INT,
 				     data_data->cell_quality.sinr, TYPE_INT,
 				     data_data->cell_quality.rssi);
+		OFONO_DFX_DATA_INTERRUPTION_INFO();
 		break;
 	}
 	case OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP: {
