@@ -5017,7 +5017,7 @@ void ofono_gprs_reset_provisioned(struct ofono_gprs *gprs)
 			"Provisioned", gprs->provisioned);
 }
 
-struct ofono_gprs_primary_context *ofono_gprs_get_pri_context_by_name(
+struct ofono_gprs_primary_context *ofono_gprs_get_pri_context_by_value(
 	struct ofono_gprs_context *gc, const char *apn)
 {
 	struct ofono_gprs *gprs = gc->gprs;
@@ -5028,22 +5028,22 @@ struct ofono_gprs_primary_context *ofono_gprs_get_pri_context_by_name(
 
 	for (l = gprs->contexts; l; l = l->next) {
 		struct pri_context *ctx = l->data;
-		char *ctx_name = NULL;
+		char *ctx_value = NULL;
 
 		if (ctx == NULL) {
 			continue;
 		}
 
-		ctx_name = g_strdup(ctx->name);
-		if (ctx_name == NULL)
+		ctx_value = g_strdup(ctx->context.apn);
+		if (ctx_value == NULL)
 			continue;
 
-		if (g_str_equal(ctx_name, apn) == TRUE) {
-			g_free(ctx_name);
+		if (g_str_equal(ctx_value, apn) == TRUE) {
+			g_free(ctx_value);
 			return &(ctx->context);
 		}
 
-		g_free(ctx_name);
+		g_free(ctx_value);
 	}
 
 	return NULL;
