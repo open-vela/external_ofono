@@ -377,7 +377,7 @@ static void ril_setup_data_call_cb(struct ril_msg *message, gpointer user_data)
 	char *raw_dns = NULL, *raw_gws = NULL;
 	int protocol;
 	struct ofono_gprs_primary_context *ctx =
-		ofono_gprs_get_pri_context_by_name(gc, gcd->apn);
+		ofono_gprs_get_pri_context_by_value(gc, gcd->apn);
 
 	DBG("*gc: %p", gc);
 
@@ -660,7 +660,7 @@ static gboolean retry_activate(gpointer user_data)
 		return FALSE;
 	}
 
-	ctx = ofono_gprs_get_pri_context_by_name(gc, gcd->apn);
+	ctx = ofono_gprs_get_pri_context_by_value(gc, gcd->apn);
 	if (ctx == NULL) {
 		ofono_debug("%s - ignore retry due to invalid ctx.", __func__);
 		retry_activate_abort(gc);
