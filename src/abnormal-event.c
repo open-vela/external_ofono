@@ -500,7 +500,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 				char temp[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = {
 					'\0'
 				};
-				sprintf(temp, "%d", ue_sim_data->ehplmn[i]);
+				snprintf(temp, sizeof(temp), "%d", ue_sim_data->ehplmn[i]);
 				strcat(ehplmn_list, temp);
 			}
 			ofono_debug("%s,sub=%u,hplmn=%u,ehplmn_list=%s", KEY_NAME, ue_sim_data->sub,
