@@ -11,7 +11,7 @@
 #define MAX_MCC_LENGTH 3
 #define MAX_MNC_LENGTH 3
 
-#define MIWEAR_LOG_IND_BUF_SIZE 200
+#define LOG_IND_BUF_SIZE 200
 
 #ifndef LOG_DEBUG
 #define LOG_DEBUG 7
@@ -90,30 +90,24 @@ struct ofono_plmn_op_code {
 	int op_code;
 };
 
-#if defined(CONFIG_DFX) && defined(CONFIG_DFX_EVENT)
+#ifdef CONFIG_TELEPHONY_DFX
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_CALL_INFO:%d,%d,%d,%d,%s", type, direction, media,    \
-		       fail_scenario, fail_reason);                                                \
-		sendEventMisightF(915200010, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
+		sendEventMisightF(923040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
 				  "direction", direction, "media", media, "fail_scenario",         \
 				  fail_scenario, "fail_reason", fail_reason);                      \
 	} while (0)
 
 #define OFONO_DFX_SS_INFO(type, fail_reason)                                                       \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_SS_INFO:%s,%s", type, fail_reason);                   \
-		sendEventMisightF(915200011, "%s:%s,%s:%s", "ss_type", type, "fail_reason",        \
+		sendEventMisightF(923040401, "%s:%s,%s:%s", "ss_type", type, "fail_reason",        \
 				  fail_reason);                                                    \
 	} while (0)
 
 #define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration, level2_duration,                \
 				 level3_duration, level4_duration, level5_duration)                \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_CALL_TIME:%d,%d,%d,%d,%d,%d", level0_duration,        \
-		       level1_duration, level2_duration, level3_duration, level4_duration,         \
-		       level5_duration);                                                           \
-		sendEventMisightF(915200012, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d",                \
+		sendEventMisightF(923040002, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d",                \
 				  "level0_time_value", level0_duration, "level1_time_value",       \
 				  level1_duration, "level2_time_value", level2_duration,           \
 				  "level3_time_value", level3_duration, "level4_time_value",       \
@@ -122,63 +116,51 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_SMS_INFO(opcode, sms_type, direction, fail_flag, covered_plmn)                   \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_SMS:%d,%d,%d,%d,%s", opcode, sms_type, direction,     \
-		       fail_flag, covered_plmn);                                                   \
-		sendEventMisightF(915200013, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "op_code", opcode,   \
+		sendEventMisightF(923040301, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "op_code", opcode,   \
 				  "sms_type", sms_type, "direction", direction, "fail_flag",       \
 				  fail_flag, "plmn", covered_plmn);                                \
 	} while (0)
 
 #define OFONO_DFX_DATA_INTERRUPTION_INFO()                                                         \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX:DATA_INTERRUPTION");                                  \
-		sendEventMisightF(915200014, "%s:%d", "data_interruption", 1);                     \
+		sendEventMisightF(923040201, "%s:%d", "data_interruption", 1);                     \
 	} while (0)
 
 #define OFONO_DFX_DATA_ACTIVE_FAIL(cause)                                                          \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX:DATA_ACTIVE_FAIL:%s", cause);                         \
-		sendEventMisightF(915000002, "%s:%s", "cause", cause);                             \
+		sendEventMisightF(923040202, "%s:%s", "cause", cause);                             \
 	} while (0)
 
 #define OFONO_DFX_DATA_ACTIVE_DURATION(data_active_time)                                           \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX:DATA_ACTIVE_TIME:%d", data_active_time);              \
-		sendEventMisightF(915200015, "%s:%d", "data_active_time", data_active_time);       \
+		sendEventMisightF(923040203, "%s:%d", "data_active_time", data_active_time);       \
 	} while (0)
 
 #define OFONO_DFX_OOS_INFO()                                                                       \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX:OOS_INFO");                                           \
-		sendEventMisightF(915300004, "%s:%d", "oosSubId", 0);                              \
+		sendEventMisightF(923040101, "%s:%d", "oosSubId", 0);                              \
 	} while (0)
 
 #define OFONO_DFX_OOS_DURATION_INFO(oos_duration)                                                  \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX:OOS_DURATION_INFO:%d", oos_duration);                 \
-		sendEventMisightF(915300005, "%s:%d", "oos_time", oos_duration);                   \
+		sendEventMisightF(923040102, "%s:%d", "oos_time", oos_duration);                   \
 	} while (0)
 
 #define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_ROAMING:%d,%s", roaming_country_code, covered_plmn);  \
-		sendEventMisightF(915300006, "%s:%d,%s:%s", "roaming_country_code",                \
+		sendEventMisightF(923040103, "%s:%d,%s:%s", "roaming_country_code",                \
 				  roaming_country_code, "plmn", covered_plmn);                     \
 	} while (0)
 
 #define OFONO_DFX_BAND_INFO(band)                                                                  \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_BAND_INFO:%d", band);                                 \
-		sendEventMisightF(915300007, "%s:%d", "band_value", band);                         \
+		sendEventMisightF(923040104, "%s:%d", "band_value", band);                         \
 	} while (0)
 
 #define OFONO_DFX_SIGNAL_LEVEL_DURATION(level0_duration, level1_duration, level2_duration,         \
 					level3_duration, level4_duration, level5_duration)         \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_SIGNAL_LEVEL:%d,%d,%d,%d,%d,%d", level0_duration,     \
-		       level1_duration, level2_duration, level3_duration, level4_duration,         \
-		       level5_duration);                                                           \
-		sendEventMisightF(915200008, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d", "level0_time", \
+		sendEventMisightF(923040105, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d", "level0_time", \
 				  level0_duration, "level1_time", level1_duration, "level2_time",  \
 				  level2_duration, "level3_time", level3_duration, "level4_time",  \
 				  level4_duration, "level5_time", level5_duration);                \
@@ -187,23 +169,18 @@ struct ofono_plmn_op_code {
 #define OFONO_DFX_RAT_DURATION(unknow_rat_duration, rat_2g_duration, rat_3g_duration,              \
 			       rat_4g_duration)                                                    \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_RAT:%d,%d,%d,%d", unknow_rat_duration,                \
-		       rat_2g_duration, rat_3g_duration, rat_4g_duration);                         \
-		sendEventMisightF(915200009, "%s:%d,%s:%d,%s:%d", "2g_time", rat_2g_duration,      \
+		sendEventMisightF(923040106, "%s:%d,%s:%d,%s:%d", "2g_time", rat_2g_duration,      \
 				  "3g_time", rat_3g_duration, "4g_time", rat_4g_duration);         \
 	} while (0)
 
 #define OFONO_DFX_IMS_DURATION(ims_duration)                                                       \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_IMS:%d", ims_duration);                               \
-		sendEventMisightF(915200010, "%s:%d", "volte_time", ims_duration);                 \
+		sendEventMisightF(923040107, "%s:%d", "volte_time", ims_duration);                 \
 	} while (0)
 
 #define OFONO_DFX_MODEM_DURATION_INFO(modem_deactive_duration, modem_active_duration)              \
 	do {                                                                                       \
-		syslog(LOG_DEBUG, "OFONO_DFX_MODEM:%d,%d", modem_deactive_duration,                \
-		       modem_active_duration);                                                     \
-		sendEventMisightF(915200011, "%s:%d,%s:%d", "modem_on_time",                       \
+		sendEventMisightF(923040108, "%s:%d,%s:%d", "modem_on_time",                       \
 				  modem_deactive_duration, "modem_off_time",                       \
 				  modem_active_duration);                                          \
 	} while (0)
@@ -245,14 +222,13 @@ struct ofono_plmn_op_code {
 				  cellinfo_changed_count);                                         \
 	} while (0)
 
-#elif defined(CONFIG_OFONO_DATA_LOG_OVER_MIWEAR)
+#else
 
 #define REPORT_DATA_LOG(format, ...)                                                               \
 	do {                                                                                       \
-		char miwear_buf[MIWEAR_LOG_IND_BUF_SIZE];                                          \
-		memset(miwear_buf, 0, sizeof(miwear_buf));                                         \
-		sprintf(miwear_buf, format, __VA_ARGS__);                                          \
-		__ofono_manager_data_log(miwear_buf);                                              \
+		char log_buf[LOG_IND_BUF_SIZE] = {0};                                              \
+		snprintf(log_buf, sizeof(log_buf), format, __VA_ARGS__);                           \
+		__ofono_manager_data_log(log_buf);                                                 \
 	} while (0)
 
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
@@ -325,75 +301,6 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_CELL_INFO_CHANGED_COUNT(cellinfo_changed_count)                                  \
 	REPORT_DATA_LOG("%s,%d", "CELLINFO_CHANGED_COUNT", cellinfo_changed_count)
-#else
-
-#define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
-	syslog(LOG_DEBUG, "OFONO_DFX_CALL_INFO:%d,%d,%d,%d,%s", type, direction, media,            \
-	       fail_scenario, fail_reason)
-
-#define OFONO_DFX_SS_INFO(type, fail_reason)                                                       \
-	syslog(LOG_DEBUG, "OFONO_DFX_SS_INFO:%s,%s", type, fail_reason)
-
-#define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration, level2_duration,                \
-				 level3_duration, level4_duration, level5_duration)                \
-	syslog(LOG_DEBUG, "OFONO_DFX_CALL_TIME:%d,%d,%d,%d,%d,%d", level0_duration,                \
-	       level1_duration, level2_duration, level3_duration, level4_duration,                 \
-	       level5_duration);
-
-#define OFONO_DFX_SMS_INFO(opcode, sms_type, direction, fail_flag, covered_plmn)                   \
-	syslog(LOG_DEBUG, "OFONO_DFX_SMS:%d,%d,%d,%d,%s", opcode, sms_type, direction, fail_flag,  \
-	       covered_plmn)
-
-#define OFONO_DFX_DATA_INTERRUPTION_INFO() syslog(LOG_DEBUG, "OFONO_DFX:DATA_INTERRUPTION")
-
-#define OFONO_DFX_DATA_ACTIVE_FAIL(cause) syslog(LOG_DEBUG, "OFONO_DFX:DATA_ACTIVE_FAIL:%s", cause)
-
-#define OFONO_DFX_DATA_ACTIVE_DURATION(data_active_time)                                           \
-	syslog(LOG_DEBUG, "OFONO_DFX:DATA_ACTIVE_TIME:%d", data_active_time)
-
-#define OFONO_DFX_OOS_INFO() syslog(LOG_DEBUG, "OFONO_DFX:OOS_INFO")
-
-#define OFONO_DFX_OOS_DURATION_INFO(oos_duration)                                                  \
-	syslog(LOG_DEBUG, "OFONO_DFX:OOS_DURATION_INFO:%d", oos_duration)
-
-#define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
-	syslog(LOG_DEBUG, "OFONO_DFX_ROAMING:%d,%s", roaming_country_code, covered_plmn)
-
-#define OFONO_DFX_BAND_INFO(band) syslog(LOG_DEBUG, "OFONO_DFX_BAND:%d", band)
-
-#define OFONO_DFX_SIGNAL_LEVEL_DURATION(level0_duration, level1_duration, level2_duration,         \
-					level3_duration, level4_duration, level5_duration)         \
-	syslog(LOG_DEBUG, "OFONO_DFX_SIGNAL:%d,%d,%d,%d,%d,%d", level0_duration, level1_duration,  \
-	       level2_duration, level3_duration, level4_duration, level5_duration);
-
-#define OFONO_DFX_RAT_DURATION(unknow_rat_duration, rat_2g_duration, rat_3g_duration,              \
-			       rat_4g_duration)                                                    \
-	syslog(LOG_DEBUG, "OFONO_DFX_RAT:%d,%d,%d,%d", unknow_rat_duration, rat_2g_duration,       \
-	       rat_3g_duration, rat_4g_duration)
-
-#define OFONO_DFX_IMS_DURATION(ims_duration) syslog(LOG_DEBUG, "OFONO_DFX_IMS:%d", ims_duration)
-
-#define OFONO_DFX_MODEM_DURATION_INFO(modem_deactive_duration, modem_active_duration)              \
-	syslog(LOG_DEBUG, "OFONO_DFX_MODEM:%d,%d", modem_deactive_duration, modem_active_duration)
-
-#define OFONO_DFX_ABNORMAL_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                    \
-	syslog(LOG_DEBUG, "OFONO_DFX_ABNORMAL_EVENT:%s,%s,%s,%s,%s,%s", parm1, parm2, parm3,       \
-	       parm4, parm5, parm6);
-
-#define OFONO_DFX_MODEM_COMMON_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                \
-	syslog(LOG_DEBUG, "OFONO_DFX_COMMON_EVENT:%s,%u,%u,%u,%u,%u", parm1, parm2, parm3, parm4,  \
-	       parm5, parm6);
-
-#define OFONO_DFX_NETWORK_SIGNAL_CHANGED_COUNT(signal_changed_count, network_state_changed_count)  \
-	syslog(LOG_DEBUG, "NETWORK_SIGNAL_CHANGED_COUNT:%d,%d", signal_changed_count,              \
-	       network_state_changed_count)
-
-#define OFONO_DFX_IMS_STATE_CHANGED_COUNT(ims_state_changed_count)                                 \
-	syslog(LOG_DEBUG, "IMS_STATE_CHANGED_COUNT:%d", ims_state_changed_count)
-
-#define OFONO_DFX_CELL_INFO_CHANGED_COUNT(cellinfo_changed_count)                                  \
-	syslog(LOG_DEBUG, "CELLINFO_CHANGED_COUNT:%d", cellinfo_changed_count)
-
 #endif
 
 #define OFONO_DFX_CALL_INFO_IF(flag, type, direction, media, fail_scenario, fail_reason)           \
@@ -403,5 +310,5 @@ struct ofono_plmn_op_code {
 		}                                                                                  \
 	} while (0)
 
-void __ofono_manager_data_log(char *data);
+void __ofono_manager_data_log(const char *data);
 #endif
