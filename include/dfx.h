@@ -2,7 +2,9 @@
 #define __OFONO_DFX_H
 
 #include <nuttx/config.h>
+#ifdef CONFIG_TELEPHONY_DFX
 #include <dfx.h>
+#endif
 #include <syslog.h>
 
 #define REPORTING_PERIOD 1000 * 60 * 60 * 5.5
