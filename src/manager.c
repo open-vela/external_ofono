@@ -309,7 +309,7 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	return reply;
 }
 
-void __ofono_manager_data_log(char *data)
+void __ofono_manager_data_log(const char *data)
 {
 	DBusMessage *signal;
 	DBusMessageIter iter;
