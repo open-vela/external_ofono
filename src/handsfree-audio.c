@@ -309,7 +309,7 @@ static gboolean sco_connect_cb(GIOChannel *io, GIOCondition cond,
 
 {
 	struct ofono_handsfree_card *card = user_data;
-	DBusMessage *reply;
+	DBusMessage *reply = NULL;
 	int sk;
 
 	if (agent == NULL) {
