@@ -612,6 +612,8 @@ static void append_voicecall_properties(struct voicecall *v,
 	ofono_dbus_dict_append(dict, "DisconnectReason",
 					DBUS_TYPE_INT32, &call->disconnet_reason);
 
+	ofono_dbus_dict_append(dict, "isMT",
+					DBUS_TYPE_INT32, &call->direction);
 }
 
 static DBusMessage *voicecall_get_properties(DBusConnection *conn,
