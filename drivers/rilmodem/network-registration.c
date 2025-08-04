@@ -799,9 +799,10 @@ static void ril_nitz_notify(struct ril_msg *message, gpointer user_data)
 	if (nitz == NULL)
 		goto error;
 
+	dst = 0;
 	n_match = sscanf(nitz, "%u/%u/%u,%u:%u:%u%c%u,%u", &year, &mon,
 				&mday, &hour, &min, &sec, &tzs, &tzi, &dst);
-	if (n_match != 9)
+	if (n_match < 8)
 		goto error;
 
 	sprintf(tz, "%c%d", tzs, tzi);
