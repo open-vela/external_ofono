@@ -431,6 +431,7 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 		vd->local_release_call_ids = NULL;
 	}
 }
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_voicecall *vc = user_data;
@@ -465,14 +466,17 @@ static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 
 	process_call_updates(message, user_data, &rilp, num);
 }
+#endif
 
 gboolean ril_poll_clcc(gpointer user_data)
 {
 	struct ofono_voicecall *vc = user_data;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
-			clcc_poll_cb, vc, NULL);
+		clcc_poll_cb, vc, NULL);
+#endif
 
 	vd->clcc_source = 0;
 
@@ -503,7 +507,6 @@ static void generic_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct change_state_req *req = user_data;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(req->vc);
-	gboolean clcc_with_data = ofono_voicecall_get_clcc(req->vc);
 	struct ofono_error error;
 
 	if (message->error == RIL_E_SUCCESS) {
@@ -517,13 +520,15 @@ static void generic_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-	if (!clcc_with_data)
-		append_local_release_calls(vd, req->affected_types);
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	append_local_release_calls(vd, req->affected_types);
+#endif
 
 out:
-	if (!clcc_with_data)
-		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
-			clcc_poll_cb, req->vc, NULL);
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+		clcc_poll_cb, req->vc, NULL);
+#endif
 
 	/* We have to callback after we schedule a poll if required */
 	if (req->cb)
@@ -607,10 +612,12 @@ static void rild_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	/* CLCC will update the oFono call list with proper ids  */
-	if (!vd->clcc_source && !ofono_voicecall_get_clcc(vc))
+	if (!vd->clcc_source)
 		vd->clcc_source = g_timeout_add(POLL_CLCC_INTERVAL,
 						ril_poll_clcc, vc);
+#endif
 
 	return;
 
@@ -641,9 +648,10 @@ static void rild_conference_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_print_response_no_args(vd->ril, message);
 
 out:
-	if (!ofono_voicecall_get_clcc(vc))
-		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
-			clcc_poll_cb, vc, NULL);
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+		clcc_poll_cb, vc, NULL);
+#endif
 
 	/* We have to callback after we schedule a poll if required */
 	if (cb)
@@ -771,9 +779,10 @@ static gboolean pending_call_check_held_all(gpointer user_data)
 		free(cbd);
 		need_check_again = FALSE;
 	} else {
-		if (!ofono_voicecall_get_clcc(req->vc))
-			g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
-					clcc_poll_cb, req->vc, NULL);
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+			clcc_poll_cb, req->vc, NULL);
+#endif
 	}
 
 	return need_check_again;
@@ -794,11 +803,13 @@ static void hold_before_dial_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	ofono_info("need wait calls held: get clcc");
 	/* get clcc respone to check active call held */
-	if (!ofono_voicecall_get_clcc(req->vc))
-		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
-			clcc_poll_cb, req->vc, NULL);
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+		clcc_poll_cb, req->vc, NULL);
+#endif
+
 	if (!vd->hold_source) {
 		/* same timer with CLCC poll to periodly check all calls status is held */
 		cbd = cb_data_new(cb, cbd->data, req);
@@ -955,24 +966,15 @@ void ril_call_state_notify(struct ril_msg *message, gpointer user_data)
 	struct parcel rilp;
 	int num;
 
-	if (message->buf == NULL || message->buf_len < sizeof(int32_t)) {
-		ofono_voicecall_set_clcc(vc, FALSE);
-		ril_get_current_call(message, user_data);
-		return;
-	}
-
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	ril_get_current_call(message, user_data);
+#else
 	g_ril_print_unsol_no_args(vd->ril, message);
 	g_ril_init_parcel(message, &rilp);
 
 	num = parcel_r_int32(&rilp);
-	if (num == 0) {
-		ofono_voicecall_set_clcc(vc, FALSE);
-		ril_get_current_call(message, user_data);
-		return;
-	}
-
-	ofono_voicecall_set_clcc(vc, TRUE);
 	process_call_updates(message, user_data, &rilp, num);
+#endif
 }
 
 static void ril_ss_notify(struct ril_msg *message, gpointer user_data)
@@ -1206,9 +1208,10 @@ static void ril_call_redirection_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-	if (!ofono_voicecall_get_clcc(req->vc))
-		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
-			clcc_poll_cb, req->vc, NULL);
+#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
+		clcc_poll_cb, req->vc, NULL);
+#endif
 
 	/* We have to callback after we schedule a poll if required */
 	if (req->cb)
@@ -1259,10 +1262,11 @@ void ril_release_all_held(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
 	int ret;
-	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
-	if (ofono_voicecall_get_clcc(vc))
-		append_local_release_calls(vd, AFFECTED_STATES_WB);
+#if CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	append_local_release_calls(vd, AFFECTED_STATES_WB);
+#endif
 
 	ret = ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
 			hangup_generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
@@ -1274,10 +1278,11 @@ void ril_release_all_active(struct ofono_voicecall *vc,
 				ofono_voicecall_cb_t cb, void *data)
 {
 	int ret;
-	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
-	if (ofono_voicecall_get_clcc(vc))
-		append_local_release_calls(vd, AFFECTED_STATES_FG);
+#if CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
+	append_local_release_calls(vd, AFFECTED_STATES_FG);
+#endif
 
 	ret = ril_template(RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND, vc,
 			hangup_generic_cb, AFFECTED_STATES_FG, NULL, cb, data);
@@ -1288,10 +1293,10 @@ void ril_release_all_active(struct ofono_voicecall *vc,
 void ril_set_udub(struct ofono_voicecall *vc,
 			ofono_voicecall_cb_t cb, void *data)
 {
+#if CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
-
-	if (ofono_voicecall_get_clcc(vc))
-		append_local_release_calls(vd, AFFECTED_STATES_WB);
+	append_local_release_calls(vd, AFFECTED_STATES_WB);
+#endif
 
 	ril_template(RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND, vc,
 			generic_cb, AFFECTED_STATES_WB, NULL, cb, data);
