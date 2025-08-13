@@ -106,7 +106,7 @@ static char *decode_text(uint8_t dcs, int len, const unsigned char *data)
 		break;
 	}
 	case SMS_CHARSET_8BIT:
-		utf8 = convert_gsm_to_utf8(data, len, NULL, NULL, 0);
+		utf8 = l_strndup((const char *)data, len);
 		break;
 	case SMS_CHARSET_UCS2:
 		utf8 = l_utf8_from_ucs2be(data, len);
