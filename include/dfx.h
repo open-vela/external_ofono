@@ -2,10 +2,7 @@
 #define __OFONO_DFX_H
 
 #include <nuttx/config.h>
-#if defined(CONFIG_DFX) && defined(CONFIG_DFX_EVENT)
-#include <dfx_debug.h>
-#include <dfx_event.h>
-#endif
+#include <dfx.h>
 #include <syslog.h>
 
 #define REPORTING_PERIOD 1000 * 60 * 60 * 5.5
