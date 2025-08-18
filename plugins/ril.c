@@ -696,14 +696,14 @@ static void ril_suppress_message_report_cb(struct ril_msg *message, gpointer use
 }
 
 static void ril_suppress_message_report(struct ofono_modem *modem, ofono_bool_t enable,
-				       ofono_modem_suppress_message_report_cb_t cb, void *data)
+					ofono_modem_suppress_message_report_cb_t cb, void *data)
 {
 	struct parcel rilp;
 	struct ril_data *rd = ofono_modem_get_data(modem);
 	struct cb_data *cbd = cb_data_new(cb, data, modem);
 
 	parcel_init(&rilp);
-	parcel_w_int32(&rilp, 2);
+	parcel_w_int32(&rilp, 4);
 
 	g_ril_append_print_buf(rd->ril, "(%d)", enable);
 
@@ -717,8 +717,47 @@ static void ril_suppress_message_report(struct ofono_modem *modem, ofono_bool_t 
 		parcel_w_int32(&rilp, 0x0F);
 		/* 0-enable,1-disable for every bit*/
 		parcel_w_int32(&rilp, 0x0F);
+		/*
+		OFONO_ABNORMAL_INSIDE_MODEM-ID1-bit1,
+		OFONO_ABNORMAL_EF_FILE-ID2-bit2,
+		OFONO_ABNORMAL_PROFILE-ID3-bit3,
+		OFONO_ABNORMAL_RLF-ID4-bit4,
+		OFONO_ABNORMAL_RACH_ACCESS-ID5-bit5,
+		OFONO_ABNORMAL_OOS-ID6-bit6,
+		OFONO_ABNORMAL_NAS_TIMEOUT-ID7-bit7,
+		OFONO_ABNORMAL_SIP_TIMEOUT-ID8-bit8,
+		OFONO_ABNORMAL_TIMEOUT_IN_RRC-ID9-bit9,
+		OFONO_ABNORMAL_ECC_CALL_FAIL-ID10-bit10,
+		OFONO_ABNORMAL_RTP_RTCP-ID11-bit11,
+		OFONO_ABNORMAL_PAGING_DECODE-ID12-bit12,
+		OFONO_ABNORMAL_CALL_QUALITY-ID13-bit13,
+		OFONO_ABNORMAL_PDCP-ID14-bit14,
+		OFONO_ABNORMAL_NAS_REJECT-ID15-bit15,
+		OFONO_ABNORMAL_SIP_REJECT-ID16-bit16,
+		OFONO_ABNORMAL_RRC_REJECT-ID17-bit17,
+		OFONO_ABNORMAL_PING_PONG-ID18-bit18,
+		OFONO_ABNORMAL_CC-ID19-bit19,
+		OFONO_ABNORMAL_XCAP-ID20-bit20,
+		OFONO_ABNORMAL_DATA-ID21-bit21,
+		OFONO_ABNORMAL_CALL_END_REASON_FROM_SIP-ID22-bit22,
+		*/
+		parcel_w_int32(&rilp, 0x20);
+		/*
+		OFONO_LIMITED_SERVICE_CAMP_EVENT-ID200-bit1,
+		OFONO_REDIRECT_EVENT-ID201-bit2,
+		OFONO_HANDOVER_EVENT-ID202-bit3,
+		OFONO_RESELECT_EVENT-ID203-bit4,
+		OFONO_CSFB_EVENT-ID204-bit5,
+		OFONO_SRVCC_EVENT-ID205-bit6,
+		OFONO_UE_CAP_INFO-ID206-bit7,
+		OFONO_UE_CAMP_CELL_INFO-ID207-bit8,
+		OFONO_UE_SIM_INFO-ID208-bit9,
+		*/
+		parcel_w_int32(&rilp, 0x80);
 	} else {
 		parcel_w_int32(&rilp, 0x0F);
+		parcel_w_int32(&rilp, 0x00);
+		parcel_w_int32(&rilp, 0x00);
 		parcel_w_int32(&rilp, 0x00);
 	}
 
