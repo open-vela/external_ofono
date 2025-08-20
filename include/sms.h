@@ -72,9 +72,9 @@ struct ofono_sms_driver {
 	void (*save_mcc_mnc)(void *driver_data, const char *mcc, const char *mnc);
 };
 
-void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
+ofono_bool_t ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 				int len, int tpdu_len);
-void ofono_sms_status_notify(struct ofono_sms *sms, const unsigned char *pdu,
+ofono_bool_t ofono_sms_status_notify(struct ofono_sms *sms, const unsigned char *pdu,
 				int len, int tpdu_len);
 
 int ofono_sms_driver_register(const struct ofono_sms_driver *d);

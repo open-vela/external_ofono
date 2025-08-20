@@ -2160,7 +2160,7 @@ static inline gboolean handle_mwi(struct ofono_sms *sms, struct sms *s)
 	return discard;
 }
 
-void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
+ofono_bool_t ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 				int len, int tpdu_len)
 {
 	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
@@ -2173,17 +2173,17 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 
 	if (!sms_decode(pdu, len, FALSE, tpdu_len, &s)) {
 		ofono_error("Unable to decode PDU");
-		return;
+		return FALSE;
 	}
 
 	if (s.type != SMS_TYPE_DELIVER) {
 		ofono_error("Expecting a DELIVER pdu");
-		return;
+		return FALSE;
 	}
 
 	if (s.deliver.pid == SMS_PID_TYPE_SM_TYPE_0) {
-		DBG("Explicitly ignoring type 0 SMS");
-		return;
+		ofono_info("Explicitly ignoring type 0 SMS");
+		return TRUE;
 	}
 
 	/*
@@ -2191,8 +2191,10 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 	 * headers and handle it like any other message
 	 */
 	if (s.deliver.pid == SMS_PID_TYPE_RETURN_CALL) {
-		if (handle_mwi(sms, &s))
-			return;
+		if (handle_mwi(sms, &s)) {
+			ofono_error("MWI handling for RETURN_CALL.");
+			return FALSE;
+		}
 
 		goto out;
 	}
@@ -2202,29 +2204,31 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 	 * and then handle the User-Data as any other message
 	 */
 	if (sms_mwi_dcs_decode(s.deliver.dcs, NULL, NULL, NULL, NULL)) {
-		if (handle_mwi(sms, &s))
-			return;
+		if (handle_mwi(sms, &s)) {
+			ofono_error("MWI handling for DCS.");
+			return FALSE;
+		}
 
 		goto out;
 	}
 
 	if (!sms_dcs_decode(s.deliver.dcs, &cls, NULL, NULL, NULL)) {
-		ofono_error("Unknown / Reserved DCS.  Ignoring");
-		return;
+		ofono_error("Unknown / Reserved DCS.");
+		return FALSE;
 	}
 
 	switch (s.deliver.pid) {
 	case SMS_PID_TYPE_ME_DOWNLOAD:
 		if (cls == SMS_CLASS_1) {
 			ofono_error("ME Download message ignored");
-			return;
+			return TRUE;
 		}
 
 		break;
 	case SMS_PID_TYPE_ME_DEPERSONALIZATION:
 		if (s.deliver.dcs == 0x11) {
 			ofono_error("ME Depersonalization message ignored");
-			return;
+			return TRUE;
 		}
 
 		break;
@@ -2235,17 +2239,23 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 			break;
 
 		sim = __ofono_atom_find(OFONO_ATOM_TYPE_SIM, modem);
-		if (sim == NULL)
-			return;
+		if (sim == NULL) {
+			ofono_error("SIM atom not found.");
+			return FALSE;
+		}
 
 		if (!__ofono_sim_service_available(sim,
 					SIM_UST_SERVICE_DATA_DOWNLOAD_SMS_PP,
-					SIM_SST_SERVICE_DATA_DOWNLOAD_SMS_PP))
-			return;
+					SIM_SST_SERVICE_DATA_DOWNLOAD_SMS_PP)) {
+			ofono_error("SIM service not available.");
+			return FALSE;
+		}
 
 		stk = __ofono_atom_find(OFONO_ATOM_TYPE_STK, modem);
-		if (stk == NULL)
-			return;
+		if (stk == NULL) {
+			ofono_error("STK atom not found.");
+			return FALSE;
+		}
 
 		__ofono_sms_sim_download(stk, &s, NULL, sms);
 
@@ -2255,7 +2265,7 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 		 *
 		 * TODO: store in EFsms if not handled
 		 */
-		return;
+		return TRUE;
 	default:
 		break;
 	}
@@ -2279,7 +2289,7 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 			if (iei > 0x25) {
 				ofono_error("Reserved / Unknown / USAT"
 						"header in use, ignore");
-				return;
+				return TRUE;
 			}
 
 			switch (iei) {
@@ -2290,13 +2300,15 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 				 * segment of a concatenated SM so as not
 				 * to repeat the indication.
 				 */
-				if (handle_mwi(sms, &s))
-					return;
+				if (handle_mwi(sms, &s)) {
+					ofono_error("MWI handling for sms iei.");
+					return FALSE;
+				}
 
 				goto out;
 			case SMS_IEI_WCMP:
-				ofono_error("No support for WCMP, ignoring");
-				return;
+				ofono_error("No support for WCMP.");
+				return FALSE;
 			default:
 				sms_udh_iter_next(&iter);
 			}
@@ -2305,9 +2317,10 @@ void ofono_sms_deliver_notify(struct ofono_sms *sms, const unsigned char *pdu,
 
 out:
 	handle_deliver(sms, &s);
+	return TRUE;
 }
 
-void ofono_sms_status_notify(struct ofono_sms *sms, const unsigned char *pdu,
+ofono_bool_t ofono_sms_status_notify(struct ofono_sms *sms, const unsigned char *pdu,
 				int len, int tpdu_len)
 {
 	struct sms s;
@@ -2317,25 +2330,26 @@ void ofono_sms_status_notify(struct ofono_sms *sms, const unsigned char *pdu,
 
 	if (!sms_decode(pdu, len, FALSE, tpdu_len, &s)) {
 		ofono_error("Unable to decode PDU");
-		return;
+		return FALSE;
 	}
 
 	if (s.type != SMS_TYPE_STATUS_REPORT) {
 		ofono_error("Expecting a STATUS REPORT pdu");
-		return;
+		return FALSE;
 	}
 
 	if (s.status_report.srq) {
 		ofono_error("Waiting an answer to SMS-SUBMIT, not SMS-COMMAND");
-		return;
+		return FALSE;
 	}
 
 	if (!sms_dcs_decode(s.status_report.dcs, &cls, NULL, NULL, NULL)) {
-		ofono_error("Unknown / Reserved DCS.  Ignoring");
-		return;
+		ofono_error("Unknown / Reserved DCS.");
+		return FALSE;
 	}
 
 	handle_sms_status_report(sms, &s);
+	return TRUE;
 }
 
 int ofono_sms_driver_register(const struct ofono_sms_driver *d)

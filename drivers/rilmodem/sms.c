@@ -643,13 +643,22 @@ static void ril_sms_notify(struct ril_msg *message, gpointer user_data)
 	smsc_len = pdu[0] + 1;
 	ofono_debug("smsc_len is %d", smsc_len);
 
-	if (message->req == RIL_UNSOL_RESPONSE_NEW_SMS)
+	if (message->req == RIL_UNSOL_RESPONSE_NEW_SMS) {
 		/* Last parameter is 'tpdu_len' ( substract SMSC length ) */
-		ofono_sms_deliver_notify(sms, pdu, ril_buf_len,
-						ril_buf_len - smsc_len);
-	else if (message->req == RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT)
-		ofono_sms_status_notify(sms, pdu, ril_buf_len,
-						ril_buf_len - smsc_len);
+		if (ofono_sms_deliver_notify(sms, pdu, ril_buf_len,
+						ril_buf_len - smsc_len) == FALSE) {
+			result = SMS_ACK_FAILURE;
+			error_code = SMS_ACK_PDU_DECODE_FAILED_ERROR_CODE;
+			goto fail;
+		}
+	} else if (message->req == RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT) {
+		if (ofono_sms_status_notify(sms, pdu, ril_buf_len,
+						ril_buf_len - smsc_len) == FALSE) {
+			result = SMS_ACK_FAILURE;
+			error_code = SMS_ACK_PDU_DECODE_FAILED_ERROR_CODE;
+			goto fail;
+		}
+	}
 
 fail:
 	if (!result) {
