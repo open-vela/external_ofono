@@ -2466,8 +2466,7 @@ static void sim_set_ready(struct ofono_sim *sim)
 
 	if (sim->state != OFONO_SIM_STATE_INSERTED &&
 			sim->state != OFONO_SIM_STATE_LOCKED_OUT) {
-		ofono_error("sim state is %d not inserted and locked out, error in %s",
-				sim->state, __func__);
+		ofono_info("%s: sim state is %d", __func__, sim->state);
 		return;
 	}
 
