@@ -136,14 +136,14 @@ struct ofono_plmn_op_code {
 		sendEventMisightF(923040203, "%s:%d", "data_active_time", data_active_time);       \
 	} while (0)
 
-#define OFONO_DFX_OOS_INFO()                                                                       \
+#define OFONO_DFX_OOS_INFO(network_type)                                                           \
 	do {                                                                                       \
-		sendEventMisightF(923040101, "%s:%d", "oosSubId", 0);                              \
+		sendEventMisightF(923040101, "%s:%s", "network_type", network_type);               \
 	} while (0)
 
-#define OFONO_DFX_OOS_DURATION_INFO(oos_duration)                                                  \
+#define OFONO_DFX_OOS_DURATION_INFO(cs_oos, ps_oos)                                                \
 	do {                                                                                       \
-		sendEventMisightF(923040102, "%s:%d", "oos_time", oos_duration);                   \
+		sendEventMisightF(923040102, "%s:%d,%s:%d", "cs_oos", cs_oos, "ps_oos", ps_oos);   \
 	} while (0)
 
 #define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
@@ -226,7 +226,7 @@ struct ofono_plmn_op_code {
 
 #define REPORT_DATA_LOG(format, ...)                                                               \
 	do {                                                                                       \
-		char log_buf[LOG_IND_BUF_SIZE] = {0};                                              \
+		char log_buf[LOG_IND_BUF_SIZE] = { 0 };                                            \
 		snprintf(log_buf, sizeof(log_buf), format, __VA_ARGS__);                           \
 		__ofono_manager_data_log(log_buf);                                                 \
 	} while (0)
@@ -257,10 +257,11 @@ struct ofono_plmn_op_code {
 #define OFONO_DFX_DATA_ACTIVE_DURATION(data_active_time)                                           \
 	REPORT_DATA_LOG("%s,%d", "DATA_ACTIVE_DURATION", data_active_time)
 
-#define OFONO_DFX_OOS_INFO() REPORT_DATA_LOG("%s,%s,%d", "OOS_INFO", "915300004", 0)
+#define OFONO_DFX_OOS_INFO(network_type)                                                           \
+	REPORT_DATA_LOG("%s,%s,%s", "OOS_INFO", "915300004", network_type)
 
-#define OFONO_DFX_OOS_DURATION_INFO(oos_duration)                                                  \
-	REPORT_DATA_LOG("%s,%d", "OOS_DURATION_INFO", oos_duration)
+#define OFONO_DFX_OOS_DURATION_INFO(cs_oos, ps_oos)                                                \
+	REPORT_DATA_LOG("%s,%d,%d", "OOS_DURATION_INFO", cs_oos, ps_oos)
 
 #define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
 	REPORT_DATA_LOG("%s,%d,%s", "ROAMING_INFO", roaming_country_code, covered_plmn)

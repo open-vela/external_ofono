@@ -99,6 +99,11 @@ struct ofono_gprs {
 	struct timespec internet_start_time;
 	int internet_active_duration;
 	int report_data_active_time_id;
+	int radio_status;
+	ofono_bool_t radio_on_oos_flag;
+	int oos_time_id;
+	int oos_duration;
+	struct timespec oos_start_time;
 };
 
 struct ipv4_settings {
@@ -1059,6 +1064,52 @@ static gboolean report_data_active_duration(gpointer user_data)
 	}
 	gprs->internet_active_duration = 0;
 
+	return TRUE;
+}
+
+void start_gprs_oos_time(struct ofono_gprs *gprs, char *tag)
+{
+	ofono_debug("%s,%s", __func__, tag);
+	if (gprs->oos_start_time.tv_sec == 0 && gprs->oos_start_time.tv_nsec == 0) {
+		clock_gettime(CLOCK_MONOTONIC, &gprs->oos_start_time);
+	} else {
+		ofono_debug("unexpect status in %s", __func__);
+	}
+}
+
+void stop_gprs_oos_time(struct ofono_gprs *gprs, char *tag)
+{
+	ofono_debug("%s,%s", __func__, tag);
+	if (gprs->oos_start_time.tv_sec > 0 || gprs->oos_start_time.tv_nsec > 0) {
+		struct timespec stop_time;
+
+		clock_gettime(CLOCK_MONOTONIC, &stop_time);
+		int temp_value = stop_time.tv_sec - gprs->oos_start_time.tv_sec;
+		if (gprs->radio_on_oos_flag && temp_value < NORMAL_REGISTER_DURATION) {
+			ofono_debug("%s ignore oos duration", __func__);
+		} else {
+			gprs->oos_duration = gprs->oos_duration + temp_value;
+		}
+		gprs->radio_on_oos_flag = FALSE;
+		memset(&gprs->oos_start_time, 0, sizeof(gprs->oos_start_time));
+	} else {
+		ofono_debug("unexpect status in %s", __func__);
+	}
+}
+
+static gboolean report_gprs_oos_duration(gpointer user_data)
+{
+	struct ofono_gprs *gprs = user_data;
+
+	if (gprs->oos_start_time.tv_sec > 0 || gprs->oos_start_time.tv_nsec > 0) {
+		stop_gprs_oos_time(gprs, "oos duration report");
+		start_gprs_oos_time(gprs, "oos duration report");
+	}
+	ofono_debug("%s,oos_duration:%d", __func__, gprs->oos_duration);
+	if (gprs->oos_duration > 0) {
+		OFONO_DFX_OOS_DURATION_INFO(0, gprs->oos_duration);
+	}
+	gprs->oos_duration = 0;
 	return TRUE;
 }
 
@@ -3659,6 +3710,20 @@ void ofono_gprs_status_notify(struct ofono_gprs *gprs, int status)
 		registration_status_to_string(status), status);
 
 	if (gprs->status != status) {
+		if ((gprs->status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
+		     gprs->status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
+		    (status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
+		     status != NETWORK_REGISTRATION_STATUS_ROAMING) &&
+		    gprs->radio_status == RADIO_STATUS_ON) {
+			OFONO_DFX_OOS_INFO("ps");
+			start_gprs_oos_time(gprs, "register status change");
+		} else if ((status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
+			    status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
+			   (gprs->status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
+			    gprs->status != NETWORK_REGISTRATION_STATUS_ROAMING)) {
+			stop_gprs_oos_time(gprs, "register status change");
+		}
+
 		gprs->status = status;
 
 		path = __ofono_atom_get_path(gprs->atom);
@@ -4240,6 +4305,8 @@ static void gprs_unregister(struct ofono_atom *atom)
 					OFONO_CONNECTION_MANAGER_INTERFACE);
 	g_source_remove(gprs->report_data_active_time_id);
 	report_data_active_duration(gprs);
+	g_source_remove(gprs->oos_time_id);
+	report_gprs_oos_duration(gprs);
 }
 
 static void gprs_handle_command(int command_id, void *data)
@@ -4291,6 +4358,23 @@ static void gprs_remove(struct ofono_atom *atom)
 	g_free(gprs);
 }
 
+static void gprs_radio_state_change(int state, void *data)
+{
+	struct ofono_atom *atom = data;
+	struct ofono_gprs *gprs = __ofono_atom_get_data(atom);
+
+	ofono_debug("gprs_radio_state_change:old:%d,new:%d", gprs->radio_status, state);
+	gprs->radio_status = state;
+
+	if (state == RADIO_STATUS_ON) {
+		gprs->radio_on_oos_flag = TRUE;
+		start_gprs_oos_time(gprs, "radio on");
+	}
+	if (state == RADIO_STATUS_OFF && gprs->radio_status != RADIO_STATUS_UNKNOWN) {
+		stop_gprs_oos_time(gprs, "radio off");
+	}
+}
+
 struct ofono_gprs *ofono_gprs_create(struct ofono_modem *modem,
 					unsigned int vendor,
 					const char *driver, void *data)
@@ -4309,6 +4393,8 @@ struct ofono_gprs *ofono_gprs_create(struct ofono_modem *modem,
 						gprs_remove, gprs);
 
 	__ofono_atom_setup_dispatcher(gprs->atom, gprs_handle_command);
+
+	__ofono_atom_add_radio_state_watch(gprs->atom, gprs_radio_state_change);
 
 	for (l = g_drivers; l; l = l->next) {
 		const struct ofono_gprs_driver *drv = l->data;
@@ -4881,6 +4967,7 @@ void ofono_gprs_register(struct ofono_gprs *gprs)
 	gprs->internet_active_duration = 0;
 	gprs->report_data_active_time_id = g_timeout_add(REPORTING_PERIOD,
 			report_data_active_duration, gprs);
+	gprs->oos_time_id = g_timeout_add(REPORTING_PERIOD, report_gprs_oos_duration, gprs);
 }
 
 void ofono_gprs_remove(struct ofono_gprs *gprs)

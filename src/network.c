@@ -1783,7 +1783,7 @@ static gboolean report_oos_duration(gpointer user_data)
 		start_record_oos_time(netreg);
 	}
 	if (netreg->oos_duration != 0) {
-		OFONO_DFX_OOS_DURATION_INFO(netreg->oos_duration);
+		OFONO_DFX_OOS_DURATION_INFO(netreg->oos_duration, 0);
 	}
 	netreg->oos_duration = 0;
 	return TRUE;
@@ -1858,7 +1858,7 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 			    (status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
 			     status != NETWORK_REGISTRATION_STATUS_ROAMING) &&
 			    netreg->radio_status == RADIO_STATUS_ON) {
-				OFONO_DFX_OOS_INFO();
+				OFONO_DFX_OOS_INFO("cs");
 				start_record_oos_time(netreg);
 			}
 		}
