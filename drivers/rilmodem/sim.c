@@ -309,14 +309,17 @@ static void ril_sim_read_info(struct ofono_sim *sim, int fileid,
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
 		ofono_error("%s, Couldn't build SIM read info request - NULL path", __func__);
-		goto error;
 	}
 
 	parcel_init(&rilp);
 
 	parcel_w_int32(&rilp, CMD_GET_RESPONSE);
 	parcel_w_int32(&rilp, fileid);
-	parcel_w_string(&rilp, hex_path);
+	if (hex_path == NULL) {
+		parcel_w_string(&rilp,"");
+        } else {
+		parcel_w_string(&rilp, hex_path);
+	}
 	parcel_w_int32(&rilp, 0);           /* P1 */
 	parcel_w_int32(&rilp, 0);           /* P2 */
 
@@ -351,7 +354,6 @@ static void ril_sim_read_info(struct ofono_sim *sim, int fileid,
 				ril_file_info_cb, cbd, g_free) > 0)
 		return;
 
-error:
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, -1, -1, -1, NULL,
 				EF_STATUS_INVALIDATED, data);
@@ -453,13 +455,16 @@ static void ril_sim_read_binary(struct ofono_sim *sim, int fileid,
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
 		ofono_error("%s: Couldn't build SIM read info request - NULL path", __func__);
-		goto error;
 	}
 
 	parcel_init(&rilp);
 	parcel_w_int32(&rilp, CMD_READ_BINARY);
 	parcel_w_int32(&rilp, fileid);
-	parcel_w_string(&rilp, hex_path);
+	if (hex_path == NULL) {
+		parcel_w_string(&rilp,"");
+        } else {
+		parcel_w_string(&rilp, hex_path);
+	}
 	parcel_w_int32(&rilp, start >> 8);   /* P1 */
 	parcel_w_int32(&rilp, start & 0xff); /* P2 */
 	parcel_w_int32(&rilp, length);         /* P3 */
@@ -482,7 +487,6 @@ static void ril_sim_read_binary(struct ofono_sim *sim, int fileid,
 				ril_file_io_cb, cbd, g_free) > 0)
 		return;
 
-error:
 	g_free(cbd);
 	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
 }
@@ -503,7 +507,7 @@ static void ril_sim_read_record(struct ofono_sim *sim, int fileid,
 	hex_path = get_path(g_ril_vendor(sd->ril),
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
-		ofono_error("Couldn't build SIM read info request - NULL path");
+		ofono_error("%s,Couldn't build SIM read info request - NULL path", __func__);
 		goto error;
 	}
 
@@ -556,7 +560,7 @@ static void ril_sim_update_binary(struct ofono_sim *sim, int fileid,
 	hex_path = get_path(g_ril_vendor(sd->ril),
 					sd->app_type, fileid, path, path_len);
 	if (hex_path == NULL) {
-		ofono_error("Couldn't build SIM read info request - NULL path");
+		ofono_error("%s,Couldn't build SIM read info request - NULL path", __func__);
 		goto error;
 	}
 
