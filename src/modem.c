@@ -155,6 +155,7 @@ static const char *modem_support_pending_list[] = { "SetProperty",
 						    "SetSignalReportThreshold",
 						    "SetModemStationary",
 						    "SetModemStationaryThreshold",
+						    "OemRequestRaw",
 						    NULL };
 static DBusMessage *modem_pop_message_from_queue(DBusConnection *connection,
 						 DBusMessage *msg, void *data);
