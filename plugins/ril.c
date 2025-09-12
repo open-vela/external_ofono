@@ -685,8 +685,11 @@ static void ril_enable_modem(struct ofono_modem *modem, ofono_bool_t enable,
 static void ril_suppress_message_report_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
 	ofono_modem_suppress_message_report_cb_t cb = cbd->cb;
 
+	g_ril_print_response_no_args(rd->ril, message);
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("set unsol message suppress fail");
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
@@ -772,8 +775,11 @@ static void ril_suppress_message_report(struct ofono_modem *modem, ofono_bool_t 
 static void ril_set_signal_report_Threshold_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
 	ofono_modem_set_signal_report_Threshold_cb_t cb = cbd->cb;
 
+	g_ril_print_response_no_args(rd->ril, message);
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("set signal report threshold fail");
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
@@ -812,8 +818,11 @@ static void ril_set_signal_report_Threshold(struct ofono_modem *modem, int type,
 static void ril_enable_modem_stationarys_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
 	ofono_modem_enable_modem_stationary_cb_t cb = cbd->cb;
 
+	g_ril_print_response_no_args(rd->ril, message);
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("set modem stationary fail");
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
@@ -846,8 +855,11 @@ static void ril_enable_modem_stationary(struct ofono_modem *modem, ofono_bool_t 
 static void ril_set_modem_stationary_threshold_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct ril_data *rd = ofono_modem_get_data(modem);
 	ofono_modem_set_modem_stationary_threshold_cb_t cb = cbd->cb;
 
+	g_ril_print_response_no_args(rd->ril, message);
 	if (message->error != RIL_E_SUCCESS) {
 		ofono_error("set modem stationary threshold fail");
 		CALLBACK_WITH_FAILURE(cb, cbd->data);
