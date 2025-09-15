@@ -3811,7 +3811,10 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 	}
 
 	ofono_info("Did not find a call with id: %d", call->id);
-
+	if (call->status == CALL_STATUS_ACTIVE || call->status == CALL_STATUS_DISCONNECTED) {
+		ofono_error("%s:new call with unexpected status:%d", __func__, call->status);
+		return;
+	}
 	__ofono_modem_callid_hold(modem, call->id);
 
 	newcall = g_memdup2(call, sizeof(struct ofono_call));
