@@ -22,6 +22,8 @@
 #ifndef __OFONO_LOG_H
 #define __OFONO_LOG_H
 
+#include <syslog.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,15 +33,19 @@ extern "C" {
  * @title: Logging premitives
  * @short_description: Functions for logging error and debug information
  */
+#define OFONO_TAG "[ofono]"
 
-extern void ofono_info(const char *format, ...)
-				__attribute__((format(printf, 1, 2)));
-extern void ofono_warn(const char *format, ...)
-				__attribute__((format(printf, 1, 2)));
-extern void ofono_error(const char *format, ...)
-				__attribute__((format(printf, 1, 2)));
-extern void ofono_debug(const char *format, ...)
-				__attribute__((format(printf, 1, 2)));
+#define ofono_info(format, ...) \
+		syslog(LOG_INFO, OFONO_TAG format, ##__VA_ARGS__)
+
+#define ofono_warn(format, ...) \
+		syslog(LOG_WARNING, OFONO_TAG format, ##__VA_ARGS__)
+
+#define ofono_error(format, ...) \
+		syslog(LOG_ERR, OFONO_TAG format, ##__VA_ARGS__)
+
+#define ofono_debug(format, ...) \
+		syslog(LOG_INFO, OFONO_TAG format, ##__VA_ARGS__)
 
 struct ofono_debug_desc {
 	const char *name;
