@@ -5383,7 +5383,7 @@ void ofono_voicecall_register(struct ofono_voicecall *vc)
 		modem, OFONO_ATOM_TYPE_NETREG, netreg_watch, vc, NULL);
 
 	vc->en_list = g_hash_table_new_full(g_str_hash, g_str_equal,
-							g_free, NULL);
+							g_free, g_free);
 
 	/*
 	 * Start out with the 22.101 mandated numbers, if we have a SIM and
