@@ -431,7 +431,7 @@ static void process_call_updates(struct ril_msg *message, gpointer user_data,
 		vd->local_release_call_ids = NULL;
 	}
 }
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 static void clcc_poll_cb(struct ril_msg *message, gpointer user_data)
 {
 	struct ofono_voicecall *vc = user_data;
@@ -473,7 +473,7 @@ gboolean ril_poll_clcc(gpointer user_data)
 	struct ofono_voicecall *vc = user_data;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
 		clcc_poll_cb, vc, NULL);
 #endif
@@ -520,12 +520,12 @@ static void generic_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	append_local_release_calls(vd, req->affected_types);
 #endif
 
 out:
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
 		clcc_poll_cb, req->vc, NULL);
 #endif
@@ -612,7 +612,7 @@ static void rild_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	/* CLCC will update the oFono call list with proper ids  */
 	if (!vd->clcc_source)
 		vd->clcc_source = g_timeout_add(POLL_CLCC_INTERVAL,
@@ -648,7 +648,7 @@ static void rild_conference_cb(struct ril_msg *message, gpointer user_data)
 	g_ril_print_response_no_args(vd->ril, message);
 
 out:
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
 		clcc_poll_cb, vc, NULL);
 #endif
@@ -779,7 +779,7 @@ static gboolean pending_call_check_held_all(gpointer user_data)
 		free(cbd);
 		need_check_again = FALSE;
 	} else {
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 		g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
 			clcc_poll_cb, req->vc, NULL);
 #endif
@@ -803,7 +803,7 @@ static void hold_before_dial_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	ofono_info("need wait calls held: get clcc");
 	/* get clcc respone to check active call held */
 	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
@@ -961,14 +961,13 @@ void ril_get_current_call(struct ril_msg *message, gpointer user_data)
 
 void ril_call_state_notify(struct ril_msg *message, gpointer user_data)
 {
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+	ril_get_current_call(message, user_data);
+#else
 	struct ofono_voicecall *vc = user_data;
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 	struct parcel rilp;
 	int num;
-
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
-	ril_get_current_call(message, user_data);
-#else
 	g_ril_print_unsol_no_args(vd->ril, message);
 	g_ril_init_parcel(message, &rilp);
 
@@ -1208,7 +1207,7 @@ static void ril_call_redirection_cb(struct ril_msg *message, gpointer user_data)
 
 	g_ril_print_response_no_args(vd->ril, message);
 
-#if !CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifndef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	g_ril_send(vd->ril, RIL_REQUEST_GET_CURRENT_CALLS, NULL,
 		clcc_poll_cb, req->vc, NULL);
 #endif
@@ -1263,7 +1262,7 @@ void ril_release_all_held(struct ofono_voicecall *vc,
 {
 	int ret;
 
-#if CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifdef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 	append_local_release_calls(vd, AFFECTED_STATES_WB);
 #endif
@@ -1279,7 +1278,7 @@ void ril_release_all_active(struct ofono_voicecall *vc,
 {
 	int ret;
 
-#if CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifdef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 	append_local_release_calls(vd, AFFECTED_STATES_FG);
 #endif
@@ -1293,7 +1292,7 @@ void ril_release_all_active(struct ofono_voicecall *vc,
 void ril_set_udub(struct ofono_voicecall *vc,
 			ofono_voicecall_cb_t cb, void *data)
 {
-#if CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
+#ifdef CONFIG_OFONO_CALL_STATE_CHANGE_WITH_DATA
 	struct ril_voicecall_data *vd = ofono_voicecall_get_data(vc);
 	append_local_release_calls(vd, AFFECTED_STATES_WB);
 #endif
