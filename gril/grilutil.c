@@ -463,6 +463,10 @@ const char *ril_request_id_to_string(int req)
 		return "RIL_REQUEST_SET_EMERGENCY_NUMBER";
 	case RIL_REQUEST_ENABLE_ABNORMAL_EVENT:
 		return "RIL_REQUEST_ENABLE_ABNORMAL_EVENT";
+	case RIL_REQUEST_MODEM_UPGRADE_CMD:
+		return "RIL_REQUEST_MODEM_UPGRADE_CMD";
+	case RIL_REQUEST_MODEM_UPGRADE_CHECK:
+		return "RIL_REQUEST_MODEM_UPGRADE_CHECK";
 	default:
 		return "<INVALID>";
 	}
@@ -557,6 +561,8 @@ const char *ril_unsol_request_to_string(int request)
 		return "RIL_UNSOL_UICC_APPLICATIONS_ENABLEMENT_CHANGED";
 	case RIL_UNSOL_ABNORMAL_EVENT:
 		return "RIL_UNSOL_ABNORMAL_EVENT";
+	case RIL_UNSOL_MODEM_UPGRADE_STATE_CHANGED:
+		return "RIL_UNSOL_MODEM_UPGRADE_STATE_CHANGED";
 	default:
 		return "<unknown request>";
 	}

@@ -76,6 +76,10 @@ typedef void (*ofono_modem_enable_modem_stationary_cb_t)(const struct ofono_erro
 
 typedef void (*ofono_modem_set_modem_stationary_threshold_cb_t)(const struct ofono_error *error,
 								void *data);
+typedef void (*ofono_check_modem_upgrade_status_cb_t)(const struct ofono_error *error,
+						      int upgrade_state, void *data);
+typedef void (*ofono_upgrade_modem_cmd_cb_t)(const struct ofono_error *error, int error_code,
+					     void *data);
 
 struct ofono_modem_driver {
 	const char *name;
@@ -150,6 +154,10 @@ struct ofono_modem_driver {
 	void (*set_modem_stationary_threshold)(struct ofono_modem *modem, int value,
 					       ofono_modem_set_modem_stationary_threshold_cb_t cb,
 					       void *data);
+	void (*check_modem_upgrade_status)(struct ofono_modem *modem,
+					   ofono_check_modem_upgrade_status_cb_t cb, void *data);
+	void (*upgrade_modem_cmd)(struct ofono_modem *modem, int cmd_id,
+				  ofono_upgrade_modem_cmd_cb_t cb, void *data);
 };
 
 void ofono_modem_add_interface(struct ofono_modem *modem,
@@ -212,6 +220,8 @@ void ofono_modem_set_powered_timeout_hint(struct ofono_modem *modem,
 
 ofono_bool_t ofono_modem_check_and_save_band(struct ofono_modem *modem,
 					     unsigned int band);
+
+void ofono_modem_upgrade_state(struct ofono_modem *modem, int state_value, int ext_info);
 
 #ifdef __cplusplus
 }
