@@ -11,7 +11,7 @@
 #define MAX_MCC_LENGTH 3
 #define MAX_MNC_LENGTH 3
 
-#define LOG_IND_BUF_SIZE 200
+#define LOG_IND_BUF_SIZE 350
 
 #ifndef LOG_DEBUG
 #define LOG_DEBUG 7
