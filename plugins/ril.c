@@ -468,6 +468,30 @@ static void ril_abnormal_event(struct ril_msg *message, gpointer user_data)
 	g_free(data);
 }
 
+static void ril_modem_upgrade_state_changed(struct ril_msg *message, gpointer user_data)
+{
+	struct ofono_modem *modem = (struct ofono_modem *) user_data;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct parcel rilp;
+	int state_value = 0;
+	int ext_info = -1;
+	int param_num = 0;
+
+	ofono_info("[%d,UNSOL]< %s", g_ril_get_slot(rd->ril),
+		   g_ril_unsol_request_to_string(rd->ril, message->req));
+	g_ril_init_parcel(message, &rilp);
+	if (rilp.malformed) {
+		ofono_error("%s: malformed parcel received", __func__);
+		return;
+	}
+	param_num = parcel_r_int32(&rilp);
+	state_value = parcel_r_int32(&rilp);
+	if (param_num == 2) {
+		ext_info = parcel_r_int32(&rilp);
+	}
+	ofono_modem_upgrade_state(modem, state_value, ext_info);
+}
+
 static int create_gril(struct ofono_modem *modem)
 {
 	struct ril_data *rd = ofono_modem_get_data(modem);
@@ -518,6 +542,8 @@ static int create_gril(struct ofono_modem *modem)
 	g_ril_register(rd->ril, RIL_UNSOL_ABNORMAL_EVENT,
 			ril_abnormal_event, modem);
 
+	g_ril_register(rd->ril, RIL_UNSOL_MODEM_UPGRADE_STATE_CHANGED,
+		       ril_modem_upgrade_state_changed, modem);
 	return 0;
 }
 
@@ -1065,6 +1091,86 @@ static void ril_request_oem_hook_strings(struct ofono_modem *modem, char *oem_re
 	CALLBACK_WITH_FAILURE(cb, NULL, 0, data);
 }
 
+static void ril_check_modem_upgrade_status_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	ofono_check_modem_upgrade_status_cb_t cb = cbd->cb;
+
+	g_ril_print_response_no_args(rd->ril, message);
+	if (message->error != RIL_E_SUCCESS) {
+		ofono_error("check modem upgrade status fail");
+		CALLBACK_WITH_FAILURE(cb, -1, cbd->data);
+	} else {
+		int upgrade_state;
+		int num;
+
+		g_ril_init_parcel(message, &rilp);
+		num = parcel_r_int32(&rilp);
+		if (num != 1) {
+			ofono_error("param number is not correct");
+		}
+		upgrade_state = parcel_r_int32(&rilp);
+		CALLBACK_WITH_SUCCESS(cb, upgrade_state, cbd->data);
+	}
+}
+
+static void ril_check_modem_upgrade_status(struct ofono_modem *modem,
+					   ofono_check_modem_upgrade_status_cb_t cb, void *data)
+{
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	if (g_ril_send(rd->ril, RIL_REQUEST_MODEM_UPGRADE_CHECK, NULL,
+		       ril_check_modem_upgrade_status_cb, cbd, g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, -1, data);
+}
+
+static void ril_upgrade_modem_cmd_cb(struct ril_msg *message, gpointer user_data)
+{
+	struct cb_data *cbd = user_data;
+	struct ofono_modem *modem = cbd->user;
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	ofono_upgrade_modem_cmd_cb_t cb = cbd->cb;
+
+	g_ril_print_response_no_args(rd->ril, message);
+	if (message->error != RIL_E_SUCCESS) {
+		int error_code;
+
+		ofono_error("%s:modem upgrade cmd fail", __func__);
+		g_ril_init_parcel(message, &rilp);
+		parcel_r_int32(&rilp);
+		error_code = parcel_r_int32(&rilp);
+		CALLBACK_WITH_FAILURE(cb, error_code, cbd->data);
+	} else {
+		CALLBACK_WITH_SUCCESS(cb, 0, cbd->data);
+	}
+}
+
+static void ril_upgrade_modem_cmd(struct ofono_modem *modem, int cmd_id,
+				  ofono_upgrade_modem_cmd_cb_t cb, void *data)
+{
+	struct parcel rilp;
+	struct ril_data *rd = ofono_modem_get_data(modem);
+	struct cb_data *cbd = cb_data_new(cb, data, modem);
+
+	parcel_init(&rilp);
+	parcel_w_int32(&rilp, 1);
+	parcel_w_int32(&rilp, cmd_id);
+	if (g_ril_send(rd->ril, RIL_REQUEST_MODEM_UPGRADE_CMD, &rilp, ril_upgrade_modem_cmd_cb, cbd,
+		       g_free) > 0)
+		return;
+
+	g_free(cbd);
+	CALLBACK_WITH_FAILURE(cb, -1, data);
+}
+
 static struct ofono_modem_driver ril_driver = {
 	.name = "ril",
 	.probe = ril_probe,
@@ -1085,6 +1191,8 @@ static struct ofono_modem_driver ril_driver = {
 	.set_signal_report_Threshold = ril_set_signal_report_Threshold,
 	.enable_modem_stationary = ril_enable_modem_stationary,
 	.set_modem_stationary_threshold = ril_set_modem_stationary_threshold,
+	.check_modem_upgrade_status = ril_check_modem_upgrade_status,
+	.upgrade_modem_cmd = ril_upgrade_modem_cmd,
 };
 
 /*

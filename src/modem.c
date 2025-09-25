@@ -156,6 +156,8 @@ static const char *modem_support_pending_list[] = { "SetProperty",
 						    "SetModemStationary",
 						    "SetModemStationaryThreshold",
 						    "OemRequestRaw",
+						    "CheckModemUpgradeState",
+						    "ModemUpgradeCmd",
 						    NULL };
 static DBusMessage *modem_pop_message_from_queue(DBusConnection *connection,
 						 DBusMessage *msg, void *data);
@@ -2327,6 +2329,103 @@ static DBusMessage *modem_handle_command(DBusConnection *conn,
 	return reply;
 }
 
+static void check_modem_upgrade_status_cb(const struct ofono_error *error, int upgrade_state,
+					  void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("Error occurs when check modem upgrade status.");
+
+		if (modem->pending) {
+			reply = __ofono_error_failed(modem->pending);
+			__ofono_dbus_pending_reply(&modem->pending, reply);
+		}
+
+		return;
+	}
+
+	if (modem->pending) {
+		reply = dbus_message_new_method_return(modem->pending);
+		dbus_message_iter_init_append(reply, &iter);
+
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &upgrade_state);
+
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
+}
+
+static DBusMessage *modem_check_upgrade_state(DBusConnection *conn, DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+
+	if (modem->driver->check_modem_upgrade_status == NULL)
+		return __ofono_error_not_implemented(msg);
+
+	if (modem->pending)
+		return __ofono_error_busy(msg);
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->check_modem_upgrade_status(modem, check_modem_upgrade_status_cb, modem);
+
+	return NULL;
+}
+
+static void upgrade_modem_cmd_cb(const struct ofono_error *error, int error_code, void *data)
+{
+	struct ofono_modem *modem = data;
+	DBusMessage *reply;
+
+	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		ofono_error("%s:Error occurs when upgrade modem cmd.error_code=%d", __func__,
+			    error_code);
+
+		if (modem->pending) {
+			reply = __ofono_error_failed(modem->pending);
+			__ofono_dbus_pending_reply(&modem->pending, reply);
+		}
+
+		return;
+	}
+
+	if (modem->pending) {
+		reply = dbus_message_new_method_return(modem->pending);
+		__ofono_dbus_pending_reply(&modem->pending, reply);
+	}
+}
+
+static DBusMessage *modem_upgrade_cmd(DBusConnection *conn, DBusMessage *msg, void *data)
+{
+	struct ofono_modem *modem = data;
+	int cmd_id;
+
+	if (modem->pending) {
+		ofono_error("%s: Modem [%s] is currently busy.", __func__,
+			    ofono_modem_get_path(modem));
+		return __ofono_error_busy(msg);
+	}
+
+	if (modem->driver->upgrade_modem_cmd == NULL) {
+		ofono_error("%s: Modem [%s] driver's 'upgrade_modem_cmd' function is not "
+			    "implemented.",
+			    __func__, ofono_modem_get_path(modem));
+		return __ofono_error_not_implemented(msg);
+	}
+
+	if (dbus_message_get_args(msg, NULL, DBUS_TYPE_INT32, &cmd_id, DBUS_TYPE_INVALID) ==
+	    FALSE) {
+		ofono_error("%s: Failed to parse DBus message arguments.", __func__);
+		return __ofono_error_invalid_args(msg);
+	}
+
+	modem->pending = dbus_message_ref(msg);
+	modem->driver->upgrade_modem_cmd(modem, cmd_id, upgrade_modem_cmd_cb, modem);
+
+	return NULL;
+}
+
 static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_METHOD("GetProperties",
 			NULL, GDBUS_ARGS({ "properties", "a{sv}" }),
@@ -2381,6 +2480,12 @@ static const GDBusMethodTable modem_methods[] = {
 	{ GDBUS_ASYNC_METHOD("SetModemStationaryThreshold",
 			GDBUS_ARGS({ "value", "i" }), NULL,
 			modem_set_modem_stationary_threshold) },
+	{ GDBUS_ASYNC_METHOD("CheckModemUpgradeState",
+			NULL, GDBUS_ARGS({ "upgrade_state", "i" }),
+			modem_check_upgrade_state) },
+	{ GDBUS_ASYNC_METHOD("ModemUpgradeCmd",
+			GDBUS_ARGS({ "cmd_id", "i" }), GDBUS_ARGS({ "error_code", "i" }),
+			modem_upgrade_cmd) },
 	{ }
 };
 
@@ -2391,6 +2496,7 @@ static const GDBusSignalTable modem_signals[] = {
 	{ GDBUS_SIGNAL("OemHookIndication",
 			GDBUS_ARGS({ "response", "ay" })) },
 	{ GDBUS_SIGNAL("DeviceInfoChanged", NULL) },
+	{ GDBUS_SIGNAL("ModemUpgradeStateChanged", GDBUS_ARGS({ "state", "i" }, { "info", "i" })) },
 	{ }
 };
 
@@ -2589,6 +2695,25 @@ void ofono_modem_restart(struct ofono_modem *modem)
 		return;
 	}
 
+	g_dbus_send_message(conn, signal);
+}
+
+void ofono_modem_upgrade_state(struct ofono_modem *modem,int state_value, int ext_info)
+{
+	DBusConnection *conn = ofono_dbus_get_connection();
+	DBusMessage *signal;
+	DBusMessageIter iter;
+
+	signal = dbus_message_new_signal(modem->path, OFONO_MODEM_INTERFACE,
+					"ModemUpgradeStateChanged");
+
+	if (signal == NULL) {
+		ofono_error("%s: Failed to create D-Bus signal for 'ModemUpgradeStateChanged' event.", __func__);
+		return;
+	}
+	dbus_message_iter_init_append(signal, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &state_value);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_INT32, &ext_info);
 	g_dbus_send_message(conn, signal);
 }
 
