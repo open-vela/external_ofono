@@ -11,7 +11,7 @@
 #define MAX_MCC_LENGTH 3
 #define MAX_MNC_LENGTH 3
 
-#define LOG_IND_BUF_SIZE 350
+#define DFX_LOG_IND_BUF_SIZE 350
 
 #ifndef LOG_DEBUG
 #define LOG_DEBUG 7
@@ -226,7 +226,7 @@ struct ofono_plmn_op_code {
 
 #define REPORT_DATA_LOG(format, ...)                                                               \
 	do {                                                                                       \
-		char log_buf[LOG_IND_BUF_SIZE] = { 0 };                                            \
+		char log_buf[DFX_LOG_IND_BUF_SIZE] = { 0 };                                            \
 		snprintf(log_buf, sizeof(log_buf), format, __VA_ARGS__);                           \
 		__ofono_manager_data_log(log_buf);                                                 \
 	} while (0)
