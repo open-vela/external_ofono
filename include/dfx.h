@@ -93,21 +93,21 @@ struct ofono_plmn_op_code {
 #ifdef CONFIG_TELEPHONY_DFX
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
 	do {                                                                                       \
-		sendEventMisightF(923040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
+		sendEventMisightF(961040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
 				  "direction", direction, "media", media, "fail_scenario",         \
 				  fail_scenario, "fail_reason", fail_reason);                      \
 	} while (0)
 
 #define OFONO_DFX_SS_INFO(type, fail_reason)                                                       \
 	do {                                                                                       \
-		sendEventMisightF(923040401, "%s:%s,%s:%s", "ss_type", type, "fail_reason",        \
+		sendEventMisightF(961040401, "%s:%s,%s:%s", "ss_type", type, "fail_reason",        \
 				  fail_reason);                                                    \
 	} while (0)
 
 #define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration, level2_duration,                \
 				 level3_duration, level4_duration, level5_duration)                \
 	do {                                                                                       \
-		sendEventMisightF(923040002, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d",                \
+		sendEventMisightF(961040002, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d",                \
 				  "level0_time_value", level0_duration, "level1_time_value",       \
 				  level1_duration, "level2_time_value", level2_duration,           \
 				  "level3_time_value", level3_duration, "level4_time_value",       \
@@ -116,51 +116,51 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_SMS_INFO(opcode, sms_type, direction, fail_flag, covered_plmn)                   \
 	do {                                                                                       \
-		sendEventMisightF(923040301, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "op_code", opcode,   \
+		sendEventMisightF(961040301, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "op_code", opcode,   \
 				  "sms_type", sms_type, "direction", direction, "fail_flag",       \
 				  fail_flag, "plmn", covered_plmn);                                \
 	} while (0)
 
 #define OFONO_DFX_DATA_INTERRUPTION_INFO()                                                         \
 	do {                                                                                       \
-		sendEventMisightF(923040201, "%s:%d", "data_interruption", 1);                     \
+		sendEventMisightF(961040201, "%s:%d", "data_interruption", 1);                     \
 	} while (0)
 
 #define OFONO_DFX_DATA_ACTIVE_FAIL(cause)                                                          \
 	do {                                                                                       \
-		sendEventMisightF(923040202, "%s:%s", "cause", cause);                             \
+		sendEventMisightF(961040202, "%s:%s", "cause", cause);                             \
 	} while (0)
 
 #define OFONO_DFX_DATA_ACTIVE_DURATION(data_active_time)                                           \
 	do {                                                                                       \
-		sendEventMisightF(923040203, "%s:%d", "data_active_time", data_active_time);       \
+		sendEventMisightF(961040203, "%s:%d", "data_active_time", data_active_time);       \
 	} while (0)
 
 #define OFONO_DFX_OOS_INFO(network_type)                                                           \
 	do {                                                                                       \
-		sendEventMisightF(923040101, "%s:%s", "network_type", network_type);               \
+		sendEventMisightF(961040101, "%s:%s", "network_type", network_type);               \
 	} while (0)
 
 #define OFONO_DFX_OOS_DURATION_INFO(cs_oos, ps_oos)                                                \
 	do {                                                                                       \
-		sendEventMisightF(923040102, "%s:%d,%s:%d", "cs_oos", cs_oos, "ps_oos", ps_oos);   \
+		sendEventMisightF(961040102, "%s:%d,%s:%d", "cs_oos", cs_oos, "ps_oos", ps_oos);   \
 	} while (0)
 
 #define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
 	do {                                                                                       \
-		sendEventMisightF(923040103, "%s:%d,%s:%s", "roaming_country_code",                \
+		sendEventMisightF(961040103, "%s:%d,%s:%s", "roaming_country_code",                \
 				  roaming_country_code, "plmn", covered_plmn);                     \
 	} while (0)
 
 #define OFONO_DFX_BAND_INFO(band)                                                                  \
 	do {                                                                                       \
-		sendEventMisightF(923040104, "%s:%d", "band_value", band);                         \
+		sendEventMisightF(961040104, "%s:%d", "band_value", band);                         \
 	} while (0)
 
 #define OFONO_DFX_SIGNAL_LEVEL_DURATION(level0_duration, level1_duration, level2_duration,         \
 					level3_duration, level4_duration, level5_duration)         \
 	do {                                                                                       \
-		sendEventMisightF(923040105, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d", "level0_time", \
+		sendEventMisightF(961040105, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%d,%s:%d", "level0_time", \
 				  level0_duration, "level1_time", level1_duration, "level2_time",  \
 				  level2_duration, "level3_time", level3_duration, "level4_time",  \
 				  level4_duration, "level5_time", level5_duration);                \
@@ -169,25 +169,25 @@ struct ofono_plmn_op_code {
 #define OFONO_DFX_RAT_DURATION(unknow_rat_duration, rat_2g_duration, rat_3g_duration,              \
 			       rat_4g_duration)                                                    \
 	do {                                                                                       \
-		sendEventMisightF(923040106, "%s:%d,%s:%d,%s:%d", "2g_time", rat_2g_duration,      \
+		sendEventMisightF(961040106, "%s:%d,%s:%d,%s:%d", "2g_time", rat_2g_duration,      \
 				  "3g_time", rat_3g_duration, "4g_time", rat_4g_duration);         \
 	} while (0)
 
 #define OFONO_DFX_IMS_DURATION(ims_duration)                                                       \
 	do {                                                                                       \
-		sendEventMisightF(923040107, "%s:%d", "volte_time", ims_duration);                 \
+		sendEventMisightF(961040107, "%s:%d", "volte_time", ims_duration);                 \
 	} while (0)
 
 #define OFONO_DFX_MODEM_DURATION_INFO(modem_deactive_duration, modem_active_duration)              \
 	do {                                                                                       \
-		sendEventMisightF(923040108, "%s:%d,%s:%d", "modem_on_time",                       \
+		sendEventMisightF(961040108, "%s:%d,%s:%d", "modem_on_time",                       \
 				  modem_deactive_duration, "modem_off_time",                       \
 				  modem_active_duration);                                          \
 	} while (0)
 
 #define OFONO_DFX_ABNORMAL_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                    \
 	do {                                                                                       \
-		sendEventMisightF(915200012,                                                       \
+		sendEventMisightF(961040501,                                                       \
 				  "%s:%s,%s:%s,%s:%s,%s:%s,%s:%s,"                                 \
 				  "%s:%s",                                                         \
 				  "parm1", parm1, "parm2", parm2, "parm3", parm3, "parm4", parm4,  \
@@ -196,7 +196,7 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_MODEM_COMMON_EVENT_INFO(parm1, parm2, parm3, parm4, parm5, parm6)                \
 	do {                                                                                       \
-		sendEventMisightF(915200013,                                                       \
+		sendEventMisightF(961040502,                                                       \
 				  "%s:%s,%s:%u,%s:%u,%s:%u,%s:%u,"                                 \
 				  "%s:%u",                                                         \
 				  "parm1", parm1, "parm2", parm2, "parm3", parm3, "parm4", parm4,  \
@@ -205,20 +205,20 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_NETWORK_SIGNAL_CHANGED_COUNT(signal_changed_count, network_state_changed_count)  \
 	do {                                                                                       \
-		sendEventMisightF(915200014, "%s:%d,%s:%d", "signal_changed_count",                \
+		sendEventMisightF(961040109, "%s:%d,%s:%d", "signal_changed_count",                \
 				  signal_changed_count, "network_state_changed_count",             \
 				  network_state_changed_count);                                    \
 	} while (0)
 
 #define OFONO_DFX_IMS_STATE_CHANGED_COUNT(ims_state_changed_count)                                 \
 	do {                                                                                       \
-		sendEventMisightF(915200015, "%s:%d", "ims_state_changed_count",                   \
+		sendEventMisightF(961040110, "%s:%d", "ims_state_changed_count",                   \
 				  ims_state_changed_count);                                        \
 	} while (0)
 
 #define OFONO_DFX_CELL_INFO_CHANGED_COUNT(cellinfo_changed_count)                                  \
 	do {                                                                                       \
-		sendEventMisightF(915200016, "%s:%d", "cellinfo_changed_count",                    \
+		sendEventMisightF(961040111, "%s:%d", "cellinfo_changed_count",                    \
 				  cellinfo_changed_count);                                         \
 	} while (0)
 
