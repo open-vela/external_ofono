@@ -95,14 +95,14 @@ struct ofono_plmn_op_code {
 #ifdef CONFIG_TELEPHONY_DFX
 #define OFONO_DFX_CALL_INFO(type, direction, media, fail_scenario, fail_reason)                    \
 	do {                                                                                       \
-		sendEventMisightF(923040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
+		sendEventMisightF(961040001, "%s:%d,%s:%d,%s:%d,%s:%d,%s:%s", "call_type", type,   \
 				  "direction", direction, "media", media, "fail_scenario",         \
 				  fail_scenario, "fail_reason", fail_reason);                      \
 	} while (0)
 
 #define OFONO_DFX_SS_INFO(type, fail_reason, covered_plmn)                                         \
 	do {                                                                                       \
-		sendEventMisightF(923040401, "%s:%s,%s:%s,%s:%s", "ss_type", type, "fail_reason",  \
+		sendEventMisightF(961040401, "%s:%s,%s:%s,%s:%s", "ss_type", type, "fail_reason",  \
 				  fail_reason, "covered_plmn", covered_plmn);                      \
 	} while (0)
 
@@ -156,7 +156,7 @@ struct ofono_plmn_op_code {
 
 #define OFONO_DFX_BAND_INFO(band, count)                                                           \
 	do {                                                                                       \
-		sendEventMisightF(923040104, "%s:%d,%s:%d", "band_value", band, "band_count",      \
+		sendEventMisightF(961040104, "%s:%d,%s:%d", "band_value", band, "band_count",      \
 				  count);                                                          \
 	} while (0)
 
