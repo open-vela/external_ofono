@@ -404,8 +404,7 @@ static void ril_connected(struct ril_msg *message, gpointer user_data)
 	struct ofono_modem *modem = (struct ofono_modem *) user_data;
 	struct ril_data *rd = ofono_modem_get_data(modem);
 
-	ofono_info("[%d,UNSOL]< %s", g_ril_get_slot(rd->ril),
-		g_ril_unsol_request_to_string(rd->ril, message->req));
+	g_ril_print_unsol(rd->ril, message);
 
 	/* TODO: need a disconnect function to restart things! */
 	rd->connected = TRUE;
@@ -420,8 +419,7 @@ static void ril_modem_restart(struct ril_msg *message, gpointer user_data)
 	struct ofono_modem *modem = (struct ofono_modem *) user_data;
 	struct ril_data *rd = ofono_modem_get_data(modem);
 
-	ofono_info("[%d,UNSOL]< %s", g_ril_get_slot(rd->ril),
-		g_ril_unsol_request_to_string(rd->ril, message->req));
+	g_ril_print_unsol(rd->ril, message);
 
 	ofono_modem_restart(modem);
 }
@@ -477,8 +475,7 @@ static void ril_modem_upgrade_state_changed(struct ril_msg *message, gpointer us
 	int ext_info = -1;
 	int param_num = 0;
 
-	ofono_info("[%d,UNSOL]< %s", g_ril_get_slot(rd->ril),
-		   g_ril_unsol_request_to_string(rd->ril, message->req));
+	g_ril_print_unsol(rd->ril, message);
 	g_ril_init_parcel(message, &rilp);
 	if (rilp.malformed) {
 		ofono_error("%s: malformed parcel received", __func__);
