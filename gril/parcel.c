@@ -74,8 +74,10 @@ int32_t parcel_r_int32(struct parcel *p)
 {
 	int32_t ret;
 
-	if (p->malformed)
+	if (p->malformed) {
+		ofono_error("%s: parcel is malformed", __func__);
 		return 0;
+	}
 
 	if (p->offset + sizeof(int32_t) > p->size) {
 		ofono_error("%s: parcel is too small", __func__);
@@ -172,8 +174,10 @@ char *parcel_r_string(struct parcel *p)
 	int len16 = parcel_r_int32(p);
 	int strbytes;
 
-	if (p->malformed)
+	if (p->malformed) {
+		ofono_error("%s: parcel is malformed", __func__);
 		return NULL;
+	}
 
 	/* This is how a null string is sent */
 	if (len16 < 0)
@@ -204,8 +208,10 @@ void parcel_skip_string(struct parcel *p)
 	int len16 = parcel_r_int32(p);
 	int strbytes;
 
-	if (p->malformed)
+	if (p->malformed) {
+		ofono_error("%s: parcel is malformed", __func__);
 		return;
+	}
 
 	/* This is how a null string is sent */
 	if (len16 < 0)
@@ -272,8 +278,10 @@ void *parcel_r_raw(struct parcel *p, int *len)
 
 	*len = parcel_r_int32(p);
 
-	if (p->malformed || *len <= 0)
+	if (p->malformed || *len <= 0) {
+		ofono_error("%s: parcel is malformed or len is too small", __func__);
 		return NULL;
+	}
 
 	if (p->offset + *len > p->size) {
 		ofono_error("%s: parcel is too small", __func__);
@@ -304,8 +312,10 @@ char **parcel_r_strv(struct parcel *p)
 	int num_str = parcel_r_int32(p);
 	char **strv;
 
-	if (p->malformed || num_str <= 0)
+	if (p->malformed || num_str <= 0) {
+		ofono_error("%s: parcel is malformed or num_str is too small", __func__);
 		return NULL;
+	}
 
 	strv = g_new0(char *, num_str + 1);
 
@@ -329,12 +339,16 @@ struct parcel_str_array *parcel_r_str_array(struct parcel *p)
 	struct parcel_str_array *str_arr;
 	int num_str = parcel_r_int32(p);
 
-	if (p->malformed || num_str <= 0)
+	if (p->malformed || num_str <= 0) {
+		ofono_error("%s: parcel is malformed or num_str is too small", __func__);
 		return NULL;
+	}
 
 	str_arr = g_try_malloc0(sizeof(*str_arr) + (num_str + 1) * sizeof(char *));
-	if (str_arr == NULL)
+	if (str_arr == NULL) {
+		ofono_error("%s: out of memory", __func__);
 		return NULL;
+	}
 
 	str_arr->num_str = num_str;
 	for (i = 0; i < num_str; ++i)
@@ -344,6 +358,7 @@ struct parcel_str_array *parcel_r_str_array(struct parcel *p)
 
 	if (p->malformed) {
 		parcel_free_str_array(str_arr);
+		ofono_error("%s: parcel is malformed", __func__);
 		return NULL;
 	}
 
