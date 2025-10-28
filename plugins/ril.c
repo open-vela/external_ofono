@@ -238,7 +238,6 @@ void ril_pre_sim(struct ofono_modem *modem)
 	ofono_radio_settings_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_devinfo_create(modem, rd->vendor, RILMODEM, rd->ril);
 	ofono_voicecall_create(modem, rd->vendor, RILMODEM, rd->ril);
-	ofono_call_volume_create(modem, rd->vendor, RILMODEM, rd->ril);
 
 	if(rd->sim_watch_for_phonebook == 0)
 		ofono_phonebook_pre_create(modem);

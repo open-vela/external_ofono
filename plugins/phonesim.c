@@ -884,7 +884,6 @@ static void phonesim_post_online(struct ofono_modem *modem)
 
 	ofono_call_meter_create(modem, 0, "atmodem", data->chat);
 	ofono_call_barring_create(modem, 0, "atmodem", data->chat);
-	ofono_call_volume_create(modem, 0, "atmodem", data->chat);
 
 	if (!data->calypso)
 		ofono_cbs_create(modem, 0, "atmodem", data->chat);
@@ -1026,7 +1025,6 @@ static void localhfp_pre_sim(struct ofono_modem *modem)
 
 	ofono_voicecall_create(modem, 0, "hfpmodem", info);
 	ofono_netreg_create(modem, 0, "hfpmodem", info);
-	ofono_call_volume_create(modem, 0, "hfpmodem", info);
 	ofono_handsfree_create(modem, 0, "hfpmodem", info);
 	ofono_siri_create(modem, 0, "hfpmodem", info);
 }

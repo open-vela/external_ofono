@@ -106,7 +106,6 @@ struct voicecall {
 	time_t detect_time;
 	char *message;
 	uint8_t icon_id;
-	gboolean untracked;
 	gboolean dial_result_handled;
 	ofono_bool_t remote_held;
 	ofono_bool_t remote_multiparty;
@@ -3710,8 +3709,6 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 	GSList *l;
 	struct voicecall *call;
-	time_t ts;
-	enum call_status prev_status;
 	const char *number;
 
 	ofono_info("Got disconnection event for id: %d, reason: %d", id, reason);
@@ -3728,9 +3725,6 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	}
 
 	call = l->data;
-
-	ts = time(NULL);
-	prev_status = call->call->status;
 
 	l = g_slist_find_custom(vc->multiparty_list, GUINT_TO_POINTER(id),
 				call_compare_by_id);
@@ -3754,16 +3748,6 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	}
 
 	voicecall_set_call_status(call, CALL_STATUS_DISCONNECTED);
-
-	if (!call->untracked) {
-		if (prev_status == CALL_STATUS_INCOMING ||
-				prev_status == CALL_STATUS_WAITING)
-			__ofono_history_call_missed(modem, call->call, ts);
-		else
-			__ofono_history_call_ended(modem, call->call,
-							call->detect_time, ts);
-	}
-
 	voicecalls_emit_call_removed(vc, call);
 	voicecalls_emit_call_changed(vc, call);
 
@@ -3854,12 +3838,6 @@ void ofono_voicecall_notify(struct ofono_voicecall *vc,
 		req->message = NULL;
 		req->call = v;
 
-		/*
-		 * TS 102 223 Section 6.4.13: The terminal shall not store
-		 * in the UICC the call set-up details (called party number
-		 * and associated parameters)
-		 */
-		v->untracked = TRUE;
 		vc->flags &= ~VOICECALL_FLAG_STK_MODEM_CALLSETUP;
 	}
 
@@ -5496,13 +5474,6 @@ static void dial_request_cb(const struct ofono_error *error, void *data)
 
 	vc->dial_req->message = NULL;
 	vc->dial_req->call = v;
-
-	/*
-	 * TS 102 223 Section 6.4.13: The terminal shall not store
-	 * in the UICC the call set-up details (called party number
-	 * and associated parameters)
-	 */
-	v->untracked = TRUE;
 
 	if (v->call->status == CALL_STATUS_ACTIVE)
 		dial_request_finish(vc);

@@ -427,7 +427,7 @@ static void brsf_cb(gboolean ok, GAtResult *result, gpointer user_data)
 
 		memset(str, 0, sizeof(str));
 
-		if (ofono_handsfree_audio_has_wideband())
+		if (FALSE)
 			sprintf(str, "AT+BAC=%d,%d", HFP_CODEC_CVSD,
 							HFP_CODEC_MSBC);
 		else

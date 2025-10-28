@@ -31,9 +31,6 @@
 extern void ril_devinfo_init(void);
 extern void ril_devinfo_exit(void);
 
-extern void ril_call_volume_init(void);
-extern void ril_call_volume_exit(void);
-
 extern void ril_voicecall_init(void);
 extern void ril_voicecall_exit(void);
 

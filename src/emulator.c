@@ -1633,8 +1633,6 @@ void __ofono_emulator_slc_condition(struct ofono_emulator *em,
 		ofono_info("SLC reached");
 		em->slc = TRUE;
 
-		ofono_handsfree_card_register(em->card);
-
 	default:
 		break;
 	}

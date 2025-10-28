@@ -753,7 +753,6 @@ static void sms_tx_queue_remove_entry(struct ofono_sms *sms, GList *entry_list,
 					enum message_state tx_state)
 {
 	struct tx_queue_entry *entry = entry_list->data;
-	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
 
 	g_queue_delete_link(sms->txq, entry_list);
 
@@ -761,28 +760,6 @@ static void sms_tx_queue_remove_entry(struct ofono_sms *sms, GList *entry_list,
 
 	if (entry->cb)
 		entry->cb(tx_state == MESSAGE_STATE_SENT, entry->data);
-
-	if (entry->flags & OFONO_SMS_SUBMIT_FLAG_RECORD_HISTORY) {
-		enum ofono_history_sms_status hs;
-
-		switch(tx_state) {
-		case MESSAGE_STATE_SENT:
-			hs = OFONO_HISTORY_SMS_STATUS_SUBMITTED;
-			break;
-		case MESSAGE_STATE_FAILED:
-			hs = OFONO_HISTORY_SMS_STATUS_SUBMIT_FAILED;
-			break;
-		case MESSAGE_STATE_CANCELLED:
-			hs = OFONO_HISTORY_SMS_STATUS_SUBMIT_CANCELLED;
-			break;
-		default:
-			ofono_error("Unexpected sms state %d", tx_state);
-			goto done;
-		}
-
-		__ofono_history_sms_send_status(modem, &entry->uuid,
-								time(NULL), hs);
-	}
 
 	if (entry->flags & OFONO_SMS_SUBMIT_FLAG_EXPOSE_DBUS) {
 		struct message *m;
@@ -801,7 +778,6 @@ static void sms_tx_queue_remove_entry(struct ofono_sms *sms, GList *entry_list,
 		}
 	}
 
-done:
 	tx_queue_entry_destroy(entry);
 }
 
@@ -1163,7 +1139,6 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 	const char *to;
 	const char *text;
 	GSList *msg_list;
-	struct ofono_modem *modem;
 	unsigned int flags;
 	gboolean use_16bit_ref = FALSE;
 	int err;
@@ -1226,9 +1201,6 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 		ofono_error("%s: SMS submission failed with error: %d", __func__, err);
 		return __ofono_error_failed(msg);
 	}
-
-	modem = __ofono_atom_get_modem(sms->atom);
-	__ofono_history_sms_send_pending(modem, &uuid, to, time(NULL), text);
 
 	return NULL;
 }
@@ -1884,7 +1856,6 @@ static void dispatch_text_message(struct ofono_sms *sms,
 					const struct sms_address *addr,
 					const struct sms_scts *scts)
 {
-	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
 	DBusConnection *conn = ofono_dbus_get_connection();
 	const char *path = __ofono_atom_get_path(sms->atom);
 	DBusMessage *signal;
@@ -1949,9 +1920,6 @@ static void dispatch_text_message(struct ofono_sms *sms,
 
 		notify(str, &remote, &local, message, h->item.notify_data);
 	}
-
-	__ofono_history_sms_received(modem, uuid, str, &remote, &local,
-					message);
 }
 
 static void sms_dispatch(struct ofono_sms *sms, GSList *sms_list)
@@ -2108,7 +2076,6 @@ static void handle_deliver(struct ofono_sms *sms, const struct sms *incoming)
 static void handle_sms_status_report(struct ofono_sms *sms,
 						const struct sms *incoming)
 {
-	struct ofono_modem *modem = __ofono_atom_get_modem(sms->atom);
 	gboolean delivered;
 	const char *is_delivered = "1";
 	const char *not_delivered = "0";
@@ -2139,10 +2106,6 @@ static void handle_sms_status_report(struct ofono_sms *sms,
 		delivered ? &is_delivered : &not_delivered);
 
 	g_dbus_send_message(conn, signal);
-
-	__ofono_history_sms_send_status(modem, &uuid, time(NULL),
-			delivered ? OFONO_HISTORY_SMS_STATUS_DELIVERED :
-			OFONO_HISTORY_SMS_STATUS_DELIVER_FAILED);
 }
 
 
