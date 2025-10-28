@@ -3161,7 +3161,7 @@ static void stk_unregister(struct ofono_atom *atom)
 
 	if (stk->default_agent) {
 		stk_agent_free(stk->default_agent);
-		stk->session_agent = NULL;
+		stk->default_agent = NULL;
 	}
 
 	if (stk->pending_cmd) {
