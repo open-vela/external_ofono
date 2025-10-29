@@ -86,7 +86,6 @@ struct ofono_netreg {
 	const struct ofono_netreg_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
-	unsigned int hfp_watch;
 	unsigned int spn_watch;
 	unsigned int radio_online_watch;
 	struct timespec oos_start_time;
@@ -1757,25 +1756,6 @@ static void signal_strength_callback(const struct ofono_error *error,
 	ofono_netreg_strength_notify(netreg, strength);
 }
 
-static void notify_emulator_status(struct ofono_atom *atom, void *data)
-{
-	struct ofono_emulator *em = __ofono_atom_get_data(atom);
-
-	switch (GPOINTER_TO_INT(data)) {
-	case NETWORK_REGISTRATION_STATUS_REGISTERED:
-		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_SERVICE, 1);
-		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_ROAMING, 0);
-		break;
-	case NETWORK_REGISTRATION_STATUS_ROAMING:
-		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_SERVICE, 1);
-		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_ROAMING, 1);
-		break;
-	default:
-		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_SERVICE, 0);
-		ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_ROAMING, 0);
-	}
-}
-
 void start_record_oos_time(struct ofono_netreg *netreg)
 {
 	ofono_debug("%s", __func__);
@@ -1886,8 +1866,6 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 		__ofono_atom_get_path(netreg->atom), status, tech, lac, ci, denial);
 
 	if (netreg->status != status) {
-		struct ofono_modem *modem;
-
 		if ((status == NETWORK_REGISTRATION_STATUS_REGISTERED ||
 		     status == NETWORK_REGISTRATION_STATUS_ROAMING) &&
 		    (netreg->status != NETWORK_REGISTRATION_STATUS_REGISTERED &&
@@ -1909,12 +1887,6 @@ void ofono_netreg_status_notify(struct ofono_netreg *netreg, int status,
 		set_registration_status(netreg, status);
 
 		update_signal_level_duration(netreg);
-
-		modem = __ofono_atom_get_modem(netreg->atom);
-		__ofono_modem_foreach_registered_atom(modem,
-					OFONO_ATOM_TYPE_EMULATOR_HFP,
-					notify_emulator_status,
-					GINT_TO_POINTER(netreg->status));
 	}
 
 	if (netreg->location != lac)
@@ -2062,17 +2034,6 @@ static void init_registration_status(const struct ofono_error *error,
 	}
 }
 
-static void notify_emulator_strength(struct ofono_atom *atom, void *data)
-{
-	struct ofono_emulator *em = __ofono_atom_get_data(atom);
-	int val = 0;
-
-	if (GPOINTER_TO_INT(data) > 0)
-		val = (GPOINTER_TO_INT(data) - 1) / 20 + 1;
-
-	ofono_emulator_set_indicator(em, OFONO_EMULATOR_IND_SIGNAL, val);
-}
-
 static gboolean report_signal_level_info(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
@@ -2183,10 +2144,6 @@ void ofono_netreg_strength_notify(struct ofono_netreg *netreg, int strength)
 		}
 
 		modem = __ofono_atom_get_modem(netreg->atom);
-		__ofono_modem_foreach_registered_atom(modem,
-					OFONO_ATOM_TYPE_EMULATOR_HFP,
-					notify_emulator_strength,
-					GINT_TO_POINTER(netreg->signal_strength));
 		ofono_voicecall_update_call_duration(__ofono_atom_find(OFONO_ATOM_TYPE_VOICECALL,
 					modem), netreg);
 		update_signal_level_duration(netreg);
@@ -2508,13 +2465,6 @@ void ofono_netreg_driver_unregister(const struct ofono_netreg_driver *d)
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
 
-static void emulator_remove_handler(struct ofono_atom *atom, void *data)
-{
-	struct ofono_emulator *em = __ofono_atom_get_data(atom);
-
-	ofono_emulator_remove_handler(em, data);
-}
-
 static void netreg_unregister(struct ofono_atom *atom)
 {
 	struct ofono_netreg *netreg = __ofono_atom_get_data(atom);
@@ -2522,22 +2472,6 @@ static void netreg_unregister(struct ofono_atom *atom)
 	struct ofono_modem *modem = __ofono_atom_get_modem(atom);
 	const char *path = __ofono_atom_get_path(atom);
 	GSList *l;
-
-	__ofono_modem_foreach_registered_atom(modem,
-						OFONO_ATOM_TYPE_EMULATOR_HFP,
-						notify_emulator_status,
-						GINT_TO_POINTER(0));
-	__ofono_modem_foreach_registered_atom(modem,
-						OFONO_ATOM_TYPE_EMULATOR_HFP,
-						notify_emulator_strength,
-						GINT_TO_POINTER(0));
-
-	__ofono_modem_foreach_registered_atom(modem,
-						OFONO_ATOM_TYPE_EMULATOR_HFP,
-						emulator_remove_handler,
-						"+COPS");
-
-	__ofono_modem_remove_atom_watch(modem, netreg->hfp_watch);
 
 	__ofono_watchlist_free(netreg->status_watches);
 	netreg->status_watches = NULL;
@@ -2930,67 +2864,6 @@ static void sim_watch(struct ofono_atom *atom,
 	sim_state_watch(ofono_sim_get_state(sim), netreg);
 }
 
-static void emulator_cops_cb(struct ofono_emulator *em,
-			struct ofono_emulator_request *req, void *userdata)
-{
-	struct ofono_netreg *netreg = userdata;
-	struct ofono_error result;
-	int val;
-	char name[17];
-	char buf[32];
-
-	result.error = 0;
-
-	switch (ofono_emulator_request_get_type(req)) {
-	case OFONO_EMULATOR_REQUEST_TYPE_SET:
-		ofono_emulator_request_next_number(req, &val);
-		if (val != 3)
-			goto fail;
-
-		ofono_emulator_request_next_number(req, &val);
-		if (val != 0)
-			goto fail;
-
-		result.type = OFONO_ERROR_TYPE_NO_ERROR;
-		ofono_emulator_send_final(em, &result);
-		break;
-
-	case OFONO_EMULATOR_REQUEST_TYPE_QUERY:
-		strncpy(name, get_operator_display_name(netreg), 16);
-		name[16] = '\0';
-		sprintf(buf, "+COPS: %d,0,\"%s\"", netreg->mode, name);
-		ofono_emulator_send_info(em, buf, TRUE);
-		result.type = OFONO_ERROR_TYPE_NO_ERROR;
-		ofono_emulator_send_final(em, &result);
-		break;
-
-	default:
-fail:
-		result.type = OFONO_ERROR_TYPE_FAILURE;
-		ofono_emulator_send_final(em, &result);
-	};
-}
-
-static void emulator_hfp_init(struct ofono_atom *atom, void *data)
-{
-	struct ofono_netreg *netreg = data;
-	struct ofono_emulator *em = __ofono_atom_get_data(atom);
-
-	notify_emulator_status(atom, GINT_TO_POINTER(netreg->status));
-	notify_emulator_strength(atom,
-				GINT_TO_POINTER(netreg->signal_strength));
-
-	ofono_emulator_add_handler(em, "+COPS", emulator_cops_cb, data, NULL);
-}
-
-static void emulator_hfp_watch(struct ofono_atom *atom,
-				enum ofono_atom_watch_condition cond,
-				void *data)
-{
-	if (cond == OFONO_ATOM_WATCH_CONDITION_REGISTERED)
-		emulator_hfp_init(atom, data);
-}
-
 static void radio_online_watch_cb(struct ofono_modem *modem,
 						ofono_bool_t online,
 						void *data)
@@ -3052,10 +2925,6 @@ void ofono_netreg_register(struct ofono_netreg *netreg)
 					netreg, NULL);
 
 	__ofono_atom_register(netreg->atom, netreg_unregister);
-
-	netreg->hfp_watch = __ofono_modem_add_atom_watch(modem,
-					OFONO_ATOM_TYPE_EMULATOR_HFP,
-					emulator_hfp_watch, netreg, NULL);
 
 	netreg->signal_strength_data = g_new0(struct ofono_signal_strength, 1);
 	if (netreg->signal_strength_data) {
