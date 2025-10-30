@@ -1003,9 +1003,9 @@ static void ril_ss_notify(struct ril_msg *message, gpointer user_data)
 	/* 0 stands for MO intermediate, 1 for MT unsolicited */
 	/* TODO How do we know the affected call? Refresh call list? */
 	if (notif_type == 1)
-		ofono_voicecall_ssn_mt_notify(vc, 0, code, index, &number);
+		ofono_voicecall_ssn_mt_notify(vc, index, code, index, &number);
 	else
-		ofono_voicecall_ssn_mo_notify(vc, 0, code, index);
+		ofono_voicecall_ssn_mo_notify(vc, index, code, index);
 }
 
 static void ril_ecc_list_notify(struct ril_msg *message, gpointer user_data)
