@@ -116,10 +116,10 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 	covert_data = l_util_from_hexstring(data, &len);
 	if (covert_data == NULL) {
 		ofono_error("covert_data is NULL");
-		l_free(covert_data);
 		return;
 	}
 	if (len * 2 != data_len) {
+		l_free(covert_data);
 		ofono_error("data len mismatch %zu,%d", len, data_len);
 		return;
 	}
