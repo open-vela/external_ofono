@@ -62,6 +62,8 @@ struct ofono_call_barring {
 	const struct ofono_call_barring_driver *driver;
 	void *driver_data;
 	struct ofono_atom *atom;
+	struct ofono_netreg *netreg;
+	unsigned int netreg_watch;
 };
 
 struct call_barring_lock {
@@ -318,6 +320,20 @@ static void cb_ss_query_next_lock(struct ofono_call_barring *cb)
 			cb_ss_query_next_lock_callback, cb);
 }
 
+static void get_covered_plmn(struct ofono_call_barring *cb, char *covered_plmn)
+{
+	const char *mcc;
+	const char *mnc;
+
+	if (cb->netreg == NULL) {
+		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		return;
+	}
+	mcc = ofono_netreg_get_mcc(cb->netreg);
+	mnc = ofono_netreg_get_mnc(cb->netreg);
+	get_covered_plmn_from_util(covered_plmn, mcc, mnc);
+}
+
 static void cb_ss_set_lock_callback(const struct ofono_error *error,
 		void *data)
 {
@@ -326,12 +342,15 @@ static void cb_ss_set_lock_callback(const struct ofono_error *error,
 
 	memset(reason_desc, 0, sizeof(reason_desc));
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cb, covered_plmn);
 		ofono_error("Enabling/disabling Call Barring via SS failed with err: %s",
-			telephony_error_to_str(error));
+			    telephony_error_to_str(error));
 		__ofono_dbus_pending_reply(&cb->pending,
-			__ofono_error_from_error(error, cb->pending));
+					   __ofono_error_from_error(error, cb->pending));
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
-		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", reason_desc);
+		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", reason_desc, covered_plmn);
 		return;
 	}
 
@@ -492,11 +511,14 @@ static void cb_set_passwd_callback(const struct ofono_error *error, void *data)
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR)
 		reply = dbus_message_new_method_return(cb->pending);
 	else {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cb, covered_plmn);
 		ofono_error("Changing Call Barring password via SS failed with err: %s",
-				telephony_error_to_str(error));
+			    telephony_error_to_str(error));
 		reply = __ofono_error_from_error(error, cb->pending);
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
-		OFONO_DFX_SS_INFO("ss:set callbarring:change password", reason_desc);
+		OFONO_DFX_SS_INFO("ss:set callbarring:change password", reason_desc, covered_plmn);
 	}
 
 	__ofono_dbus_pending_reply(&cb->pending, reply);
@@ -672,7 +694,10 @@ static void get_query_lock_callback(const struct ofono_error *error,
 		if (cb->query_next == CB_ALL_END)
 			cb->flags |= CALL_BARRING_FLAG_CACHED;
 	} else {
-		OFONO_DFX_SS_INFO("ss:request callbarring", "modem fail");
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cb, covered_plmn);
+		OFONO_DFX_SS_INFO("ss:request callbarring", "modem fail", covered_plmn);
 	}
 
 	if (cb->query_next < CB_ALL_END) {
@@ -764,10 +789,12 @@ static void set_lock_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_barring *cb = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cb, covered_plmn);
 		ofono_error("Enabling/disabling a lock failed");
-		__ofono_dbus_pending_reply(&cb->pending,
-					__ofono_error_failed(cb->pending));
-		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", "modem fail");
+		__ofono_dbus_pending_reply(&cb->pending, __ofono_error_failed(cb->pending));
+		OFONO_DFX_SS_INFO("ss:set callbarring:UNKNOW", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -943,10 +970,12 @@ static void disable_all_callback(const struct ofono_error *error, void *data)
 	struct ofono_call_barring *cb = data;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cb, covered_plmn);
 		ofono_error("Disabling all barring failed");
-		__ofono_dbus_pending_reply(&cb->pending,
-					__ofono_error_failed(cb->pending));
-		OFONO_DFX_SS_INFO("ss:set callbarring:disable all", "modem fail");
+		__ofono_dbus_pending_reply(&cb->pending, __ofono_error_failed(cb->pending));
+		OFONO_DFX_SS_INFO("ss:set callbarring:disable all", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -1114,6 +1143,18 @@ void ofono_call_barring_driver_unregister(const struct ofono_call_barring_driver
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
 
+static void netreg_watch(struct ofono_atom *atom, enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_call_barring *cb = data;
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		cb->netreg = NULL;
+		return;
+	}
+
+	cb->netreg = __ofono_atom_get_data(atom);
+}
+
 static void call_barring_unregister(struct ofono_atom *atom)
 {
 	struct ofono_call_barring *cb = __ofono_atom_get_data(atom);
@@ -1129,6 +1170,11 @@ static void call_barring_unregister(struct ofono_atom *atom)
 
 	if (cb->ussd_watch)
 		__ofono_modem_remove_atom_watch(modem, cb->ussd_watch);
+
+	if (cb->netreg_watch) {
+		__ofono_modem_remove_atom_watch(modem, cb->netreg_watch);
+		cb->netreg_watch = 0;
+	}
 }
 
 static void call_barring_remove(struct ofono_atom *atom)
@@ -1229,6 +1275,9 @@ void ofono_call_barring_register(struct ofono_call_barring *cb)
 					ussd_watch, cb, NULL);
 
 	__ofono_atom_register(cb->atom, call_barring_unregister);
+
+	cb->netreg_watch =
+		__ofono_modem_add_atom_watch(modem, OFONO_ATOM_TYPE_NETREG, netreg_watch, cb, NULL);
 }
 
 void ofono_call_barring_remove(struct ofono_call_barring *cb)

@@ -127,3 +127,5 @@ unsigned char *convert_ucs2_to_gsm(const unsigned char *text, long len,
 					unsigned char terminator);
 
 bool is_ofono_interface_supported(enum ofono_interface interface);
+
+void get_covered_plmn_from_util(char *covered_plmn, const char *mcc, const char *mnc);
