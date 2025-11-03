@@ -100,10 +100,10 @@ struct ofono_plmn_op_code {
 				  fail_scenario, "fail_reason", fail_reason);                      \
 	} while (0)
 
-#define OFONO_DFX_SS_INFO(type, fail_reason)                                                       \
+#define OFONO_DFX_SS_INFO(type, fail_reason, covered_plmn)                                         \
 	do {                                                                                       \
-		sendEventMisightF(961040401, "%s:%s,%s:%s", "ss_type", type, "fail_reason",        \
-				  fail_reason);                                                    \
+		sendEventMisightF(923040401, "%s:%s,%s:%s,%s:%s", "ss_type", type, "fail_reason",  \
+				  fail_reason, "covered_plmn", covered_plmn);                      \
 	} while (0)
 
 #define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration, level2_duration,                \
@@ -238,8 +238,8 @@ struct ofono_plmn_op_code {
 	REPORT_DATA_LOG("%s,%d,%d,%d,%d,%s", "CALL_INFO", type, direction, media, fail_scenario,   \
 			fail_reason)
 
-#define OFONO_DFX_SS_INFO(type, fail_reason)                                                       \
-	REPORT_DATA_LOG("%s,%s,%s", "SS_INFO", type, fail_reason)
+#define OFONO_DFX_SS_INFO(type, fail_reason, covered_plmn)                                         \
+	REPORT_DATA_LOG("%s,%s,%s,%s", "SS_INFO", type, fail_reason, covered_plmn)
 
 #define OFONO_DFX_CALL_TIME_INFO(level0_duration, level1_duration, level2_duration,                \
 				 level3_duration, level4_duration, level5_duration)                \

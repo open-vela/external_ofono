@@ -34,6 +34,7 @@
 #include "ofono.h"
 
 #include "common.h"
+#include "util.h"
 
 #define CALL_SETTINGS_FLAG_CACHED 0x1
 
@@ -113,6 +114,8 @@ struct ofono_call_settings {
 	void *driver_data;
 	struct ofono_atom *atom;
 	GQueue *cs_queue;
+	struct ofono_netreg *netreg;
+	unsigned int netreg_watch;
 };
 
 static const char *cs_support_pending_list[] = { "SetCallWaiting",
@@ -1447,17 +1450,33 @@ static DBusMessage *cs_set_property(DBusConnection *conn, DBusMessage *msg,
 	return __ofono_error_invalid_args(msg);
 }
 
+static void get_covered_plmn(struct ofono_call_settings *cs, char *covered_plmn)
+{
+	const char *mcc;
+	const char *mnc;
+
+	if (cs->netreg == NULL) {
+		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		return;
+	}
+	mcc = ofono_netreg_get_mcc(cs->netreg);
+	mnc = ofono_netreg_get_mnc(cs->netreg);
+	get_covered_plmn_from_util(covered_plmn, mcc, mnc);
+}
+
 static void set_call_waiting_cb(const struct ofono_error *error, void *data)
 {
 	struct ofono_call_settings *cs = data;
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
 		ofono_error("Error occurred during setting call waiting !");
 
-		__ofono_dbus_pending_reply(&cs->pending,
-					__ofono_error_failed(cs->pending));
-		OFONO_DFX_SS_INFO("ss:set call waiting", "modem fail");
+		__ofono_dbus_pending_reply(&cs->pending, __ofono_error_failed(cs->pending));
+		OFONO_DFX_SS_INFO("ss:set call waiting", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -1475,13 +1494,17 @@ static void get_call_waiting_cb(const struct ofono_error *error,
 	int i, value = 0;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("Error occurs during get call waiting status !");
 
 		if (cs->pending) {
 			reply = __ofono_error_failed(cs->pending);
 			__ofono_dbus_pending_reply(&cs->pending, reply);
 		}
-		OFONO_DFX_SS_INFO("ss:get call waiting", "modem fail");
+		OFONO_DFX_SS_INFO("ss:get call waiting", "modem fail", covered_plmn);
 
 		return;
 	}
@@ -1521,8 +1544,12 @@ static DBusMessage *cs_set_call_waiting(DBusConnection *conn,
 	}
 
 	if (cs->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("%s: Call setting is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:set call waiting", "busy");
+		OFONO_DFX_SS_INFO("ss:set call waiting", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1559,8 +1586,12 @@ static DBusMessage *cs_get_call_waiting(DBusConnection *conn,
 	}
 
 	if (cs->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("%s: Call setting is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:get call waiting", "busy");
+		OFONO_DFX_SS_INFO("ss:get call waiting", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1577,11 +1608,14 @@ static void set_clir_cb(const struct ofono_error *error, void *data)
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("Error occurred during setting clir !");
 
-		__ofono_dbus_pending_reply(&cs->pending,
-					__ofono_error_failed(cs->pending));
-		OFONO_DFX_SS_INFO("ss:set clir", "modem fail");
+		__ofono_dbus_pending_reply(&cs->pending, __ofono_error_failed(cs->pending));
+		OFONO_DFX_SS_INFO("ss:set clir", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -1598,11 +1632,14 @@ static void get_clir_cb(const struct ofono_error *error,
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("Error occurred during setting clir !");
 
-		__ofono_dbus_pending_reply(&cs->pending,
-					__ofono_error_failed(cs->pending));
-		OFONO_DFX_SS_INFO("ss:get clir", "modem fail");
+		__ofono_dbus_pending_reply(&cs->pending, __ofono_error_failed(cs->pending));
+		OFONO_DFX_SS_INFO("ss:get clir", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -1632,8 +1669,12 @@ static DBusMessage *cs_set_clir(DBusConnection *conn,
 	}
 
 	if (cs->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("%s: Call setting is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:set clir", "busy");
+		OFONO_DFX_SS_INFO("ss:set clir", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1674,8 +1715,12 @@ static DBusMessage *cs_get_clir(DBusConnection *conn,
 	}
 
 	if (cs->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cs, covered_plmn);
+
 		ofono_error("%s: Call setting is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:get clir", "busy");
+		OFONO_DFX_SS_INFO("ss:get clir", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1824,6 +1869,18 @@ void ofono_call_settings_driver_unregister(const struct ofono_call_settings_driv
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
 
+static void netreg_watch(struct ofono_atom *atom, enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_call_settings *cs = data;
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		cs->netreg = NULL;
+		return;
+	}
+
+	cs->netreg = __ofono_atom_get_data(atom);
+}
+
 static void call_settings_unregister(struct ofono_atom *atom)
 {
 	struct ofono_call_settings *cs = __ofono_atom_get_data(atom);
@@ -1842,6 +1899,11 @@ static void call_settings_unregister(struct ofono_atom *atom)
 
 	g_queue_free_full(cs->cs_queue, cs_free_pending_data);
 	cs->cs_queue = NULL;
+
+	if (cs->netreg_watch) {
+		__ofono_modem_remove_atom_watch(modem, cs->netreg_watch);
+		cs->netreg_watch = 0;
+	}
 }
 
 static void call_settings_remove(struct ofono_atom *atom)
@@ -1944,6 +2006,9 @@ void ofono_call_settings_register(struct ofono_call_settings *cs)
 	__ofono_atom_register(cs->atom, call_settings_unregister);
 
 	cs->cs_queue = g_queue_new();
+
+	cs->netreg_watch =
+		__ofono_modem_add_atom_watch(modem, OFONO_ATOM_TYPE_NETREG, netreg_watch, cs, NULL);
 }
 
 void ofono_call_settings_remove(struct ofono_call_settings *cs)

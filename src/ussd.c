@@ -63,6 +63,8 @@ struct ofono_ussd {
 	void *driver_data;
 	struct ofono_atom *atom;
 	struct ussd_request *req;
+	struct ofono_netreg *netreg;
+	unsigned int netreg_watch;
 };
 
 struct ssc_entry {
@@ -549,6 +551,20 @@ free:
 	g_free(utf8_str);
 }
 
+static void get_covered_plmn(struct ofono_ussd *ussd, char *covered_plmn)
+{
+	const char *mcc;
+	const char *mnc;
+
+	if (ussd->netreg == NULL) {
+		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		return;
+	}
+	mcc = ofono_netreg_get_mcc(ussd->netreg);
+	mnc = ofono_netreg_get_mnc(ussd->netreg);
+	get_covered_plmn_from_util(covered_plmn, mcc, mnc);
+}
+
 static void ussd_callback(const struct ofono_error *error, void *data)
 {
 	struct ofono_ussd *ussd = data;
@@ -556,11 +572,13 @@ static void ussd_callback(const struct ofono_error *error, void *data)
 	char reason_desc[REASON_DESC_SIZE];
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("ussd request failed with error: %s",
-				telephony_error_to_str(error));
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(ussd, covered_plmn);
+		ofono_error("ussd request failed with error: %s", telephony_error_to_str(error));
 		reply = __ofono_error_failed(ussd->pending);
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
-		OFONO_DFX_SS_INFO("ss:ussd:request", reason_desc);
+		OFONO_DFX_SS_INFO("ss:ussd:request", reason_desc, covered_plmn);
 		if (ussd->pending == NULL)
 			return;
 		__ofono_dbus_pending_reply(&ussd->pending, reply);
@@ -642,10 +660,12 @@ static void ussd_response_callback(const struct ofono_error *error, void *data)
 	char reason_desc[REASON_DESC_SIZE];
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("ussd response failed with error: %s",
-				telephony_error_to_str(error));
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(ussd, covered_plmn);
+		ofono_error("ussd response failed with error: %s", telephony_error_to_str(error));
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
-		OFONO_DFX_SS_INFO("ss:ussd:response", reason_desc);
+		OFONO_DFX_SS_INFO("ss:ussd:response", reason_desc, covered_plmn);
 	}
 
 	if (error->type == OFONO_ERROR_TYPE_NO_ERROR) {
@@ -670,8 +690,11 @@ static DBusMessage *ussd_respond(DBusConnection *conn, DBusMessage *msg,
 	long num_packed;
 
 	if (ussd->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(ussd, covered_plmn);
 		ofono_error("%s: USSD service is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:ussd:response", "busy");
+		OFONO_DFX_SS_INFO("ss:ussd:response", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -718,13 +741,15 @@ static void ussd_cancel_callback(const struct ofono_error *error, void *data)
 	char reason_desc[REASON_DESC_SIZE];
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
-		ofono_error("ussd cancel failed with error: %s",
-				telephony_error_to_str(error));
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(ussd, covered_plmn);
+		ofono_error("ussd cancel failed with error: %s", telephony_error_to_str(error));
 
 		reply = __ofono_error_failed(ussd->cancel);
 		__ofono_dbus_pending_reply(&ussd->cancel, reply);
 		snprintf(reason_desc, REASON_DESC_SIZE, "modem fail:%d", error->error);
-		OFONO_DFX_SS_INFO("ss:ussd:cancel", reason_desc);
+		OFONO_DFX_SS_INFO("ss:ussd:cancel", reason_desc, covered_plmn);
 
 		return;
 	}
@@ -860,6 +885,18 @@ void ofono_ussd_driver_unregister(const struct ofono_ussd_driver *d)
 	g_drivers = g_slist_remove(g_drivers, (void *) d);
 }
 
+static void netreg_watch(struct ofono_atom *atom, enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_ussd *ussd = data;
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		ussd->netreg = NULL;
+		return;
+	}
+
+	ussd->netreg = __ofono_atom_get_data(atom);
+}
+
 static void ussd_unregister(struct ofono_atom *atom)
 {
 	struct ofono_ussd *ussd = __ofono_atom_get_data(atom);
@@ -893,6 +930,11 @@ static void ussd_unregister(struct ofono_atom *atom)
 					OFONO_SUPPLEMENTARY_SERVICES_INTERFACE);
 	g_dbus_unregister_interface(conn, path,
 					OFONO_SUPPLEMENTARY_SERVICES_INTERFACE);
+
+	if (ussd->netreg_watch) {
+		__ofono_modem_remove_atom_watch(modem, ussd->netreg_watch);
+		ussd->netreg_watch = 0;
+	}
 }
 
 static void ussd_remove(struct ofono_atom *atom)
@@ -976,6 +1018,8 @@ void ofono_ussd_register(struct ofono_ussd *ussd)
 				OFONO_SUPPLEMENTARY_SERVICES_INTERFACE);
 
 	__ofono_atom_register(ussd->atom, ussd_unregister);
+	ussd->netreg_watch = __ofono_modem_add_atom_watch(modem, OFONO_ATOM_TYPE_NETREG,
+							  netreg_watch, ussd, NULL);
 }
 
 void ofono_ussd_remove(struct ofono_ussd *ussd)

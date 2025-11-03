@@ -30,7 +30,7 @@
 #include <stdlib.h>
 
 #include <ell/ell.h>
-
+#include <ofono/types.h>
 #include "util.h"
 
 /*
@@ -3814,4 +3814,21 @@ bool is_ofono_interface_supported(enum ofono_interface interface)
 	}
 
 	return TRUE;
+}
+
+void get_covered_plmn_from_util(char *covered_plmn, const char *mcc, const char *mnc)
+{
+	char *ptr = covered_plmn;
+
+	if (mcc && mnc && *mcc && *mnc) {
+		for (int i = 0; mcc[i] != '\0'; i++) {
+			*ptr++ = mcc[i] - '0' + 'a';
+		}
+		for (int i = 0; mnc[i] != '\0'; i++) {
+			*ptr++ = mnc[i] - '0' + 'a';
+		}
+		*ptr = '\0';
+	} else {
+		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+	}
 }

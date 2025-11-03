@@ -35,6 +35,7 @@
 
 #include "common.h"
 #include "simutil.h"
+#include "util.h"
 
 #define CALL_FORWARDING_FLAG_CACHED	0x1
 #define CALL_FORWARDING_FLAG_CPHS_CFF	0x2
@@ -72,6 +73,8 @@ struct ofono_call_forwarding {
 	void *driver_data;
 	struct ofono_atom *atom;
 	GQueue *cf_queue;
+	struct ofono_netreg *netreg;
+	unsigned int netreg_watch;
 };
 
 struct cf_ss_request {
@@ -956,6 +959,20 @@ static DBusMessage *cf_disable_all(DBusConnection *conn, DBusMessage *msg,
 	return NULL;
 }
 
+static void get_covered_plmn(struct ofono_call_forwarding *cf, char *covered_plmn)
+{
+	const char *mcc;
+	const char *mnc;
+
+	if (cf->netreg == NULL) {
+		strncpy(covered_plmn, "unknow", OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1);
+		return;
+	}
+	mcc = ofono_netreg_get_mcc(cf->netreg);
+	mnc = ofono_netreg_get_mnc(cf->netreg);
+	get_covered_plmn_from_util(covered_plmn, mcc, mnc);
+}
+
 static void get_call_forwarding_cb(const struct ofono_error *error, int total,
 			const struct ofono_call_forwarding_condition *list,
 			void *data)
@@ -968,11 +985,14 @@ static void get_call_forwarding_cb(const struct ofono_error *error, int total,
 	char *number;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cf, covered_plmn);
 		ofono_error("Error get_call_forwarding_cb!");
 
 		reply = __ofono_error_failed(cf->pending);
 		__ofono_dbus_pending_reply(&cf->pending, reply);
-		OFONO_DFX_SS_INFO("ss:query call forwarding", "modem fail");
+		OFONO_DFX_SS_INFO("ss:query call forwarding", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -1006,11 +1026,14 @@ static void set_call_forwarding_cb(const struct ofono_error *error, void *data)
 	DBusMessage *reply;
 
 	if (error->type != OFONO_ERROR_TYPE_NO_ERROR) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cf, covered_plmn);
 		ofono_error("Error set_call_forwarding_cb!");
 
 		reply = __ofono_error_failed(cf->pending);
 		__ofono_dbus_pending_reply(&cf->pending, reply);
-		OFONO_DFX_SS_INFO("ss:set call forwarding", "modem fail");
+		OFONO_DFX_SS_INFO("ss:set call forwarding", "modem fail", covered_plmn);
 		return;
 	}
 
@@ -1033,8 +1056,11 @@ static DBusMessage *cf_get_call_forwarding(DBusConnection *conn,
 	}
 
 	if (cf->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cf, covered_plmn);
 		ofono_error("%s: Call forwarding is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:query call forwarding", "busy");
+		OFONO_DFX_SS_INFO("ss:query call forwarding", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1074,8 +1100,11 @@ static DBusMessage *cf_set_call_forwarding(DBusConnection *conn,
 	}
 
 	if (cf->pending) {
+		char covered_plmn[OFONO_MAX_MCC_LENGTH + OFONO_MAX_MNC_LENGTH + 1] = { '\0' };
+
+		get_covered_plmn(cf, covered_plmn);
 		ofono_error("%s: Call forwarding is currently busy.", __func__);
-		OFONO_DFX_SS_INFO("ss:set call forwarding", "busy");
+		OFONO_DFX_SS_INFO("ss:set call forwarding", "busy", covered_plmn);
 		return __ofono_error_busy(msg);
 	}
 
@@ -1729,6 +1758,11 @@ static void call_forwarding_unregister(struct ofono_atom *atom)
 
 	g_queue_free_full(cf->cf_queue, cf_free_pending_data);
 	cf->cf_queue = NULL;
+
+	if (cf->netreg_watch) {
+		__ofono_modem_remove_atom_watch(modem, cf->netreg_watch);
+		cf->netreg_watch = 0;
+	}
 }
 
 static void sim_cfis_changed(int id, void *userdata)
@@ -1864,6 +1898,18 @@ static void ussd_watch(struct ofono_atom *atom,
 	cf_register_ss_controls(cf);
 }
 
+static void netreg_watch(struct ofono_atom *atom, enum ofono_atom_watch_condition cond, void *data)
+{
+	struct ofono_call_forwarding *cf = data;
+
+	if (cond == OFONO_ATOM_WATCH_CONDITION_UNREGISTERED) {
+		cf->netreg = NULL;
+		return;
+	}
+
+	cf->netreg = __ofono_atom_get_data(atom);
+}
+
 void ofono_call_forwarding_register(struct ofono_call_forwarding *cf)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
@@ -1895,6 +1941,9 @@ void ofono_call_forwarding_register(struct ofono_call_forwarding *cf)
 	__ofono_atom_register(cf->atom, call_forwarding_unregister);
 
 	cf->cf_queue = g_queue_new();
+
+	cf->netreg_watch =
+		__ofono_modem_add_atom_watch(modem, OFONO_ATOM_TYPE_NETREG, netreg_watch, cf, NULL);
 }
 
 void ofono_call_forwarding_remove(struct ofono_call_forwarding *cf)
