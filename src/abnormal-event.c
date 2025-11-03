@@ -669,9 +669,7 @@ void ofono_handle_abnormal_event(struct ofono_modem *modem, int type_id, char *d
 			    ue_camp_cell_data->tac, ue_camp_cell_data->cell_id,
 			    ue_camp_cell_data->band, ue_camp_cell_data->earfcn,
 			    ue_camp_cell_data->pci);
-		if (!ofono_modem_check_and_save_band(modem, ue_camp_cell_data->band)) {
-			OFONO_DFX_BAND_INFO(ue_camp_cell_data->band);
-		}
+		ofono_modem_save_band_info(modem, ue_camp_cell_data->band);
 		break;
 	}
 	case OFONO_UE_SIM_INFO: {

@@ -2058,6 +2058,22 @@ static gboolean report_signal_level_info(gpointer user_data)
 	return TRUE;
 }
 
+void report_band_list(gpointer key, gpointer value, gpointer user_data)
+{
+	ofono_debug("%s:%d,%d", __func__, GPOINTER_TO_INT(key), GPOINTER_TO_INT(value));
+	OFONO_DFX_BAND_INFO(GPOINTER_TO_INT(key), GPOINTER_TO_INT(value));
+}
+
+void report_band_info(struct ofono_netreg *netreg)
+{
+	struct ofono_modem *modem = __ofono_atom_get_modem(netreg->atom);
+	GHashTable *camp_band_info = ofono_modem_get_camp_band_table(modem);
+	if (camp_band_info != NULL) {
+		g_hash_table_foreach(camp_band_info, report_band_list, NULL);
+		g_hash_table_remove_all(camp_band_info);
+	}
+}
+
 static gboolean report_rat_info(gpointer user_data)
 {
 	struct ofono_netreg *netreg = user_data;
@@ -2083,6 +2099,8 @@ static gboolean report_rat_info(gpointer user_data)
 	memset(netreg->rat_duration, 0, sizeof(netreg->rat_duration));
 
 	report_network_signal_change_unsol_count(netreg);
+
+	report_band_info(netreg);
 	return TRUE;
 }
 
@@ -2579,6 +2597,8 @@ static void netreg_unregister(struct ofono_atom *atom)
 
 	report_rat_info(netreg);
 	g_source_remove(netreg->rat_report_time_id);
+
+	report_band_info(netreg);
 }
 
 static void netreg_remove(struct ofono_atom *atom)
