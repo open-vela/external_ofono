@@ -3889,14 +3889,23 @@ void ofono_modem_process_radio_state(struct ofono_modem *modem, int radio_state)
 	radio_status_change(modem, old_radio_state, modem->radio_status);
 }
 
-ofono_bool_t ofono_modem_check_and_save_band(struct ofono_modem *modem,
-					     unsigned int band)
+void ofono_modem_save_band_info(struct ofono_modem *modem, unsigned int band)
 {
-	if (!g_hash_table_contains(modem->camp_band_info,
-				   GINT_TO_POINTER(band))) {
-		g_hash_table_insert(modem->camp_band_info,
-				    GINT_TO_POINTER(band), NULL);
-		return FALSE;
+	gpointer value = g_hash_table_lookup(modem->camp_band_info, GINT_TO_POINTER(band));
+	if (value == NULL) {
+		g_hash_table_insert(modem->camp_band_info, GINT_TO_POINTER(band),
+				    GINT_TO_POINTER(1));
+	} else {
+
+		g_hash_table_insert(modem->camp_band_info, GINT_TO_POINTER(band),
+				    GINT_TO_POINTER(GPOINTER_TO_INT(value) + 1));
 	}
-	return TRUE;
+}
+
+GHashTable* ofono_modem_get_camp_band_table(struct ofono_modem *modem)
+{
+	if (modem != NULL) {
+		return modem->camp_band_info;
+	}
+	return NULL;
 }

@@ -154,9 +154,10 @@ struct ofono_plmn_op_code {
 				  roaming_country_code, "plmn", covered_plmn);                     \
 	} while (0)
 
-#define OFONO_DFX_BAND_INFO(band)                                                                  \
+#define OFONO_DFX_BAND_INFO(band, count)                                                           \
 	do {                                                                                       \
-		sendEventMisightF(961040104, "%s:%d", "band_value", band);                         \
+		sendEventMisightF(923040104, "%s:%d,%s:%d", "band_value", band, "band_count",      \
+				  count);                                                          \
 	} while (0)
 
 #define OFONO_DFX_SIGNAL_LEVEL_DURATION(level0_duration, level1_duration, level2_duration,         \
@@ -268,7 +269,7 @@ struct ofono_plmn_op_code {
 #define OFONO_DFX_ROAMING_INFO(roaming_country_code, covered_plmn)                                 \
 	REPORT_DATA_LOG("%s,%d,%s", "ROAMING_INFO", roaming_country_code, covered_plmn)
 
-#define OFONO_DFX_BAND_INFO(band) REPORT_DATA_LOG("%s,%d", "BAND_INFO", band)
+#define OFONO_DFX_BAND_INFO(band, count) REPORT_DATA_LOG("%s,%d,%d", "BAND_INFO", band, count)
 
 #define OFONO_DFX_SIGNAL_LEVEL_DURATION(level0_duration, level1_duration, level2_duration,         \
 					level3_duration, level4_duration, level5_duration)         \

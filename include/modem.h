@@ -218,11 +218,11 @@ struct ofono_modem *ofono_modem_find(ofono_modem_compare_cb_t func,
 void ofono_modem_set_powered_timeout_hint(struct ofono_modem *modem,
 							unsigned int seconds);
 
-ofono_bool_t ofono_modem_check_and_save_band(struct ofono_modem *modem,
-					     unsigned int band);
+void ofono_modem_save_band_info(struct ofono_modem *modem, unsigned int band);
 
 void ofono_modem_upgrade_state(struct ofono_modem *modem, int state_value, int ext_info);
 
+GHashTable* ofono_modem_get_camp_band_table(struct ofono_modem *modem);
 #ifdef __cplusplus
 }
 #endif
