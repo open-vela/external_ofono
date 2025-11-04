@@ -3597,9 +3597,6 @@ static void modem_unregister(struct ofono_modem *modem)
 	if (modem->powered == TRUE)
 		set_powered(modem, FALSE);
 
-	__ofono_watchlist_free(modem->atom_watches);
-	modem->atom_watches = NULL;
-
 	__ofono_watchlist_free(modem->online_watches);
 	modem->online_watches = NULL;
 
@@ -3645,6 +3642,9 @@ static void modem_unregister(struct ofono_modem *modem)
 
 	if (modem->driver && modem->driver->remove)
 		modem->driver->remove(modem);
+
+	__ofono_watchlist_free(modem->atom_watches);
+	modem->atom_watches = NULL;
 
 	g_hash_table_destroy(modem->properties);
 	modem->properties = NULL;
