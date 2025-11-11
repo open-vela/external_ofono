@@ -110,31 +110,23 @@ int parcel_w_int32(struct parcel *p, int32_t val)
 
 int parcel_w_string(struct parcel *p, const char *str)
 {
-	gunichar2 *gs16;
-	glong gs16_len;
 	size_t len;
-	size_t gs16_size;
 
 	if (str == NULL) {
 		parcel_w_int32(p, -1);
 		return 0;
 	}
 
-	gs16 = g_utf8_to_utf16(str, -1, NULL, &gs16_len, NULL);
+	len = strlen(str);
 
-	if (parcel_w_int32(p, gs16_len) == -1)
+	if (parcel_w_int32(p, len++) == -1)
 		return -1;
 
-	gs16_size = gs16_len * sizeof(char16_t);
-	len = gs16_size + sizeof(char16_t);
 	for (;;) {
 		size_t padded = PAD_SIZE(len);
 
-		if (p->offset + len < p->capacity) {
-			/* There's enough space */
-			memcpy(p->data + p->offset, gs16, gs16_size);
-			*((char16_t *) (void *)
-				(p->data + p->offset + gs16_size)) = 0;
+		if (p->offset + padded <= p->capacity) {
+			memcpy(p->data + p->offset, str, len);
 			p->offset += padded;
 			p->size += padded;
 			if (padded != len) {
@@ -164,14 +156,13 @@ int parcel_w_string(struct parcel *p, const char *str)
 		}
 	}
 
-	g_free(gs16);
 	return 0;
 }
 
 char *parcel_r_string(struct parcel *p)
 {
 	char *ret;
-	int len16 = parcel_r_int32(p);
+	int len = parcel_r_int32(p);
 	int strbytes;
 
 	if (p->malformed) {
@@ -180,20 +171,19 @@ char *parcel_r_string(struct parcel *p)
 	}
 
 	/* This is how a null string is sent */
-	if (len16 < 0)
+	if (len < 0)
 		return NULL;
 
-	strbytes = PAD_SIZE((len16 + 1) * sizeof(char16_t));
+	strbytes = PAD_SIZE(len + 1);
 	if (p->offset + strbytes > p->size) {
 		ofono_error("%s: parcel is too small", __func__);
 		p->malformed = 1;
 		return NULL;
 	}
 
-	ret = g_utf16_to_utf8((gunichar2 *) (void *) (p->data + p->offset),
-				len16, NULL, NULL, NULL);
+	ret = g_strdup((const char *) (p->data + p->offset));
 	if (ret == NULL) {
-		ofono_error("%s: wrong UTF16 coding", __func__);
+		ofono_error("%s: g_strdup failed (out of memory)", __func__);
 		p->malformed = 1;
 		return NULL;
 	}
@@ -205,7 +195,7 @@ char *parcel_r_string(struct parcel *p)
 
 void parcel_skip_string(struct parcel *p)
 {
-	int len16 = parcel_r_int32(p);
+	int len = parcel_r_int32(p);
 	int strbytes;
 
 	if (p->malformed) {
@@ -214,10 +204,10 @@ void parcel_skip_string(struct parcel *p)
 	}
 
 	/* This is how a null string is sent */
-	if (len16 < 0)
+	if (len < 0)
 		return;
 
-	strbytes = PAD_SIZE((len16 + 1) * sizeof(char16_t));
+	strbytes = PAD_SIZE(len + 1);
 	if (p->offset + strbytes > p->size) {
 		p->malformed = 1;
 		return;
