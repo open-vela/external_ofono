@@ -40,8 +40,11 @@
 #define PAUSE ","
 #define WAIT ";"
 
+#ifdef CONFIG_OFONO_FIVE_SIGNAL_LEVEL
 static const int five_bar_rsrp_thresholds[] = {-140, -125, -115, -110, -102};
+#else
 static const int default_rsrp_thresholds[] = {-128, -118, -108, -98};
+#endif
 static const int default_rssi_thresholds[] = {-113, -107, -101, -95};
 
 struct error_entry {
@@ -1243,21 +1246,19 @@ int get_signal_level_from_rsrp(int rsrp)
 {
 	const int *threshold = NULL;
 	int length, level;
-	const char *support_env;
 
 	rsrp = in_range_or_unavailable(rsrp, -140, -43);
 	if (rsrp == INT_MAX)
 		return SIGNAL_STRENGTH_UNKNOWN;
 
 	// Check for 5-level signal support
-	support_env = getenv("OFONO_FIVE_SIGNAL_LEVEL_SUPPORT");
-	if (support_env != NULL && strcmp(support_env, "1") == 0) {
+#ifdef CONFIG_OFONO_FIVE_SIGNAL_LEVEL
 		threshold = five_bar_rsrp_thresholds;
 		length = sizeof(five_bar_rsrp_thresholds) / sizeof(int);
-	} else {
+#else
 		threshold = default_rsrp_thresholds;
 		length = sizeof(default_rsrp_thresholds) / sizeof(int);
-	}
+#endif
 
 	level = length;
 	while (level > 0 && rsrp < threshold[level - 1]) level--;
@@ -1289,22 +1290,22 @@ int get_signal_level_from_rssi(int rssi)
 	return level;
 }
 
-gboolean is_gprs_context_type_support(const char *gc_type) {
-	const char *gc_type_support;
-
-	gc_type_support = getenv("OFONO_GPRS_CONTEXT_TYPE_SUPPORT");
-	if (gc_type_support != NULL && strstr(gc_type_support, gc_type) != NULL)  {
+gboolean is_gprs_context_type_support(const char *gc_type)
+{
+	if (strstr(CONFIG_OFONO_GPRS_CONTEXT_TYPE, gc_type) != NULL) {
 		return TRUE;
-	} else {
-		ofono_debug("not support for gprs context %s type ! \n", gc_type);
-		return FALSE;
 	}
+	return FALSE;
 }
 
 const int *get_signal_level_thresholds_info(int type)
 {
 	if (type == 0) {
+#ifdef CONFIG_OFONO_FIVE_SIGNAL_LEVEL
+		return five_bar_rsrp_thresholds;
+#else
 		return default_rsrp_thresholds;
+#endif
 	} else {
 		return default_rssi_thresholds;
 	}

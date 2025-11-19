@@ -1854,6 +1854,11 @@ int ofono_call_settings_driver_register(const struct ofono_call_settings_driver 
 {
 	DBG("driver: %p, name: %s", d, d->name);
 
+	if (!is_ofono_interface_supported(CALL_SETTINGS_INTERFACE)) {
+		ofono_debug("%s : not support for call setting! \n", __func__);
+		return 0;
+	}
+
 	if (d->probe == NULL)
 		return -EINVAL;
 
@@ -1933,6 +1938,11 @@ struct ofono_call_settings *ofono_call_settings_create(struct ofono_modem *modem
 {
 	struct ofono_call_settings *cs;
 	GSList *l;
+
+	if (!is_ofono_interface_supported(CALL_SETTINGS_INTERFACE)) {
+		ofono_debug("%s : not support for call setting! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

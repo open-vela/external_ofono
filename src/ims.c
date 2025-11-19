@@ -36,6 +36,7 @@
 
 #include "common.h"
 #include "storage.h"
+#include "util.h"
 
 #define SETTINGS_KEY "ims"
 #define SETTINGS_STORE "imssetting"
@@ -770,6 +771,11 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 	struct ofono_ims *ims;
 	GSList *l;
 
+	if (!is_ofono_interface_supported(IMS_INTERFACE)) {
+		ofono_debug("%s : not support for ims! \n", __func__);
+		return NULL;
+	}
+
 	if (driver == NULL)
 		return NULL;
 
@@ -807,6 +813,11 @@ struct ofono_ims *ofono_ims_create(struct ofono_modem *modem,
 int ofono_ims_driver_register(const struct ofono_ims_driver *d)
 {
 	DBG("driver: %p, name: %s", d, d->name);
+
+	if (!is_ofono_interface_supported(IMS_INTERFACE)) {
+		ofono_debug("%s : not support for ims! \n", __func__);
+		return 0;
+	}
 
 	if (d->probe == NULL)
 		return -EINVAL;

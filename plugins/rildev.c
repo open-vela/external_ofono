@@ -86,31 +86,13 @@ static int create_rilmodem(const char *ril_type, int slot)
 
 static int detect_init(void)
 {
-	const char *ril_type;
-	const char *multi_sim;
-	int num_slots = 1;
 	int i;
 
-	ril_type = getenv("OFONO_RIL_DEVICE");
-	if (ril_type == NULL)
-		return 0;
+	ofono_info("RILDEV detected modem type %s, %d SIM slot(s)", OFONO_RIL_DEVICE_TYPE,
+		   CONFIG_OFONO_RIL_NUM_SIM_SLOTS);
 
-	/* Check for multi-SIM support */
-	multi_sim = getenv("OFONO_RIL_NUM_SIM_SLOTS");
-	if (multi_sim != NULL && *multi_sim != '\0') {
-		int env_slots;
-		char *endp;
-
-		env_slots = (int) strtoul(multi_sim, &endp, 10);
-		if (*endp == '\0')
-			num_slots = env_slots;
-	}
-
-	ofono_info("RILDEV detected modem type %s, %d SIM slot(s)",
-			ril_type, num_slots);
-
-	for (i = 0; i < num_slots; ++i)
-		create_rilmodem(ril_type, i);
+	for (i = 0; i < CONFIG_OFONO_RIL_NUM_SIM_SLOTS; ++i)
+		create_rilmodem(OFONO_RIL_DEVICE_TYPE, i);
 
 	return 0;
 }
