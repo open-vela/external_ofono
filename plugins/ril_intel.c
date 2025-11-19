@@ -136,8 +136,7 @@ static int ril_probe(struct ofono_modem *modem)
 
 	rd = g_new0(struct ril_data, 1);
 
-	lte_cap = getenv("OFONO_RIL_RAT_LTE") ? TRUE : FALSE;
-	ofono_modem_set_boolean(modem, MODEM_PROP_LTE_CAPABLE, lte_cap);
+	ofono_modem_set_boolean(modem, MODEM_PROP_LTE_CAPABLE, OFONO_RIL_RAT_LTE_CAP);
 
 	ofono_modem_set_data(modem, rd);
 
@@ -542,8 +541,7 @@ static int ril_enable(struct ofono_modem *modem)
 		return -EIO;
 	}
 
-	if (getenv("OFONO_RIL_TRACE"))
-		g_ril_set_trace(rd->ril, TRUE);
+	g_ril_set_trace(rd->ril, OFONO_RIL_TRACE);
 
 	if (getenv("OFONO_RIL_HEX_TRACE"))
 		g_ril_set_debugf(rd->ril, ril_debug, "IntelModem:");

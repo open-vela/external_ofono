@@ -1811,6 +1811,11 @@ int ofono_call_forwarding_driver_register(
 {
 	DBG("driver: %p, name: %s", d, d->name);
 
+	if (!is_ofono_interface_supported(CALL_FORWARDING_INTERFACE)) {
+		ofono_debug("%s : not support for call forwarding! \n", __func__);
+		return 0;
+	}
+
 	if (d->probe == NULL)
 		return -EINVAL;
 
@@ -1856,6 +1861,11 @@ struct ofono_call_forwarding *ofono_call_forwarding_create(
 {
 	struct ofono_call_forwarding *cf;
 	GSList *l;
+
+	if (!is_ofono_interface_supported(CALL_FORWARDING_INTERFACE)) {
+		ofono_debug("%s : not support for call forwarding! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

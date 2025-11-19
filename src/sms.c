@@ -2319,6 +2319,10 @@ int ofono_sms_driver_register(const struct ofono_sms_driver *d)
 {
 	DBG("driver: %p, name: %s", d, d->name);
 
+	if (!is_ofono_interface_supported(MESSAGE_MANAGER_INTERFACE)) {
+		ofono_debug("%s : not support for message manager! \n", __func__);
+		return 0;
+	}
 	if (d->probe == NULL)
 		return -EINVAL;
 
@@ -2467,6 +2471,11 @@ struct ofono_sms *ofono_sms_create(struct ofono_modem *modem,
 {
 	struct ofono_sms *sms;
 	GSList *l;
+
+	if (!is_ofono_interface_supported(MESSAGE_MANAGER_INTERFACE)) {
+		ofono_debug("%s : not support for message manager! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

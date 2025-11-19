@@ -37,6 +37,9 @@ understanding that oFono hasn't reached a stable API."
 #define OFONO_PLUGIN_PRIORITY_LOW      -100
 #define OFONO_PLUGIN_PRIORITY_DEFAULT     0
 #define OFONO_PLUGIN_PRIORITY_HIGH      100
+#define OFONO_RIL_DEVICE_TYPE "ril"
+#define OFONO_RIL_RAT_LTE_CAP TRUE
+#define OFONO_RIL_TRACE TRUE
 
 /**
  * SECTION:plugin

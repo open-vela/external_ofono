@@ -38,6 +38,7 @@
 #include "smsutil.h"
 #include "storage.h"
 #include "missing.h"
+#include "util.h"
 
 #define MAX_VOICE_CALLS 16
 #define MAX_IMS_CONFERENCE_CALLS 5
@@ -4020,6 +4021,10 @@ int ofono_voicecall_driver_register(const struct ofono_voicecall_driver *d)
 {
 	DBG("driver: %p, name: %s", d, d->name);
 
+	if (!is_ofono_interface_supported(VOICECALL_MANAGER_INTERFACE)) {
+		ofono_debug("%s : not support for voice call! \n", __func__);
+		return 0;
+	}
 	if (d->probe == NULL)
 		return -EINVAL;
 
@@ -4177,6 +4182,11 @@ struct ofono_voicecall *ofono_voicecall_create(struct ofono_modem *modem,
 {
 	struct ofono_voicecall *vc;
 	GSList *l;
+
+	if (!is_ofono_interface_supported(VOICECALL_MANAGER_INTERFACE)) {
+		ofono_debug("%s : not support for voice call! \n", __func__);
+		return NULL;
+	}
 
 	if (driver == NULL)
 		return NULL;

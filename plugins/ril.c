@@ -154,7 +154,6 @@ static void ril_radio_state_changed(struct ril_msg *message, gpointer user_data)
 
 int ril_create(struct ofono_modem *modem, enum ofono_ril_vendor vendor)
 {
-	ofono_bool_t lte_cap;
 	struct ril_data *rd = g_try_new0(struct ril_data, 1);
 	if (rd == NULL) {
 		errno = ENOMEM;
@@ -168,8 +167,7 @@ int ril_create(struct ofono_modem *modem, enum ofono_ril_vendor vendor)
 	rd->radio_state = RADIO_STATE_OFF;
 	rd->sim_watch_for_phonebook = 0;
 
-	lte_cap = getenv("OFONO_RIL_RAT_LTE") ? TRUE : FALSE;
-	ofono_modem_set_boolean(modem, MODEM_PROP_LTE_CAPABLE, lte_cap);
+	ofono_modem_set_boolean(modem, MODEM_PROP_LTE_CAPABLE, OFONO_RIL_RAT_LTE_CAP);
 
 	ofono_modem_set_data(modem, rd);
 
@@ -517,8 +515,7 @@ static int create_gril(struct ofono_modem *modem)
 	}
 	g_ril_set_slot(rd->ril, slot_id);
 
-	if (getenv("OFONO_RIL_TRACE"))
-		g_ril_set_trace(rd->ril, TRUE);
+	g_ril_set_trace(rd->ril, OFONO_RIL_TRACE);
 
 	if (getenv("OFONO_RIL_HEX_TRACE"))
 		g_ril_set_debugf(rd->ril, ril_debug, GRIL_HEX_PREFIX[slot_id]);
