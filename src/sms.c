@@ -416,7 +416,7 @@ static DBusMessage *generate_get_properties_reply(struct ofono_sms *sms,
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create D-Bus method return message.", __func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -1557,7 +1557,7 @@ static DBusMessage *sms_get_messages(DBusConnection *conn, DBusMessage *msg,
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create DBus method return message.", __func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);

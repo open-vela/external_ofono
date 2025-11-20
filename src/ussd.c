@@ -817,7 +817,7 @@ static DBusMessage *ussd_get_properties(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create DBus method return message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);

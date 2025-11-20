@@ -288,7 +288,7 @@ static DBusMessage *generate_export_entries_reply(struct ofono_phonebook *pb,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to allocate D-Bus reply message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -515,7 +515,7 @@ static DBusMessage *generate_fdn_export_entries_reply(struct ofono_phonebook *pb
 	if (reply == NULL) {
 		ofono_error("%s: Failed to allocate D-Bus reply message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);

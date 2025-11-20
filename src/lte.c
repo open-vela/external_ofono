@@ -158,8 +158,8 @@ static DBusMessage *lte_get_properties(DBusConnection *conn,
 
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL) {
-		 ofono_error("%s: Failed to create D-Bus method return message.", __func__);
-		return NULL;
+		ofono_error("%s: Failed to create D-Bus method return message.", __func__);
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);

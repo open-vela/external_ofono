@@ -292,6 +292,13 @@ DBusMessage *__ofono_error_code_args(DBusMessage *msg, int error_code)
 					".ErrorCodeArguments", "%d", error_code);
 }
 
+DBusMessage *__ofono_error_no_memory(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg, OFONO_ERROR_INTERFACE
+					".NoMemory",
+					"Memory allocation failed");
+}
+
 DBusMessage *__ofono_error_invalid_args(DBusMessage *msg)
 {
 	return g_dbus_create_error(msg, OFONO_ERROR_INTERFACE

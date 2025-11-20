@@ -967,7 +967,7 @@ static DBusMessage *generate_get_properties_reply(struct ofono_call_settings *cs
 	if (reply == NULL) {
 		ofono_error("%s: Failed to allocate D-Bus reply message for call forwarding", 
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
