@@ -1006,7 +1006,7 @@ static DBusMessage *pri_get_properties(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to allocate D-Bus reply message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -2320,7 +2320,7 @@ static DBusMessage *gprs_get_properties(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create a new D-Bus method return message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -3287,7 +3287,7 @@ static DBusMessage *gprs_get_contexts(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create DBus method return message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -3529,7 +3529,7 @@ static DBusMessage *gprs_reset_contexts(DBusConnection *conn,
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create DBus method return message.", __func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	/* Remove first the current contexts, re-provision after */

@@ -1373,7 +1373,7 @@ static DBusMessage *modem_get_properties(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Modem [%s] - Failed to create D-Bus reply message",
 			__func__, ofono_modem_get_path(modem));
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -2307,7 +2307,7 @@ static DBusMessage *modem_handle_command(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Modem [%s] - Failed to create D-Bus reply message",
 		 	__func__, ofono_modem_get_path(modem));
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	if (dbus_message_get_args(msg, NULL,

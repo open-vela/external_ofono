@@ -619,7 +619,7 @@ static DBusMessage *voicecall_get_properties(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create DBus method return message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -1425,7 +1425,7 @@ static DBusMessage *manager_get_properties(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to allocate D-Bus reply message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
@@ -1928,7 +1928,7 @@ static DBusMessage *manager_dial_memory(DBusConnection *conn,
        int err;
 
        if (vc->pending || vc->dial_req)
-               return __ofono_error_busy(msg);
+               return __ofono_error_no_memory(msg);
 
        if (dbus_message_get_args(msg, NULL, DBUS_TYPE_UINT32, &memory_location,
                                        DBUS_TYPE_INVALID) == FALSE)
@@ -2824,7 +2824,7 @@ static DBusMessage *manager_get_calls(DBusConnection *conn,
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create a new D-Bus method return message.",
 			__func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);

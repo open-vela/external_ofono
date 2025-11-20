@@ -64,7 +64,7 @@ static DBusMessage *message_get_properties(DBusConnection *conn,
 
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL)
-		return NULL;
+		return __ofono_error_no_memory(msg);
 
 	dbus_message_iter_init_append(reply, &iter);
 

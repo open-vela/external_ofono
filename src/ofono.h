@@ -50,6 +50,7 @@ int __ofono_dbus_init(DBusConnection *conn);
 void __ofono_dbus_cleanup(void);
 
 DBusMessage *__ofono_error_code_args(DBusMessage *msg, int error_code);
+DBusMessage *__ofono_error_no_memory(DBusMessage *msg);
 DBusMessage *__ofono_error_invalid_args(DBusMessage *msg);
 DBusMessage *__ofono_error_invalid_format(DBusMessage *msg);
 DBusMessage *__ofono_error_not_implemented(DBusMessage *msg);

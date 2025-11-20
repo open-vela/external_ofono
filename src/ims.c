@@ -217,7 +217,7 @@ static DBusMessage *ims_get_properties(DBusConnection *conn,
 	reply = dbus_message_new_method_return(msg);
 	if (reply == NULL) {
 		ofono_error("%s: Failed to create DBus reply message.", __func__);
-		return NULL;
+		return __ofono_error_no_memory(msg);
 	}
 
 	dbus_message_iter_init_append(reply, &iter);
