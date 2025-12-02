@@ -4120,7 +4120,14 @@ static void voicecall_unregister(struct ofono_atom *atom)
 		dial_request_finish(vc);
 
 	for (l = vc->call_list; l; l = l->next)
-		voicecall_dbus_unregister(vc, l->data);
+	{
+		struct voicecall *v = l->data;
+		if (v->call->status != CALL_STATUS_DISCONNECTED) {
+			voicecall_set_call_status(v, CALL_STATUS_DISCONNECTED);
+			voicecalls_emit_call_changed(vc, v);
+		}
+		voicecall_dbus_unregister(vc, v);
+	}
 
 	g_slist_free(vc->call_list);
 	vc->call_list = NULL;
