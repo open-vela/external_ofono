@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+#include <glib.h>
 #include <ofono/types.h>
 
 struct ofono_modem;
