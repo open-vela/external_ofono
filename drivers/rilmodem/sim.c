@@ -97,6 +97,8 @@ struct sim_data {
 	struct ofono_modem *modem;
 	ofono_sim_state_event_cb_t ril_state_watch;
 	ofono_bool_t unlock_pending;
+	guint sim_register_id;
+	guint sim_status_id;
 };
 
 struct change_state_cbd {
@@ -1555,7 +1557,11 @@ static gboolean listen_and_get_sim_status(gpointer user)
 	struct ofono_sim *sim = user;
 	struct sim_data *sd = ofono_sim_get_data(sim);
 
-	DBG("");
+	if (sd == NULL) {
+		ofono_debug("%s, sim driver data is NULL", __func__);
+		return FALSE;
+	}
+	sd->sim_status_id = 0;
 
 	send_get_sim_status(sim);
 
@@ -1578,7 +1584,9 @@ static gboolean listen_and_get_sim_status(gpointer user)
 static gboolean ril_sim_register(gpointer user)
 {
 	struct ofono_sim *sim = user;
+	struct sim_data *sd = ofono_sim_get_data(sim);
 
+	sd->sim_register_id = 0;
 	ofono_debug("ril_sim_register");
 
 	ofono_sim_register(sim);
@@ -1588,7 +1596,7 @@ static gboolean ril_sim_register(gpointer user)
 	 * interface is signalled before signalling anything else from the said
 	 * interface, as ofono_sim_register also uses g_idle_add.
 	 */
-	g_idle_add(listen_and_get_sim_status, sim);
+	sd->sim_status_id = g_idle_add(listen_and_get_sim_status, sim);
 
 	return FALSE;
 }
@@ -1600,7 +1608,7 @@ static int ril_sim_probe(struct ofono_sim *sim, unsigned int vendor,
 	struct sim_data *sd;
 	int i;
 
-	DBG("");
+	ofono_debug("%s", __func__);
 
 	sd = g_new0(struct sim_data, 1);
 	sd->ril = g_ril_clone(ril);
@@ -1626,7 +1634,7 @@ static int ril_sim_probe(struct ofono_sim *sim, unsigned int vendor,
 	 * call register in the callback; we use an idle event
 	 * instead.
 	 */
-	g_idle_add(ril_sim_register, sim);
+	sd->sim_register_id = g_idle_add(ril_sim_register, sim);
 
 	return 0;
 }
@@ -1720,6 +1728,12 @@ static void ril_sim_remove(struct ofono_sim *sim)
 
 	g_ril_unref(sd->ril);
 	g_free(sd->aid_str);
+	if (sd->sim_register_id > 0) {
+		g_source_remove(sd->sim_register_id);
+	}
+	if (sd->sim_status_id > 0) {
+		g_source_remove(sd->sim_status_id);
+	}
 	g_free(sd);
 }
 
