@@ -4391,12 +4391,15 @@ static void sim_remove(struct ofono_atom *atom)
 {
 	struct ofono_sim *sim = __ofono_atom_get_data(atom);
 
-	DBG("atom: %p", atom);
+	ofono_debug("%s:atom: %p", __func__, atom);
 
-	if (sim == NULL)
+	if (sim == NULL) {
+		ofono_error("sim is NULL in %s", __func__);
 		return;
+	}
 
 	if (sim->pending != NULL) {
+		ofono_error("sim pending in %s is not null", __func__);
 		DBusMessage *reply = __ofono_error_failed(sim->pending);
 		__ofono_dbus_pending_reply(&sim->pending, reply);
 	}
